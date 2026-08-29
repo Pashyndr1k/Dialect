@@ -1,12 +1,14 @@
 //! The Tauri host.
 //!
 //! Deliberately thin. The compiler is portable TypeScript shared with the CLI,
-//! so nothing about prompts, schemas or rules lives here. This side owns only
-//! what a web view must not be trusted with: the credential, and the request
-//! that carries it.
+//! so nothing about prompts, schemas or rules lives here. This side owns what a
+//! web view cannot own for itself: the credential and the request that carries
+//! it, and anything that has to outlive the window — the cache of answers
+//! already paid for, and a record of what was on screen.
 
 mod anthropic;
 mod secrets;
+mod store;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -18,6 +20,13 @@ pub fn run() {
             secrets::secret_has,
             secrets::secret_delete,
             anthropic::anthropic_extract,
+            store::cache_get,
+            store::cache_set,
+            store::cache_stats,
+            store::cache_clear,
+            store::session_get,
+            store::session_set,
+            store::session_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

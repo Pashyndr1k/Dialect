@@ -1,0 +1,268 @@
+//! What survives closing the window.
+//!
+//! Two things, for two different reasons.
+//!
+//! The cache holds answers that were paid for. Keyed by the hash of the image
+//! and the question, so re-reading a reference the app has seen before costs
+//! nothing — which is the whole reason it exists, and the reason it has to
+//! outlive the process.
+//!
+//! The session holds what the window was showing: which references were read
+//! and what came back. The files themselves cannot be kept — a dropped file is
+//! gone once the page reloads — so this is a record, not a resumable job. Drop
+//! the same folder again and the cache makes it free.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use serde::Serialize;
+use tauri::{AppHandle, Manager};
+
+/// The gateway's keys are sha256 hex. Anything else is not ours to write, and
+/// is the shape a path traversal would arrive in.
+fn checked_key(key: &str) -> Result<&str, String> {
+    let ok = key.len() == 64 && key.bytes().all(|b| b.is_ascii_hexdigit());
+    if ok {
+        Ok(key)
+    } else {
+        Err(format!("Not a cache key: {key}"))
+    }
+}
+
+fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map_err(|e| format!("No place to keep data: {e}"))
+}
+
+fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = data_dir(app)?.join("cache");
+    fs::create_dir_all(&dir).map_err(|e| format!("Could not make the cache directory: {e}"))?;
+    Ok(dir)
+}
+
+/// Everything below takes a directory rather than an `AppHandle`, so it can be
+/// tested against a real one. The commands only resolve where that is.
+pub fn read_entry(dir: &Path, key: &str) -> Result<Option<String>, String> {
+    let path = dir.join(format!("{}.json", checked_key(key)?));
+    match fs::read_to_string(&path) {
+        Ok(text) => Ok(Some(text)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("Could not read a cached answer: {e}")),
+    }
+}
+
+pub fn write_entry(dir: &Path, key: &str, value: &str) -> Result<(), String> {
+    let path = dir.join(format!("{}.json", checked_key(key)?));
+
+    // Written aside and renamed, so a crash mid-write leaves the old entry or
+    // none — never half of one, which would fail to parse forever.
+    let temp = dir.join(format!("{}.{}.tmp", checked_key(key)?, std::process::id()));
+    fs::write(&temp, value).map_err(|e| format!("Could not write a cached answer: {e}"))?;
+    fs::rename(&temp, &path).map_err(|e| format!("Could not store a cached answer: {e}"))
+}
+
+#[tauri::command]
+pub fn cache_get(app: AppHandle, key: String) -> Result<Option<String>, String> {
+    read_entry(&cache_dir(&app)?, &key)
+}
+
+#[tauri::command]
+pub fn cache_set(app: AppHandle, key: String, value: String) -> Result<(), String> {
+    write_entry(&cache_dir(&app)?, &key, &value)
+}
+
+#[derive(Serialize)]
+pub struct CacheStats {
+    entries: u64,
+    bytes: u64,
+}
+
+/// What the cache is holding, so the settings panel can say what clearing costs.
+pub fn stats_in(dir: &Path) -> Result<CacheStats, String> {
+    let mut stats = CacheStats { entries: 0, bytes: 0 };
+
+    for entry in fs::read_dir(dir).map_err(|e| format!("Could not read the cache: {e}"))? {
+        let entry = entry.map_err(|e| format!("Could not read the cache: {e}"))?;
+        if entry.path().extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        if let Ok(meta) = entry.metadata() {
+            stats.entries += 1;
+            stats.bytes += meta.len();
+        }
+    }
+    Ok(stats)
+}
+
+#[tauri::command]
+pub fn cache_stats(app: AppHandle) -> Result<CacheStats, String> {
+    stats_in(&cache_dir(&app)?)
+}
+
+pub fn clear_in(dir: &Path) -> Result<u64, String> {
+    let mut removed = 0;
+
+    for entry in fs::read_dir(dir).map_err(|e| format!("Could not read the cache: {e}"))? {
+        let entry = entry.map_err(|e| format!("Could not read the cache: {e}"))?;
+        if entry.path().extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        if fs::remove_file(entry.path()).is_ok() {
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+#[tauri::command]
+pub fn cache_clear(app: AppHandle) -> Result<u64, String> {
+    clear_in(&cache_dir(&app)?)
+}
+
+// ---------------------------------------------------------------------------
+// The session
+// ---------------------------------------------------------------------------
+
+fn session_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = data_dir(app)?;
+    fs::create_dir_all(&dir).map_err(|e| format!("Could not make the data directory: {e}"))?;
+    Ok(dir.join("session.json"))
+}
+
+pub fn read_session(path: &Path) -> Result<Option<String>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some(text)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("Could not read the last session: {e}")),
+    }
+}
+
+pub fn write_session(path: &Path, value: &str) -> Result<(), String> {
+    let temp = path.with_extension("tmp");
+    fs::write(&temp, value).map_err(|e| format!("Could not write the session: {e}"))?;
+    fs::rename(&temp, path).map_err(|e| format!("Could not store the session: {e}"))
+}
+
+pub fn remove_session(path: &Path) -> Result<(), String> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("Could not clear the session: {e}")),
+    }
+}
+
+#[tauri::command]
+pub fn session_get(app: AppHandle) -> Result<Option<String>, String> {
+    read_session(&session_path(&app)?)
+}
+
+#[tauri::command]
+pub fn session_set(app: AppHandle, value: String) -> Result<(), String> {
+    write_session(&session_path(&app)?, &value)
+}
+
+#[tauri::command]
+pub fn session_clear(app: AppHandle) -> Result<(), String> {
+    remove_session(&session_path(&app)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("dialect-store-{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    const KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const OTHER: &str = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+
+    #[test]
+    fn only_accepts_the_shape_the_gateway_produces() {
+        assert!(checked_key(KEY).is_ok());
+
+        // The bad shapes include the one a path traversal would arrive in.
+        for bad in ["", "abc", "../../etc/passwd", &"g".repeat(64), &"a".repeat(63)] {
+            assert!(checked_key(bad).is_err(), "{bad} should have been refused");
+        }
+    }
+
+    #[test]
+    fn an_answer_survives_being_written_and_read_back() {
+        let dir = scratch("roundtrip");
+
+        assert_eq!(read_entry(&dir, KEY).unwrap(), None);
+
+        write_entry(&dir, KEY, r#"{"headline":"a bottle"}"#).unwrap();
+        assert_eq!(
+            read_entry(&dir, KEY).unwrap().as_deref(),
+            Some(r#"{"headline":"a bottle"}"#)
+        );
+
+        // Overwriting keeps the latest, not both.
+        write_entry(&dir, KEY, r#"{"headline":"a different bottle"}"#).unwrap();
+        assert!(read_entry(&dir, KEY).unwrap().unwrap().contains("different"));
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn leaves_no_temporary_file_behind() {
+        let dir = scratch("temp");
+        write_entry(&dir, KEY, "{}").unwrap();
+
+        let names: Vec<String> = fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+
+        assert_eq!(names, vec![format!("{KEY}.json")]);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_session_survives_being_written_and_read_back() {
+        let dir = scratch("session");
+        let path = dir.join("session.json");
+
+        // Nothing yet is not an error; it is a first run.
+        assert_eq!(read_session(&path).unwrap(), None);
+
+        write_session(&path, r#"{"version":1,"target":"nano-banana-2"}"#).unwrap();
+        assert!(read_session(&path).unwrap().unwrap().contains("nano-banana-2"));
+
+        // The next write replaces it rather than appending.
+        write_session(&path, r#"{"version":1,"target":"kling-3-omni"}"#).unwrap();
+        let text = read_session(&path).unwrap().unwrap();
+        assert!(text.contains("kling-3-omni"));
+        assert!(!text.contains("nano-banana-2"));
+
+        remove_session(&path).unwrap();
+        assert_eq!(read_session(&path).unwrap(), None);
+        // Clearing something already gone is not an error.
+        remove_session(&path).unwrap();
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn counts_and_clears_what_it_holds() {
+        let dir = scratch("stats");
+        write_entry(&dir, KEY, "{\"a\":1}").unwrap();
+        write_entry(&dir, OTHER, "{\"b\":2}").unwrap();
+
+        let stats = stats_in(&dir).unwrap();
+        assert_eq!(stats.entries, 2);
+        assert!(stats.bytes > 0);
+
+        assert_eq!(clear_in(&dir).unwrap(), 2);
+        assert_eq!(stats_in(&dir).unwrap().entries, 0);
+        assert_eq!(read_entry(&dir, KEY).unwrap(), None);
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+}

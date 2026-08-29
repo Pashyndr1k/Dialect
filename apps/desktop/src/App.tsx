@@ -14,6 +14,7 @@ import { Batch, type BatchItem } from './Batch.tsx';
 import { Fields } from './Fields.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
+import { HostCache, loadSession, saveSession, SESSION_VERSION, type Session } from './store.ts';
 import { profiles, registry } from './registry.ts';
 import { Settings } from './Settings.tsx';
 import videoExample from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
@@ -31,6 +32,7 @@ const exampleFor = (family: string): unknown => (family === 'video' ? videoExamp
  * survive between drops. Re-reading the same reference costs nothing.
  */
 const gateway = new Gateway(new HostProvider(), {
+  cache: new HostCache(),
   budgetUsd: 5,
   onSpend: (_usage, total) => window.dispatchEvent(new CustomEvent('dialect:spend', { detail: total })),
 });
@@ -88,6 +90,58 @@ export function App() {
     window.addEventListener('dialect:spend', onSpend);
     return () => window.removeEventListener('dialect:spend', onSpend);
   }, []);
+
+  // What the window was showing last time. The files themselves cannot come
+  // back — a dropped file is gone once the page reloads — so this restores the
+  // record and their results, and the cache makes re-reading them free.
+  const restored = useRef(false);
+  useEffect(() => {
+    void loadSession().then((session) => {
+      restored.current = true;
+      if (!session) return;
+
+      if (registry.profiles.has(session.target)) setTarget(session.target);
+      if (session.ir) setIrText(JSON.stringify(session.ir, null, 2));
+      setSpent(session.spentUsd);
+
+      if (session.items.length > 0) {
+        for (const item of session.items) {
+          if (item.ir) results.current.set(item.id, item.ir);
+        }
+        setBatch(
+          session.items.map(({ ir: _ir, ...item }) => ({
+            ...item,
+            // Nothing is staged after a restart: the files are gone.
+            state: item.state === 'done' ? ('done' as const) : ('failed' as const),
+            ...(item.state === 'done' ? {} : { error: 'not read before the window closed' }),
+          })),
+        );
+      }
+    });
+  }, []);
+
+  // Saved after every change, but never before the restore has run — an empty
+  // first render must not overwrite what is on disk.
+  useEffect(() => {
+    if (!restored.current) return;
+
+    const session: Session = {
+      version: SESSION_VERSION,
+      target,
+      items: batch.map((item) => {
+        const ir = results.current.get(item.id);
+        return ir ? { ...item, ir } : item;
+      }),
+      spentUsd: spent,
+      // Parsed here rather than reaching for the memo below: an effect that
+      // refers to something declared a hundred lines later reads like a bug.
+      ...(() => {
+        const current = parseIR(irText);
+        return 'error' in current ? {} : { ir: current.ir };
+      })(),
+    };
+    void saveSession(session);
+  }, [batch, target, spent, irText]);
 
   const readOne = async (file: File): Promise<PromptIR> => {
     const { ir: extracted } = await extractFromImage(

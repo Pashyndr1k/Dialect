@@ -321,3 +321,6 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   border-radius: 3px; padding: 2px 6px; margin-left: -10px;
   font-variant-numeric: tabular-nums;
 }
+
+.sheet-sep { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.sheet-sub { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--ink); }

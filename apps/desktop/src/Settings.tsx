@@ -6,6 +6,7 @@ import {
   setSecret,
   type SecretStatus,
 } from './secrets.ts';
+import { cacheStats, clearCache, type CacheStats } from './store.ts';
 
 const STORE_LABEL: Record<SecretStatus['store'], string> = {
   os: 'the operating system credential store',
@@ -18,6 +19,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [cache, setCache] = useState<CacheStats | null>(null);
 
   const refresh = (): void => {
     secretStatus(ANTHROPIC_KEY).then(setStatus, (e: unknown) =>
@@ -26,6 +28,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
   };
 
   useEffect(refresh, []);
+  useEffect(() => {
+    void cacheStats().then(setCache);
+  }, []);
 
   const run = async (action: () => Promise<void>): Promise<void> => {
     setBusy(true);
@@ -119,6 +124,35 @@ export function Settings({ onClose }: { onClose: () => void }) {
         ) : null}
 
         {error ? <p className="sheet-err">{error}</p> : null}
+
+        <div className="sheet-sep">
+          <h3 className="sheet-sub">Answers already paid for</h3>
+          <p className="sheet-p">
+            Every reference that has been read is kept, so reading it again costs nothing —
+            including after the window is closed. Clearing means paying for those again.
+          </p>
+          <div className="sheet-row">
+            <button
+              className="ghost"
+              disabled={busy || !cache || cache.entries === 0}
+              onClick={() =>
+                void run(async () => {
+                  await clearCache();
+                  setCache(await cacheStats());
+                })
+              }
+            >
+              Clear the cache
+            </button>
+            <span className="state">
+              {cache === null
+                ? 'kept in memory only, until the desktop app runs it'
+                : cache.entries === 0
+                  ? 'nothing kept yet'
+                  : `${cache.entries} reference${cache.entries === 1 ? '' : 's'}, ${(cache.bytes / 1024).toFixed(0)} kB`}
+            </span>
+          </div>
+        </div>
 
         <p className="sheet-p dim">
           Keys are issued at{' '}

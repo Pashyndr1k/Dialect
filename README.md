@@ -40,6 +40,7 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Engine rules | 11 implemented, each with its own file, source and tests |
 | Templates | partial IR with variables, snippets and inheritance |
 | Batch | resumable queue, persistent cache, budget across restarts |
+| Survives a restart | answers already paid for, and what was on screen |
 | Job routing | `bestFor` matching, exposed via `dialect targets --job` |
 | Extraction | reference image to IR, behind a provider-agnostic gateway |
 | Provider gateway | content-addressed cache, budget cap, spend reporting |
@@ -155,6 +156,25 @@ rather than in whichever surface is driving it:
   a file that is not an image is not.
 - **Running out of budget stops the run**, rather than burning through the
   remainder failing one at a time. The items that never ran stay queued.
+
+## What survives closing the window
+
+Two things, for two different reasons, and both kept by the host because a web
+view cannot keep either for itself.
+
+**The cache** holds answers that were paid for, keyed by the hash of the image
+and the question. Read a reference once and reading it again is free — after a
+restart as much as before one. Settings says how much is kept and offers to
+clear it, which is the only way to end up paying twice.
+
+**The session** holds what was on screen: which references were read and what
+came back. The files themselves cannot be kept — a dropped file is gone once
+the page reloads — so this is a record rather than a resumable job. Drop the
+same folder again and the cache makes it free.
+
+Everything is written aside and renamed, so a crash leaves the old copy or none,
+never half of one. Cache keys are checked against the shape the gateway
+produces, which is also the shape a path traversal would have to arrive in.
 
 ## Spending money
 
