@@ -10,7 +10,7 @@
 import type { PromptIR } from '../ir/types.ts';
 import type { ModelProfile } from '../registry/types.ts';
 import type { RenderResult, Segment } from './types.ts';
-import { RendererError, joinParts } from './types.ts';
+import { RendererError, assembleText, joinParts } from './types.ts';
 
 const ID = 'field-list';
 
@@ -130,7 +130,8 @@ export function renderFieldList(ir: PromptIR, profile: ModelProfile): RenderResu
     segments.push({ label: field, from, text: value, source: 'ir' });
   }
 
-  const text = segments.map((s) => `${s.label}: ${s.text}`).join('\n\n');
+  const assembly = { separator: '\n\n', labelled: true };
+  const text = assembleText({ segments, assembly });
 
   const params: Record<string, string> = {};
   if (ir.shot?.aspectRatio) params['aspect_ratio'] = ir.shot.aspectRatio;
@@ -139,6 +140,6 @@ export function renderFieldList(ir: PromptIR, profile: ModelProfile): RenderResu
   }
 
   return negative === undefined
-    ? { target: profile.id, segments, text, params }
-    : { target: profile.id, segments, text, negative, params };
+    ? { target: profile.id, segments, text, assembly, params }
+    : { target: profile.id, segments, text, assembly, negative, params };
 }

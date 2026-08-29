@@ -1,3 +1,4 @@
+import { assembleText } from '../../renderers/types.ts';
 import type { Rule } from '../types.ts';
 
 const ID = 'no-booster-words';
@@ -63,7 +64,9 @@ export const noBoosterWords: Rule = {
     if (hits.size === 0) return { result, findings: [] };
 
     const negative = result.negative === undefined ? undefined : strip(result.negative);
-    const text = segments.map((s) => `${s.label}: ${s.text}`).join('\n\n');
+    // Rebuild through the result's own assembly rules: this rule runs against
+    // every dialect and must not impose one form's joining on another.
+    const text = assembleText({ segments, assembly: result.assembly });
 
     const fixed = { ...result, segments, text };
     if (negative !== undefined) fixed.negative = negative;

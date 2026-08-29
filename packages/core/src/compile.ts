@@ -87,7 +87,6 @@ export function compile(
   const irPass = runIRRules(withDefaults, profile, rules);
 
   const findings: Finding[] = [...irPass.findings];
-  const blocked = blockingFindings(findings).length > 0;
 
   // A blocked document is still rendered so the editor can show what would have
   // been produced alongside the reason it will not ship.

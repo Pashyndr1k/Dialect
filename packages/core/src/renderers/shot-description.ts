@@ -12,7 +12,7 @@
 import type { PromptIR } from '../ir/types.ts';
 import type { ModelProfile } from '../registry/types.ts';
 import type { RenderResult, Segment } from './types.ts';
-import { joinParts } from './types.ts';
+import { assembleText, joinParts } from './types.ts';
 
 const SHOT_LABELS: Record<string, string> = {
   'extreme-wide': 'extreme wide shot',
@@ -133,19 +133,12 @@ export function renderShotDescription(ir: PromptIR, profile: ModelProfile): Rend
     push('Sound', ['sound'], parts.join(' '));
   }
 
-  const bodyText = segments
-    .filter((s) => s.label !== 'References')
-    .map((s) => s.text)
-    .join(' ');
+  const assembly = { separator: ' ', labelled: false, prefixLabel: 'References' };
+  const text = assembleText({ segments, assembly });
 
   const params: Record<string, string> = {};
   if (ir.shot?.aspectRatio) params['aspect_ratio'] = ir.shot.aspectRatio;
   if (ir.shot?.durationS !== undefined) params['duration'] = `${ir.shot.durationS} seconds`;
 
-  return {
-    target: profile.id,
-    segments,
-    text: refs ? `${refs} ${bodyText}` : bodyText,
-    params,
-  };
+  return { target: profile.id, segments, text, assembly, params };
 }

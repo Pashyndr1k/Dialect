@@ -14,12 +14,7 @@
 import type { PromptIR, TextInImage } from '../ir/types.ts';
 import type { ModelProfile } from '../registry/types.ts';
 import type { RenderResult, Segment } from './types.ts';
-import { joinParts } from './types.ts';
-
-/** A prompt reads as prose, so it opens like one. */
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+import { assembleText, joinParts } from './types.ts';
 
 /** Spelling a stubborn word out letter by letter is the documented escape hatch. */
 function spelled(word: string): string {
@@ -47,7 +42,8 @@ export function renderNatural(ir: PromptIR, profile: ModelProfile): RenderResult
   // Edit mode inverts the discipline: name the one thing that changes, then pin
   // everything else. "Fix the headline" fails; "change X, keep Y exactly" works.
   if (ir.mode === 'edit' && ir.edit) {
-    push('Change', ['edit.change'], ir.edit.change);
+    // Segments carry their own punctuation so assembly stays a pure join.
+    push('Change', ['edit.change'], `${ir.edit.change.replace(/\.$/, '')}.`);
     const keep = [...(ir.edit.keep ?? []), ...(ir.constraints?.locked ?? [])];
     push(
       'Keep',
@@ -55,17 +51,19 @@ export function renderNatural(ir: PromptIR, profile: ModelProfile): RenderResult
       keep.length > 0 ? `Keep ${joinParts(keep)} exactly unchanged.` : 'Keep everything else exactly unchanged.',
     );
 
-    const editText = capitalize(
-      segments
-        .filter((s) => s.label !== 'References')
-        .map((s) => (s.label === 'Change' ? `${s.text.replace(/\.$/, '')}.` : s.text))
-        .join(' '),
-    );
+    const editAssembly = {
+      separator: ' ',
+      labelled: false,
+      prefixLabel: 'References',
+      capitalize: true,
+      terminator: '.',
+    };
 
     return {
       target: profile.id,
       segments,
-      text: refs ? `${refs} ${editText}` : editText,
+      text: assembleText({ segments, assembly: editAssembly }),
+      assembly: editAssembly,
       params: {},
     };
   }
@@ -107,11 +105,15 @@ export function renderNatural(ir: PromptIR, profile: ModelProfile): RenderResult
     });
   }
 
-  const body = segments
-    .filter((s) => s.label !== 'References')
-    .map((s) => s.text.replace(/\.$/, ''))
-    .join('. ');
-  const text = `${refs ? `${refs} ` : ''}${capitalize(body)}.`;
+  const assembly = {
+    separator: '. ',
+    labelled: false,
+    stripTrailingPeriod: true,
+    terminator: '.',
+    prefixLabel: 'References',
+    capitalize: true,
+  };
+  const text = assembleText({ segments, assembly });
 
   const params: Record<string, string> = {};
   if (ir.shot?.aspectRatio) params['aspect_ratio'] = ir.shot.aspectRatio;
@@ -122,6 +124,6 @@ export function renderNatural(ir: PromptIR, profile: ModelProfile): RenderResult
   const avoid = ir.constraints?.avoid ?? [];
 
   return supportsNegative && avoid.length > 0
-    ? { target: profile.id, segments, text, negative: joinParts(avoid), params }
-    : { target: profile.id, segments, text, params };
+    ? { target: profile.id, segments, text, assembly, negative: joinParts(avoid), params }
+    : { target: profile.id, segments, text, assembly, params };
 }

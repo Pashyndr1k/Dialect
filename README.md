@@ -31,12 +31,19 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Engine rules | 5 implemented, 6 named and pending |
 | Job routing | `bestFor` matching, exposed via `dialect targets --job` |
 | CLI | `compile`, `targets` |
-| Desktop shell | waiting on the Rust + MSVC toolchain |
+| Desktop shell | Tauri 2 window, compiling live with a chip editor |
 
 ## Try it
 
+The window:
+
 ```bash
-npm install
+npm install && npm run tauri dev --prefix apps/desktop
+```
+
+Or the same compiler from a terminal:
+
+```bash
 node apps/cli/src/main.ts targets
 node apps/cli/src/main.ts compile packages/core/tests/golden/cowboy-saloon.ir.json --target kling-3-omni
 ```
@@ -66,8 +73,22 @@ packages/core     the compiler — no filesystem, no network, no platform APIs
   src/registry    model profiles as data, plus the loader and the job router
   src/renderers   one renderer per dialect *form*, not per model
   src/rules       engine rules, one file each, with source and date
-apps/cli          a thin surface over the same compile() the desktop app will use
+apps/cli          a thin surface over the same compile() the window uses
+apps/desktop      the Tauri window: React in src/, the host in src-tauri/
 ```
+
+## The window
+
+Two panes. The left holds the IR as JSON; the right holds the prompt it
+compiles to, live. Between them sit the chips: one per segment of the prompt,
+each switchable off, each rebuilt through the dialect's own joining rules
+rather than the editor's guess at them.
+
+Findings appear underneath, sorted with anything blocking first, each naming
+the rule that raised it and what to do about it.
+
+Switching the target recompiles from the same IR without touching a model. It
+is the clearest demonstration of why the compiler is shaped this way.
 
 ## Engine rules
 
@@ -88,9 +109,9 @@ gets switched off, not refactored around.
 
 ## Next
 
-The desktop shell is Tauri, pending the Rust toolchain and MSVC C++ build tools
-being installed. Nothing above depends on that: the compiler is portable
-TypeScript, and the same `compile()` will sit behind the window.
+The window still ships Tauri's placeholder icons, and the Rust host does
+nothing yet beyond hosting — the filesystem, keychain, ffmpeg and updates it is
+meant to own are all unwired.
 
 Named but not yet built, roughly in order: the remaining engine rules
 (`quote-in-image-text`, `emotions-are-physical`, `skin-realism-block`,
