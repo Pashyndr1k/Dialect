@@ -9,6 +9,7 @@ import {
   type PromptIR,
   type Segment,
 } from '@dialect/core';
+import { Fields } from './Fields.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
 import { profiles, registry } from './registry.ts';
@@ -56,6 +57,7 @@ export function App() {
   const [extractError, setExtractError] = useState<string | null>(null);
   const [spent, setSpent] = useState(0);
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
     secretStatus(ANTHROPIC_KEY).then(
@@ -120,6 +122,7 @@ export function App() {
   };
 
   const render = compiled && !('failure' in compiled) ? compiled.render : null;
+  const selectedSegment = render?.segments.find((s) => s.label === selected) ?? null;
   const promptText = render ? assembleText(render, isOn) : '';
 
   const copy = async (): Promise<void> => {
@@ -143,6 +146,7 @@ export function App() {
             onChange={(e) => {
               setTarget(e.target.value);
               setDisabled(new Set());
+              setSelected(null);
               setCopied(false);
             }}
           >
@@ -224,16 +228,38 @@ export function App() {
             <>
               <div className="chips">
                 {render.segments.map((s) => (
-                  <button
+                  <span
                     key={s.label}
-                    className={`chip${isOn(s) ? '' : ' off'}${s.source === 'rule' ? ' ruled' : ''}`}
-                    title={`from ${s.from.join(', ')}`}
-                    onClick={() => toggle(s.label)}
+                    className={`chip${isOn(s) ? '' : ' off'}${s.source === 'rule' ? ' ruled' : ''}${
+                      selected === s.label ? ' sel' : ''
+                    }`}
                   >
-                    {s.label}
-                  </button>
+                    <button
+                      className="chip-t"
+                      title="Open the fields behind this block"
+                      onClick={() => setSelected(selected === s.label ? null : s.label)}
+                    >
+                      {s.label}
+                    </button>
+                    <button
+                      className="chip-x"
+                      title={isOn(s) ? 'Leave this block out' : 'Put this block back'}
+                      aria-label={isOn(s) ? `Leave ${s.label} out` : `Put ${s.label} back`}
+                      onClick={() => toggle(s.label)}
+                    >
+                      {isOn(s) ? '\u00d7' : '+'}
+                    </button>
+                  </span>
                 ))}
               </div>
+
+              {selectedSegment && !('error' in parsed) ? (
+                <Fields
+                  ir={parsed.ir}
+                  segment={selectedSegment}
+                  onChange={(next) => setIrText(JSON.stringify(next, null, 2))}
+                />
+              ) : null}
 
               <pre className="out">{promptText}</pre>
 

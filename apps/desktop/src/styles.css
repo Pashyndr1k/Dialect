@@ -219,3 +219,41 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   font: inherit; color: var(--accent); background: none; border: 0; padding: 0;
   cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
 }
+
+/* --- chips become two controls: select, and include/exclude --- */
+.chip { display: inline-flex; align-items: stretch; padding: 0; overflow: hidden; }
+.chip-t, .chip-x {
+  font: inherit; font-size: 12px; color: inherit;
+  background: none; border: 0; cursor: pointer; padding: 3px 8px;
+}
+.chip-x { padding-left: 4px; padding-right: 7px; opacity: .5; font-size: 13px; line-height: 1; }
+.chip-x:hover { opacity: 1; }
+.chip.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chip.off .chip-t { text-decoration: line-through; }
+
+/* --- the fields behind a chip --- */
+.fields {
+  display: flex; flex-direction: column; gap: 12px;
+  margin-bottom: 14px; padding: 14px;
+  background: var(--surface); border: 1px solid var(--accent); border-radius: 6px;
+}
+.fields-empty { margin: 0 0 14px; }
+.fld { display: flex; flex-direction: column; gap: 4px; }
+.fld-k {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 10px; font-weight: 650; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.fld-k .src {
+  font-style: normal; font-size: 9.5px; letter-spacing: .06em;
+  background: var(--accent-soft); color: var(--accent);
+  border-radius: 3px; padding: 1px 5px; text-transform: none;
+}
+.fld-v {
+  width: 100%; font: inherit; font-size: 13px; line-height: 1.5;
+  color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--rule); border-radius: 5px; padding: 7px 9px;
+  resize: vertical;
+}
+.fld-p { font-size: 10px; color: var(--ink-3); }
+.fields-note { margin: 2px 0 0; font-size: 11.5px; color: var(--ink-3); }

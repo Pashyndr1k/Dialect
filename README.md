@@ -143,10 +143,17 @@ cannot surprise you:
 
 ## The window
 
-Two panes. The left holds the IR as JSON; the right holds the prompt it
-compiles to, live. Between them sit the chips: one per segment of the prompt,
-each switchable off, each rebuilt through the dialect's own joining rules
-rather than the editor's guess at them.
+Two panes. The left holds the IR; the right holds the prompt it compiles to,
+live. Between them sit the chips: one per segment of the prompt.
+
+Each chip does two things. Its label opens the IR fields that segment was built
+from — a segment records the paths it came from, so the editor can offer those
+fields rather than asking anyone to edit a finished prompt as text. The × beside
+it leaves the block out, rebuilt through the dialect's own joining rules rather
+than the editor's guess at them.
+
+Editing a field rewrites the IR, so every target recompiles, not just the one on
+screen. Where a field came from a reference, the panel says which one.
 
 Findings appear underneath, sorted with anything blocking first, each naming
 the rule that raised it and what to do about it.

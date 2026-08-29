@@ -7,6 +7,7 @@
  */
 
 export * from './ir/types.ts';
+export * from './ir/paths.ts';
 export * from './registry/types.ts';
 export * from './registry/load.ts';
 export * from './renderers/index.ts';
