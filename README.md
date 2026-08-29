@@ -33,6 +33,7 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Extraction | reference image to IR, behind a provider-agnostic gateway |
 | Provider gateway | content-addressed cache, budget cap, spend reporting |
 | Adapters | Anthropic (`claude-opus-5`, structured outputs); a mock for tests |
+| Key storage | OS credential store via the Rust host, with a settings panel |
 | CLI | `compile`, `extract`, `targets` |
 | Desktop shell | Tauri 2 window, compiling live with a chip editor |
 
@@ -90,6 +91,22 @@ apps/cli            a thin surface over the same compile() the window uses
 apps/desktop        the Tauri window: React in src/, the host in src-tauri/
 ```
 
+## The key
+
+Extraction needs an Anthropic key. It is typed into the app's own settings panel
+and handed straight to the operating system's credential store — Windows
+Credential Manager, the macOS Keychain, the Secret Service on Linux. Nothing is
+written to a config file, and nothing lands in shell history.
+
+The value is never read back into the settings field. The panel asks only
+whether a key is stored, which is all it needs to render its state; a saved key
+has no reason to travel through the UI again.
+
+Running the Vite dev server in a plain browser, there is no host and so no
+credential store. The panel says so and falls back to localStorage in the clear
+rather than pretending otherwise. The command line still reads
+`ANTHROPIC_API_KEY`, which is the normal thing for a CLI to do.
+
 ## Spending money
 
 Extraction is the only step that costs anything, so it is the only step behind
@@ -145,7 +162,8 @@ worse than a missing one — it teaches people to ignore the panel.
 
 The Anthropic adapter is written but has never run against the live API — there
 were no credentials on this machine to try it with. Everything up to the network
-boundary is tested; the boundary itself is not.
+boundary is tested; the boundary itself is not. The window can now store a key,
+but does not yet use it: extraction still runs only from the CLI.
 
 The window still ships Tauri's placeholder icons, and the Rust host does nothing
 yet beyond hosting — the filesystem, keychain, ffmpeg and updates it is meant to

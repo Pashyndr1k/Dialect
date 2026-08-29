@@ -8,6 +8,7 @@ import {
   type Segment,
 } from '@dialect/core';
 import { profiles, registry } from './registry.ts';
+import { Settings } from './Settings.tsx';
 import exampleIR from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
 
 const LEVEL_ORDER: Record<Finding['level'], number> = { block: 0, warn: 1, autofix: 2 };
@@ -27,6 +28,7 @@ export function App() {
   const [target, setTarget] = useState('kling-3-omni');
   const [disabled, setDisabled] = useState<ReadonlySet<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const parsed = useMemo(() => parseIR(irText), [irText]);
   const profile = useMemo(() => getProfile(registry, target), [target]);
@@ -87,7 +89,12 @@ export function App() {
           </select>
         </label>
         {profile.routingNote ? <p className="note">{profile.routingNote}</p> : null}
+        <button className="ghost bar-end" onClick={() => setSettingsOpen(true)}>
+          Settings
+        </button>
       </header>
+
+      {settingsOpen ? <Settings onClose={() => setSettingsOpen(false)} /> : null}
 
       <main className="panes">
         <section className="pane">

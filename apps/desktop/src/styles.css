@@ -162,3 +162,44 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   margin: 10px 0 0; font-size: 12.5px; color: var(--bad);
   background: var(--bad-soft); border-radius: 5px; padding: 8px 10px;
 }
+
+/* --- settings sheet --- */
+.bar-end { margin-left: auto; margin-bottom: 0; }
+
+.sheet {
+  position: fixed; inset: 0; z-index: 20;
+  background: color-mix(in srgb, var(--ink) 34%, transparent);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 8vh 20px 20px;
+}
+.sheet-box {
+  width: min(540px, 100%);
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 20px 22px 22px;
+  box-shadow: 0 24px 64px -24px rgba(0, 0, 0, .45);
+}
+.sheet-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sheet-h h2 { margin: 0 0 10px; font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.sheet-p { margin: 0 0 16px; font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+.sheet-p.dim { margin: 16px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.sheet-l {
+  display: block; font-size: 10px; font-weight: 650; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px;
+}
+.sheet-i {
+  width: 100%; font: inherit; font-family: var(--mono); font-size: 13px;
+  color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--rule); border-radius: 5px; padding: 8px 10px;
+}
+.sheet-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.sheet-row .ghost { margin-bottom: 0; }
+.state { font-size: 12.5px; color: var(--ink-3); }
+.state.on { color: var(--accent); }
+.sheet-warn {
+  margin: 14px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--hot);
+  background: var(--hot-soft); border-radius: 5px; padding: 9px 11px;
+}
+.sheet-err {
+  margin: 14px 0 0; font-size: 12.5px; color: var(--bad);
+  background: var(--bad-soft); border-radius: 5px; padding: 9px 11px;
+}
