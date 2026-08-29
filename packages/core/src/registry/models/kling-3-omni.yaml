@@ -1,0 +1,57 @@
+id: kling-3-omni
+label: Kling 3.0 Omni
+vendor: kuaishou
+family: video
+syntax: field-list
+renderer: field-list
+header: Kling 3.0 prompt
+
+bestFor:
+  - performance_cloning
+  - on_product_text
+  - physics
+  - character_continuity
+  - dialogue
+routingNote: >-
+  Holds product copy correct while things move, and clones a performance from a
+  reference clip. Pick it when the shot lives or dies on text or acting.
+
+# Mandatory order. Nothing is skipped: a field that does not apply gets a
+# deliberate minimal value rather than being dropped.
+fieldOrder:
+  - Subject
+  - SubjectDescription
+  - Movement
+  - Scene
+  - SceneDescription
+  - Camera
+  - Lighting
+  - Atmosphere
+  - Negative
+
+limits:
+  durationS: 15
+  maxRes: "4K"
+
+supports:
+  negativePrompt: true
+  nativeAudio: true
+  lipSync: true
+  startEndFrame: true
+  emitsGearNumbers: true   # the Camera line conventionally carries a lens
+
+defaults:
+  sound.music: false
+  sound.subtitles: false
+
+rules:
+  - one-action-one-move
+  - max-tracked-entities
+  - max-look-words
+  # Not yet implemented, listed here as the next batch to build:
+  #   quote-in-image-text, emotions-are-physical, skin-realism-block,
+  #   clip-duration-limit, only-visible-and-audible, exit-frame-means-gone
+
+source:
+  name: kling_prompt.md (kling-3-prompt-director)
+  dated: "2026-06-19"

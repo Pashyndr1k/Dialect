@@ -1,0 +1,23 @@
+{
+  "name": "@dialect/core",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Prompt IR, model registry, dialect renderers and the engine-rules validator",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/registry/load-node.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,56 @@
+id: seedance-2.5
+label: Seedance 2.5
+vendor: bytedance
+family: video
+syntax: shot-description
+renderer: shot-description
+
+bestFor:
+  - cinematic_shot
+  - product_shot
+  - social_ad
+  - narrative
+routingNote: >-
+  The default for anything that has to ship: best quality, native audio, and
+  clips up to 30 seconds.
+
+# Shot, duration and aspect ratio are stated up front — the model reads the
+# first line first — then subject, action, environment, camera, style, sound.
+fieldOrder:
+  - shot
+  - subject
+  - action
+  - environment
+  - camera
+  - lighting
+  - style
+  - sound
+
+limits:
+  durationS: 30
+  references: 50
+  maxRes: "4K"
+
+supports:
+  negativePrompt: false
+  nativeAudio: true
+  lipSync: true
+  startEndFrame: true
+  emitsGearNumbers: false   # lens numbers barely register; the effect carries it
+  refSyntax: "@image{n}"
+
+defaults:
+  sound.music: false
+  sound.subtitles: false
+
+rules:
+  - one-action-one-move
+  - max-tracked-entities
+  - max-look-words
+  # Not yet implemented, listed here as the next batch to build:
+  #   quote-in-image-text, emotions-are-physical, skin-realism-block,
+  #   clip-duration-limit, only-visible-and-audible, exit-frame-means-gone
+
+source:
+  name: The Prompting Handbook v1.2 (Magnific)
+  dated: "2026-07-01"

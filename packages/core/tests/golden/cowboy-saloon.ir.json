@@ -1,0 +1,79 @@
+{
+  "irVersion": "1.0",
+  "modality": "video",
+  "mode": "generate",
+  "title": "Aged cowboy musician talks to saloon bartender",
+  "intent": {
+    "job": "cinematic_shot",
+    "target": "kling-3-omni"
+  },
+  "shot": {
+    "framing": "Medium two-shot",
+    "angle": "slight low angle from just behind the bartender's right shoulder looking toward the cowboy's face",
+    "aspectRatio": "16:9",
+    "durationS": 7
+  },
+  "cameraMove": {
+    "move": "push-in",
+    "speed": "slow"
+  },
+  "optics": {
+    "gearHint": "50mm"
+  },
+  "subject": {
+    "headline": "Aged cowboy musician at a frontier saloon bar, mid-conversation with an aged bartender",
+    "entities": [
+      {
+        "id": "cowboy",
+        "type": "person",
+        "name": "Aged cowboy musician",
+        "description": "The cowboy — a weathered man in his late 60s, deeply lined face with silver-grey stubble, sun-darkened leathery skin, pale grey-blue eyes shadowed under the brim of a worn brown leather cowboy hat dented and stained from years of road use. Lean build, slightly stooped shoulders, broad-chested. Wearing a dust-covered brown duster coat with frayed cuffs, faded denim shirt open at the collar, a dark brown leather vest with a missing button, scuffed brown boots with worn-down heels, a battered leather belt with a weathered empty holster. A large black leather guitar case — road-worn, scratched, with a faded sticker and tarnished silver clasps — leans against the bar at his feet.",
+        "tracked": true
+      },
+      {
+        "id": "bartender",
+        "type": "person",
+        "name": "Saloon bartender",
+        "description": "The bartender stands across the bar: a stout man in his late 60s, bald with a thick white walrus moustache, wearing red suspenders over a white collarless shirt with sleeves rolled to the elbow, thick forearms resting on the counter, listening with a composed and measured expression, a glass and cloth in one hand.",
+        "tracked": true
+      }
+    ],
+    "action": "The cowboy leans forward on both forearms on the bar, head tilted slightly toward the bartender, lips moving in slow deliberate speech, right hand loosely curled around a small shot glass. The bartender leans back slightly, polishing the glass with a slow circular motion, eyes steady on the cowboy's face. The bat-wing doors in the background sway gently, still settling from the cowboy's entrance."
+  },
+  "environment": {
+    "location": "Inside a dusty Wild West frontier saloon",
+    "timeOfDay": "mid-afternoon",
+    "description": "Dim interior of a frontier saloon — long worn wooden bar counter with deep scratches, ring stains, and a cracked brass foot rail, rows of unlabeled whiskey bottles lined against a large cracked mirror behind the bar, a few wooden stools with cracked leather seats pushed aside, rough-hewn plank walls with sun-bleached wanted posters tacked unevenly, a mounted deer skull above the mirror, warped floorboards covered in dry sawdust, low ceiling of rough-cut wooden beams with oil lanterns hanging on hooks casting warm amber pools, bat-wing doors at the entrance visible in the background still faintly swinging, golden afternoon light slicing through them as dusty shafts across the floor, a beat-up upright piano with yellowed keys in the far corner, empty round tables and mismatched chairs in the background mid-room."
+  },
+  "lighting": {
+    "key": "Warm amber oil lantern glow from the ceiling beams",
+    "sources": [
+      "golden afternoon sunlight cutting through the bat-wing doors as long dusty shafts across the floor"
+    ],
+    "contrast": "high contrast with deep shadow in the back corners",
+    "colorTemp": "warm orange-yellow color temperature throughout",
+    "quality": "soft rim light catching the edge of the cowboy's hat brim and the bartender's bald head"
+  },
+  "mood": {
+    "atmosphere": "Quiet, world-weary, sun-baked frontier solitude, fine dust particles drifting slowly through the light shafts, heavy stillness of a near-empty afternoon saloon, intimate low-stakes gravity"
+  },
+  "constraints": {
+    "avoid": [
+      "distorted faces",
+      "extra limbs",
+      "warped hands",
+      "low resolution",
+      "blurry",
+      "watermark",
+      "text overlay",
+      "cartoonish",
+      "plastic skin",
+      "modern clothing",
+      "modern objects",
+      "electric lighting",
+      "neon signs",
+      "color grading artifacts",
+      "crowded background"
+    ]
+  }
+}
