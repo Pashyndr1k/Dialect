@@ -1,0 +1,20 @@
+{
+  "name": "@dialect/providers",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Vendor adapters behind the core Provider interface. Kept out of core so the compiler stays portable.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.122.0",
+    "@dialect/core": "0.0.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

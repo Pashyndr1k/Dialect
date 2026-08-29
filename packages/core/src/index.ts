@@ -12,3 +12,5 @@ export * from './registry/load.ts';
 export * from './renderers/index.ts';
 export * from './rules/index.ts';
 export * from './compile.ts';
+export * from './providers/index.ts';
+export * from './extract/index.ts';

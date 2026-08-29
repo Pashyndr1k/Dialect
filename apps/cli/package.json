@@ -3,8 +3,17 @@
   "version": "0.0.1",
   "type": "module",
   "description": "Compile a Prompt IR document into one model's dialect from the command line",
-  "bin": { "dialect": "./src/main.ts" },
-  "scripts": { "typecheck": "tsc --noEmit" },
-  "dependencies": { "@dialect/core": "0.0.1" },
-  "devDependencies": { "typescript": "^5.7.2" }
+  "bin": {
+    "dialect": "./src/main.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dialect/core": "0.0.1",
+    "@dialect/providers": "0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
 }
