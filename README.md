@@ -178,6 +178,11 @@ than the editor's guess at them.
 Editing a field rewrites the IR, so every target recompiles, not just the one on
 screen. Where a field came from a reference, the panel says which one.
 
+Drop one reference and it is read straight away. Drop several — or a whole
+folder — and they are staged instead, with what the run will cost, because a
+dozen is a spend worth seeing before it happens. Rows report their own state as
+the queue works through them, and a finished one opens into the editor.
+
 Findings appear underneath, sorted with anything blocking first, each naming
 the rule that raised it and what to do about it.
 

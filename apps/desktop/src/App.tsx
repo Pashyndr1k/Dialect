@@ -9,6 +9,8 @@ import {
   type PromptIR,
   type Segment,
 } from '@dialect/core';
+import { createQueue, runQueue } from '@dialect/core';
+import { Batch, type BatchItem } from './Batch.tsx';
 import { Fields } from './Fields.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
@@ -59,6 +61,16 @@ export function App() {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement>(null);
+
+  const [batch, setBatch] = useState<BatchItem[]>([]);
+  const [batchOpen, setBatchOpen] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  // Files and their extracted IRs live outside React state: neither is
+  // serialisable, and neither belongs in a render.
+  const staged = useRef(new Map<string, File>());
+  const results = useRef(new Map<string, PromptIR>());
+  const abort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     secretStatus(ANTHROPIC_KEY).then(
@@ -73,29 +85,127 @@ export function App() {
     return () => window.removeEventListener('dialect:spend', onSpend);
   }, []);
 
-  const readReference = async (file: File): Promise<void> => {
+  const readOne = async (file: File): Promise<PromptIR> => {
+    const { ir: extracted } = await extractFromImage(
+      gateway,
+      { mediaType: file.type, base64: await toBase64(file) },
+      { reference: file.name },
+    );
+    return extracted;
+  };
+
+  const showIR = (next: PromptIR): void => {
+    setIrText(JSON.stringify(next, null, 2));
+    setDisabled(new Set());
+    setSelected(null);
+  };
+
+  /**
+   * One reference is read straight away. Several are staged, because a dozen
+   * is a spend worth seeing before it happens.
+   */
+  const takeFiles = async (files: File[]): Promise<void> => {
     setExtractError(null);
 
-    if (!READABLE.has(file.type)) {
-      setExtractError(`${file.name} is a ${file.type || 'file of unknown type'}. Drop a PNG, JPEG, WebP or GIF.`);
+    const usable = files.filter((f) => READABLE.has(f.type));
+    const rejected = files.length - usable.length;
+    if (usable.length === 0) {
+      setExtractError(
+        `Nothing readable there. Drop PNG, JPEG, WebP or GIF${rejected > 0 ? ` — ${rejected} file(s) were something else` : ''}.`,
+      );
+      return;
+    }
+    if (rejected > 0) {
+      setExtractError(`Skipped ${rejected} file(s) that were not images.`);
+    }
+
+    if (usable.length === 1) {
+      const file = usable[0]!;
+      setBatch([]);
+      staged.current.clear();
+      results.current.clear();
+
+      setExtracting(file.name);
+      try {
+        showIR(await readOne(file));
+      } catch (err) {
+        setExtractError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setExtracting(null);
+      }
       return;
     }
 
-    setExtracting(file.name);
+    staged.current.clear();
+    results.current.clear();
+    setBatchOpen(null);
+
+    for (const file of usable) staged.current.set(file.name, file);
+    setBatch(usable.map((f) => ({ id: f.name, name: f.name, state: 'staged' as const })));
+  };
+
+  const runBatch = async (): Promise<void> => {
+    setExtractError(null);
+    setRunning(true);
+
+    const controller = new AbortController();
+    abort.current = controller;
+
+    const state = createQueue(
+      [...staged.current.keys()].map((name) => ({ id: name, ref: name })),
+    );
+
     try {
-      const { ir: extracted, cached } = await extractFromImage(
-        gateway,
-        { mediaType: file.type, base64: await toBase64(file) },
-        { reference: file.name },
-      );
-      setIrText(JSON.stringify(extracted, null, 2));
-      setDisabled(new Set());
-      if (cached) setExtractError(null);
-    } catch (err) {
-      setExtractError(err instanceof Error ? err.message : String(err));
+      await runQueue(state, {
+        concurrency: 3,
+        signal: controller.signal,
+        onChange: (s) => {
+          setBatch(
+            s.items.map((i) => ({
+              id: i.id,
+              name: i.id,
+              state: i.state,
+              ...(i.error ? { error: i.error } : {}),
+            })),
+          );
+        },
+        work: async (item) => {
+          const file = staged.current.get(item.id);
+          if (!file) throw new Error('that file is no longer here');
+          results.current.set(item.id, await readOne(file));
+          return item.id;
+        },
+      });
+
+      if (state.stoppedBecause) setExtractError(state.stoppedBecause);
+
+      // Open the first one that worked, so the run ends on something to look at.
+      const first = state.items.find((i) => i.state === 'done');
+      if (first) {
+        const ir = results.current.get(first.id);
+        if (ir) {
+          showIR(ir);
+          setBatchOpen(first.id);
+        }
+      }
     } finally {
-      setExtracting(null);
+      abort.current = null;
+      setRunning(false);
     }
+  };
+
+  const openFromBatch = (id: string): void => {
+    const ir = results.current.get(id);
+    if (!ir) return;
+    showIR(ir);
+    setBatchOpen(id);
+  };
+
+  const clearBatch = (): void => {
+    staged.current.clear();
+    results.current.clear();
+    setBatch([]);
+    setBatchOpen(null);
   };
 
   const parsed = useMemo(() => parseIR(irText), [irText]);
@@ -177,8 +287,7 @@ export function App() {
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
-            const file = e.dataTransfer.files[0];
-            if (file) void readReference(file);
+            void takeFiles([...e.dataTransfer.files]);
           }}
         >
           <div className="pane-h">
@@ -193,11 +302,22 @@ export function App() {
               ref={fileInput}
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
               hidden
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void readReference(file);
+                void takeFiles([...(e.target.files ?? [])]);
                 // Cleared so choosing the same file twice fires again.
+                e.target.value = '';
+              }}
+            />
+            <input
+              ref={folderInput}
+              type="file"
+              hidden
+              // Not in the TS DOM types, but every Chromium webview has it.
+              {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+              onChange={(e) => {
+                void takeFiles([...(e.target.files ?? [])]);
                 e.target.value = '';
               }}
             />
@@ -206,10 +326,15 @@ export function App() {
               <p className="drop-busy">Reading {extracting}…</p>
             ) : (
               <>
-                <p className="drop-t">Drop a reference image here</p>
-                <button className="solid" onClick={() => fileInput.current?.click()}>
-                  Upload reference
-                </button>
+                <p className="drop-t">Drop references here — one, or a folder of them</p>
+                <div className="drop-b">
+                  <button className="solid" onClick={() => fileInput.current?.click()}>
+                    Upload reference
+                  </button>
+                  <button className="ghost" onClick={() => folderInput.current?.click()}>
+                    Upload folder
+                  </button>
+                </div>
                 <p className="drop-n">
                   PNG, JPEG, WebP or GIF
                   {hasKey === false ? (
@@ -228,6 +353,19 @@ export function App() {
           </div>
 
           {extractError ? <p className="err">{extractError}</p> : null}
+
+          {batch.length > 0 ? (
+            <Batch
+              items={batch}
+              selected={batchOpen}
+              running={running}
+              spent={spent}
+              onRun={() => void runBatch()}
+              onStop={() => abort.current?.abort()}
+              onSelect={openFromBatch}
+              onClear={clearBatch}
+            />
+          ) : null}
           <textarea
             className="ir"
             spellCheck={false}
