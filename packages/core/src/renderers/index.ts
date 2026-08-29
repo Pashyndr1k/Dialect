@@ -25,5 +25,6 @@ export class UnknownRendererError extends Error {
 }
 
 export * from './types.ts';
+export * from './resolve.ts';
 export * from './document.ts';
 export { renderFieldList, renderShotDescription, renderNatural };

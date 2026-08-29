@@ -55,10 +55,11 @@ describe('golden: Kling 3.0 — aged cowboy at the saloon bar', () => {
     const profile = getProfile(registry, 'kling-3-omni');
     const result = compile(ir, profile);
 
-    // Negative travels separately, so it is not among the body segments.
+    // The order comes from the profile's own field list, which is the formula.
     expect(result.render.segments.map((s) => s.label)).toEqual(
-      profile.fieldOrder?.filter((f) => f !== 'Negative'),
+      profile.fields?.filter((f) => f.role !== 'negative').map((f) => f.name),
     );
+    // Negative travels separately, so it is not among the body segments.
     expect(result.render.negative).toBeTruthy();
   });
 });

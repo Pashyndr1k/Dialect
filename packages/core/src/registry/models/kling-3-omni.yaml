@@ -16,18 +16,55 @@ routingNote: >-
   Holds product copy correct while things move, and clones a performance from a
   reference clip. Pick it when the shot lives or dies on text or acting.
 
-# Mandatory order. Nothing is skipped: a field that does not apply gets a
-# deliberate minimal value rather than being dropped.
-fieldOrder:
-  - Subject
-  - SubjectDescription
-  - Movement
-  - Scene
-  - SceneDescription
-  - Camera
-  - Lighting
-  - Atmosphere
-  - Negative
+# The nine-field formula, as data rather than code. Order is mandatory and
+# nothing is skipped: a field that does not apply gets a deliberate minimal
+# value, which is what `fallback` is for.
+#
+# `from` lists the IR paths that feed a field, in the order they should read.
+# `[]` means each item of an array. A leading `@` is one of the few computed
+# phrases the renderer knows, for lines that are word order rather than a field.
+fields:
+  - name: Subject
+    # The headline if there is one; failing that, whatever is in frame.
+    from: ["subject.headline", "subject.entities[].name"]
+    mode: first
+
+  - name: SubjectDescription
+    # Repeated in full every time. Abbreviating this is what breaks a character
+    # across separate generations.
+    from: ["subject.entities[].description"]
+    join: " "
+
+  - name: Movement
+    from: [subject.action]
+
+  - name: Scene
+    from: [environment.location, environment.timeOfDay]
+
+  - name: SceneDescription
+    from: [environment.description]
+    fallback: minimal context
+
+  - name: Camera
+    from: [shot.framing, shot.angle, "@cameraMove", "@lens"]
+
+  - name: Lighting
+    from:
+      - lighting.key
+      - "lighting.sources[]"
+      - lighting.contrast
+      - lighting.colorTemp
+      - lighting.quality
+      - lighting.direction
+      - "lighting.lookWords[]"
+
+  - name: Atmosphere
+    from: [mood.atmosphere, mood.emotion, mood.energy]
+    fallback: neutral
+
+  - name: Negative
+    from: ["constraints.avoid[]"]
+    role: negative
 
 limits:
   durationS: 15

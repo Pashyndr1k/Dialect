@@ -8,6 +8,7 @@
  */
 
 import type { Modality } from '../ir/types.ts';
+import type { FieldSpec } from '../renderers/resolve.ts';
 
 export type ProfileFamily = Modality | 'pipeline';
 
@@ -70,7 +71,16 @@ export interface ModelProfile {
    * `label`, which names the model itself.
    */
   header?: string;
-  /** Mandatory field order for `field-list` and `shot-description` dialects. */
+  /**
+   * The dialect itself, for `field-list` profiles: each field in its mandatory
+   * order, naming what feeds it. This is what makes a formula like Kling's an
+   * editable card rather than a function in the renderer.
+   */
+  fields?: FieldSpec[];
+  /**
+   * The order a `shot-description` model expects, recorded for the reader.
+   * That form is prose, so the renderer composes it rather than filling slots.
+   */
   fieldOrder?: string[];
   limits?: ProfileLimits;
   supports?: ProfileSupports;

@@ -25,7 +25,7 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | --- | --- |
 | Prompt IR schema | image / video / audio, one versioned shape |
 | Model registry | YAML cards: 2 video, 2 image |
-| Renderers | `field-list`, `shot-description`, `natural` |
+| Renderers | `field-list` (formula-driven), `shot-description`, `natural` |
 | Generate mode | all four targets |
 | Edit mode | `natural` targets — names the delta, pins the rest |
 | Engine rules | 11 implemented, each with its own file, source and tests |
@@ -160,6 +160,32 @@ the rule that raised it and what to do about it.
 
 Switching the target recompiles from the same IR without touching a model. It
 is the clearest demonstration of why the compiler is shaped this way.
+
+## Dialects are cards, not code
+
+A `field-list` dialect is described entirely by its profile. Kling's nine-field
+formula is nine entries in a YAML file, each naming the IR paths that feed it
+and how the parts are joined:
+
+```yaml
+  - name: Camera
+    from: [shot.framing, shot.angle, "@cameraMove", "@lens"]
+
+  - name: Atmosphere
+    from: [mood.atmosphere, mood.emotion, mood.energy]
+    fallback: neutral
+```
+
+Reorder the fields, change what feeds one, add a field the renderer has never
+heard of — the output follows, and no code is touched. The tests in
+`formula.test.ts` are exactly that: edit the card, compile, check.
+
+Deliberately a list of paths and a separator rather than a template language.
+The moment it grows conditionals and loops it stops being editable by anyone
+who is not a programmer, which was the point of moving it out of code. The one
+concession is a short, fixed vocabulary of computed phrases written with a
+leading `@`, for lines that are word order rather than a field — "slow push-in"
+is two IR values and an order that only makes sense together.
 
 ## Engine rules
 

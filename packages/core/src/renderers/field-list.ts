@@ -1,133 +1,42 @@
 /**
  * The `field-list` form: labelled fields in a mandatory order, nothing skipped.
  *
- * Kling is the reference implementation. The renderer never writes English — it
- * orders, labels and joins prose that already sits in the IR. That is what keeps
- * it deterministic, and what makes a batch of a thousand files cost nothing to
- * compose.
+ * The renderer holds no knowledge of any particular dialect. Which fields exist,
+ * what feeds each one and how the parts are joined all come from the profile —
+ * so Kling's nine-field formula is an editable card, not a function in here.
+ * This file only orders, labels and joins.
  */
 
 import type { PromptIR } from '../ir/types.ts';
 import type { ModelProfile } from '../registry/types.ts';
 import type { RenderResult, Segment } from './types.ts';
-import { RendererError, assembleText, joinParts } from './types.ts';
+import { RendererError, assembleText } from './types.ts';
+import { resolveField } from './resolve.ts';
 
 const ID = 'field-list';
 
-type FieldBuilder = (ir: PromptIR, profile: ModelProfile) => { text: string; from: string[] };
-
-/** A field that does not apply gets a deliberate minimal value, never omission. */
-const FALLBACK: Record<string, string> = {
-  SceneDescription: 'minimal context',
-  Atmosphere: 'neutral',
-};
-
-const BUILDERS: Record<string, FieldBuilder> = {
-  Subject: (ir) => ({
-    text: ir.subject?.headline ?? joinParts(ir.subject?.entities?.map((e) => e.name) ?? []),
-    from: ['subject.headline', 'subject.entities[].name'],
-  }),
-
-  SubjectDescription: (ir) => ({
-    // Descriptions are repeated in full, every time. Abbreviating them is what
-    // breaks a character across separate generations.
-    text: joinParts(
-      (ir.subject?.entities ?? []).map((e) => e.description),
-      ' ',
-    ),
-    from: ['subject.entities[].description'],
-  }),
-
-  Movement: (ir) => ({
-    text: ir.subject?.action ?? '',
-    from: ['subject.action'],
-  }),
-
-  Scene: (ir) => ({
-    text: joinParts([ir.environment?.location, ir.environment?.timeOfDay]),
-    from: ['environment.location', 'environment.timeOfDay'],
-  }),
-
-  SceneDescription: (ir) => ({
-    text: ir.environment?.description ?? '',
-    from: ['environment.description'],
-  }),
-
-  Camera: (ir, profile) => ({
-    text: joinParts([
-      ir.shot?.framing,
-      ir.shot?.angle,
-      cameraMovePhrase(ir),
-      profile.supports?.emitsGearNumbers ? lensPhrase(ir) : undefined,
-    ]),
-    from: ['shot.framing', 'shot.angle', 'cameraMove', 'optics.gearHint'],
-  }),
-
-  Lighting: (ir) => ({
-    text: joinParts([
-      ir.lighting?.key,
-      ...(ir.lighting?.sources ?? []),
-      ir.lighting?.contrast,
-      ir.lighting?.colorTemp,
-      ir.lighting?.quality,
-      ir.lighting?.direction,
-      ...(ir.lighting?.lookWords ?? []),
-    ]),
-    from: ['lighting'],
-  }),
-
-  Atmosphere: (ir) => ({
-    text: joinParts([ir.mood?.atmosphere, ir.mood?.emotion, ir.mood?.energy]),
-    from: ['mood'],
-  }),
-
-  Negative: (ir) => ({
-    text: joinParts(ir.constraints?.avoid ?? []),
-    from: ['constraints.avoid'],
-  }),
-};
-
-function cameraMovePhrase(ir: PromptIR): string | undefined {
-  const cm = ir.cameraMove;
-  if (!cm) return undefined;
-  // Moves read hyphenated in cinematography: push-in, dolly-zoom, whip-pan.
-  const move = cm.move;
-  return cm.speed && cm.speed !== 'medium' ? `${cm.speed} ${move}` : move;
-}
-
-function lensPhrase(ir: PromptIR): string | undefined {
-  const hint = ir.optics?.gearHint;
-  if (!hint) return undefined;
-  return /lens$/i.test(hint) ? hint : `${hint} lens`;
-}
-
 export function renderFieldList(ir: PromptIR, profile: ModelProfile): RenderResult {
-  const order = profile.fieldOrder;
-  if (!order || order.length === 0) {
-    throw new RendererError(ID, `profile "${profile.id}" has no fieldOrder, so there is nothing to order`);
+  const fields = profile.fields;
+  if (!fields || fields.length === 0) {
+    throw new RendererError(
+      ID,
+      `profile "${profile.id}" lists no fields, so there is nothing to render. ` +
+        `A field-list profile needs a "fields" block naming each field and what feeds it.`,
+    );
   }
 
   const segments: Segment[] = [];
   let negative: string | undefined;
 
-  for (const field of order) {
-    const build = BUILDERS[field];
-    if (!build) {
-      throw new RendererError(
-        ID,
-        `profile "${profile.id}" asks for a field named "${field}", which this renderer does not know how to build. ` +
-          `Known fields: ${Object.keys(BUILDERS).join(', ')}.`,
-      );
-    }
-    const { text, from } = build(ir, profile);
-    const value = text.trim() || (FALLBACK[field] ?? '');
+  for (const spec of fields) {
+    const text = resolveField(ir, spec, profile);
 
-    if (field === 'Negative') {
+    if (spec.role === 'negative') {
       // Negative travels separately so the UI can show it in its own panel.
-      if (value) negative = value;
+      if (text) negative = text;
       continue;
     }
-    segments.push({ label: field, from, text: value, source: 'ir' });
+    segments.push({ label: spec.name, from: spec.from, text, source: 'ir' });
   }
 
   const assembly = { separator: '\n\n', labelled: true };
