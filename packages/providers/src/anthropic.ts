@@ -9,8 +9,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { Provider, ProviderResult, StructuredRequest } from '@dialect/core';
-import { ProviderError } from '@dialect/core';
-import { costUsd } from './pricing.ts';
+import { costUsd, ProviderError } from '@dialect/core';
 
 export interface AnthropicProviderOptions {
   /**

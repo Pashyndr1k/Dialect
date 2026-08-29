@@ -86,9 +86,12 @@ packages/core       the compiler — no filesystem, no network, no vendor SDK
   src/rules         engine rules, one file each, with source and date
   src/providers     the provider boundary: interface, gateway, cache, budget
   src/extract       reference to IR, using whichever provider it is handed
-packages/providers  vendor adapters — the only place an SDK is imported
+packages/providers  the Anthropic SDK adapter, used by the CLI
 apps/cli            a thin surface over the same compile() the window uses
 apps/desktop        the Tauri window: React in src/, the host in src-tauri/
+  src/provider.ts   the same Provider contract, satisfied by the Rust host
+  src-tauri/        secrets.rs owns the credential store, anthropic.rs proxies
+                    the one call that needs it
 ```
 
 ## The key
@@ -98,9 +101,16 @@ and handed straight to the operating system's credential store — Windows
 Credential Manager, the macOS Keychain, the Secret Service on Linux. Nothing is
 written to a config file, and nothing lands in shell history.
 
-The value is never read back into the settings field. The panel asks only
-whether a key is stored, which is all it needs to render its state; a saved key
-has no reason to travel through the UI again.
+**The key never enters the web view.** The host reads it from the credential
+store and makes the model call itself; the window sends a request and gets an
+answer back. There is no command to fetch the value — `secret_get` is host-side
+Rust, deliberately not exposed — so this is a property of the build rather than
+a promise about how the UI behaves.
+
+That is also why the window and the CLI use different providers behind the same
+`Provider` interface: the window hands the request to Rust, the CLI uses the
+Anthropic SDK with `ANTHROPIC_API_KEY`. Same schema, same prompt, same gateway,
+same cache and budget — only the holder of the credential differs.
 
 Running the Vite dev server in a plain browser, there is no host and so no
 credential store. The panel says so and falls back to localStorage in the clear
@@ -160,10 +170,11 @@ worse than a missing one — it teaches people to ignore the panel.
 
 ## Next
 
-The Anthropic adapter is written but has never run against the live API — there
-were no credentials on this machine to try it with. Everything up to the network
-boundary is tested; the boundary itself is not. The window can now store a key,
-but does not yet use it: extraction still runs only from the CLI.
+Neither path has run against the live API — there were no credentials on this
+machine to try it with. Everything up to the network boundary is tested on both
+sides; the boundary itself is not. Drop a reference into the window and it will
+reach the host, read the key and make the call — that much is wired, and the
+failure paths around it are verified, but the successful one has never happened.
 
 The window still ships Tauri's placeholder icons, and the Rust host does nothing
 yet beyond hosting — the filesystem, keychain, ffmpeg and updates it is meant to

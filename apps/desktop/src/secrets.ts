@@ -8,9 +8,9 @@
  * straight into the OS credential store: Windows Credential Manager, the macOS
  * Keychain, the Secret Service on Linux.
  *
- * The value is never read back into the settings field. The panel only asks
- * whether one is stored, which is all it needs to render — a saved key has no
- * reason to travel back through the UI.
+ * There is no way to read a stored key back out. The host makes the model call
+ * itself, so the value has no reason to enter the web view at all — and with no
+ * command to fetch it, that is a property of the build rather than a promise.
  */
 
 const FALLBACK_KEY = 'dialect.settings.insecure.v1';
@@ -73,13 +73,6 @@ function writeFallback(name: string, value: string): void {
   } catch {
     // Nothing sensible to do: the panel already says storage is unavailable.
   }
-}
-
-export async function getSecret(name: string): Promise<string> {
-  if ((await secretStore()) === 'os') {
-    return (await invoke<string | null>('secret_get', { name })) ?? '';
-  }
-  return readFallback(name);
 }
 
 export async function setSecret(name: string, value: string): Promise<void> {

@@ -1,17 +1,39 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   assembleText,
   compile,
+  extractFromImage,
+  Gateway,
   getProfile,
   type Finding,
   type PromptIR,
   type Segment,
 } from '@dialect/core';
+import { HostProvider } from './provider.ts';
+import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
 import { profiles, registry } from './registry.ts';
 import { Settings } from './Settings.tsx';
 import exampleIR from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
 
 const LEVEL_ORDER: Record<Finding['level'], number> = { block: 0, warn: 1, autofix: 2 };
+
+const READABLE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+/**
+ * One gateway for the window's lifetime, so its cache and its running total
+ * survive between drops. Re-reading the same reference costs nothing.
+ */
+const gateway = new Gateway(new HostProvider(), {
+  budgetUsd: 5,
+  onSpend: (_usage, total) => window.dispatchEvent(new CustomEvent('dialect:spend', { detail: total })),
+});
+
+async function toBase64(file: File): Promise<string> {
+  const buffer = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  for (const byte of buffer) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
 
 function parseIR(text: string): { ir: PromptIR } | { error: string } {
   try {
@@ -29,6 +51,49 @@ export function App() {
   const [disabled, setDisabled] = useState<ReadonlySet<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [extracting, setExtracting] = useState<string | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [spent, setSpent] = useState(0);
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    secretStatus(ANTHROPIC_KEY).then(
+      (s) => setHasKey(s.stored),
+      () => setHasKey(false),
+    );
+  }, [settingsOpen]);
+
+  useEffect(() => {
+    const onSpend = (e: Event): void => setSpent((e as CustomEvent<number>).detail);
+    window.addEventListener('dialect:spend', onSpend);
+    return () => window.removeEventListener('dialect:spend', onSpend);
+  }, []);
+
+  const readReference = async (file: File): Promise<void> => {
+    setExtractError(null);
+
+    if (!READABLE.has(file.type)) {
+      setExtractError(`${file.name} is a ${file.type || 'file of unknown type'}. Drop a PNG, JPEG, WebP or GIF.`);
+      return;
+    }
+
+    setExtracting(file.name);
+    try {
+      const { ir: extracted, cached } = await extractFromImage(
+        gateway,
+        { mediaType: file.type, base64: await toBase64(file) },
+        { reference: file.name },
+      );
+      setIrText(JSON.stringify(extracted, null, 2));
+      setDisabled(new Set());
+      if (cached) setExtractError(null);
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setExtracting(null);
+    }
+  };
 
   const parsed = useMemo(() => parseIR(irText), [irText]);
   const profile = useMemo(() => getProfile(registry, target), [target]);
@@ -97,13 +162,45 @@ export function App() {
       {settingsOpen ? <Settings onClose={() => setSettingsOpen(false)} /> : null}
 
       <main className="panes">
-        <section className="pane">
+        <section
+          className={`pane${dragging ? ' dropping' : ''}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            const file = e.dataTransfer.files[0];
+            if (file) void readReference(file);
+          }}
+        >
           <div className="pane-h">
             <h2>Source</h2>
             <button className="ghost" onClick={() => setIrText(JSON.stringify(exampleIR, null, 2))}>
               Reset to example
             </button>
           </div>
+
+          <div className="drop">
+            {extracting ? (
+              <span className="busy">Reading {extracting}…</span>
+            ) : hasKey === false ? (
+              <span>
+                Drop a reference image to read it into IR — once a key is saved in{' '}
+                <button className="link" onClick={() => setSettingsOpen(true)}>
+                  Settings
+                </button>
+                .
+              </span>
+            ) : (
+              <span>Drop a reference image here to read it into IR.</span>
+            )}
+            {spent > 0 ? <span className="spend">${spent.toFixed(4)} this session</span> : null}
+          </div>
+
+          {extractError ? <p className="err">{extractError}</p> : null}
           <textarea
             className="ir"
             spellCheck={false}

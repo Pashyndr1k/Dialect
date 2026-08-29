@@ -203,3 +203,19 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   margin: 14px 0 0; font-size: 12.5px; color: var(--bad);
   background: var(--bad-soft); border-radius: 5px; padding: 9px 11px;
 }
+
+/* --- reference drop zone --- */
+.pane.dropping { background: var(--accent-soft); }
+.drop {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 10px; padding: 9px 12px;
+  border: 1px dashed var(--rule); border-radius: 6px;
+  font-size: 12.5px; color: var(--ink-3); line-height: 1.4;
+}
+.pane.dropping .drop { border-color: var(--accent); color: var(--accent); }
+.drop .busy { color: var(--accent); }
+.drop .spend { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.link {
+  font: inherit; color: var(--accent); background: none; border: 0; padding: 0;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}

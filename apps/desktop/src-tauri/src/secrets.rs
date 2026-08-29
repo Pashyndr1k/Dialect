@@ -14,6 +14,10 @@ use keyring::Entry;
 /// Namespaced so the entry is recognisable in the OS credential UI.
 const SERVICE: &str = "com.dialect.app";
 
+/// The account name the Anthropic key is stored under. Shared with the host
+/// proxy so the key is fetched, never passed in.
+pub const ANTHROPIC: &str = "anthropic";
+
 fn entry(name: &str) -> Result<Entry, String> {
     Entry::new(SERVICE, name).map_err(|e| format!("Could not reach the credential store: {e}"))
 }
@@ -41,7 +45,9 @@ pub fn secret_set(name: String, value: String) -> Result<(), String> {
         .map_err(|err| format!("Could not store the key: {err}"))
 }
 
-#[tauri::command]
+/// Host-side only, deliberately not a `#[tauri::command]`: the web view has no
+/// way to ask for the value, which is what makes "the key never leaves the
+/// host" a property of the build rather than a convention.
 pub fn secret_get(name: String) -> Result<Option<String>, String> {
     match entry(&name)?.get_password() {
         Ok(v) => Ok(Some(v)),
