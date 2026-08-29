@@ -1,0 +1,39 @@
+id: product-still
+name: Product still
+description: >-
+  A product photographed as an object with weight and surface, on a named
+  surface in named light.
+modality: image
+snippets: [film-look, standard-negatives]
+
+variables:
+  - name: product
+    label: Product
+    hint: Materials and finish, not just the name. "A matte-black cologne bottle".
+    required: true
+  - name: surface
+    label: On what
+    default: wet slate
+  - name: light
+    label: Light
+    default: hard raking light from the right, deep shadows stretching left
+
+ir:
+  modality: image
+  mode: generate
+  subject:
+    headline: "{{product}} on {{surface}}"
+    entities:
+      - id: e1
+        type: product
+        name: "{{product}}"
+  environment:
+    location: "on {{surface}}"
+  shot:
+    size: extreme-close-up
+    framing: tight macro framing
+    aspectRatio: "4:5"
+  lighting:
+    key: "{{light}}"
+  style:
+    medium: photograph

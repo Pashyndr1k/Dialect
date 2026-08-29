@@ -1,0 +1,54 @@
+id: cinematic-shot
+name: Cinematic shot
+description: >-
+  One directed shot: a subject doing one thing, somewhere, in named light. The
+  base every other video template builds on.
+modality: video
+snippets: [film-look, clean-audio]
+
+variables:
+  - name: subject
+    label: Subject
+    hint: A short noun phrase. "A weathered cowboy in his late sixties", not "a man".
+    required: true
+  - name: details
+    label: What they look like
+    hint: >-
+      Build, face, wardrobe, props, wear. This is repeated verbatim in every
+      clip of a sequence, and that repetition is what holds a character
+      together across separate generations.
+    default: ""
+  - name: action
+    label: Doing what
+    hint: One action. A second one belongs in the next shot.
+    required: true
+  - name: location
+    label: Where
+    required: true
+  - name: light
+    label: Key light
+    hint: Name the source, not the mood. "Warm oil lanterns from the ceiling beams".
+    default: soft daylight from a window out of frame
+
+ir:
+  modality: video
+  mode: generate
+  subject:
+    headline: "{{subject}}, {{location}}"
+    entities:
+      - id: e1
+        type: person
+        name: "{{subject}}"
+        description: "{{details}}"
+    action: "{{action}}"
+  environment:
+    location: "{{location}}"
+  shot:
+    size: medium
+    aspectRatio: "16:9"
+    durationS: 5
+  cameraMove:
+    move: push-in
+    speed: slow
+  lighting:
+    key: "{{light}}"

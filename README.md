@@ -29,12 +29,13 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Generate mode | all four targets |
 | Edit mode | `natural` targets — names the delta, pins the rest |
 | Engine rules | 11 implemented, each with its own file, source and tests |
+| Templates | partial IR with variables, snippets and inheritance |
 | Job routing | `bestFor` matching, exposed via `dialect targets --job` |
 | Extraction | reference image to IR, behind a provider-agnostic gateway |
 | Provider gateway | content-addressed cache, budget cap, spend reporting |
 | Adapters | Anthropic (`claude-opus-5`, structured outputs); a mock for tests |
 | Key storage | OS credential store via the Rust host, with a settings panel |
-| CLI | `compile`, `extract`, `targets` |
+| CLI | `compile`, `extract`, `apply`, `targets`, `templates` |
 | Desktop shell | Tauri 2 window, compiling live with a chip editor |
 
 ## Try it
@@ -160,6 +161,34 @@ the rule that raised it and what to do about it.
 
 Switching the target recompiles from the same IR without touching a model. It
 is the clearest demonstration of why the compiler is shaped this way.
+
+## Templates
+
+A template is a partially filled IR with holes in it, not a prompt. That is what
+lets one template serve every target: it produces an IR, and the dialects take
+it from there.
+
+```bash
+node apps/cli/src/main.ts templates
+node apps/cli/src/main.ts apply dialogue-shot --target kling-3-omni --set subject=... --set line=...
+```
+
+The same filled template compiles to Kling's nine labelled fields and to
+Seedance's prose, and the spoken line survives both — it lands in a sentence for
+Seedance and stays in the IR for Kling, whose formula has no slot for it.
+
+Layers merge in one order: the inheritance chain from the furthest ancestor
+down, then snippets, then the template's own fields, then whatever document was
+already in hand. Each layer can override the one before, so the person editing
+always wins over the template that produced it.
+
+Arrays replace rather than blend — three look words means those three, not those
+three plus whatever was inherited. Appending is opt-in and visible: a key
+ending in `+` adds to the list below it, which is how `standard-negatives` can
+extend an avoid list a template already started.
+
+Snippets carry the handbook's reusable blocks: the film-look line, the standard
+negatives, the skin-realism block, clean audio.
 
 ## Dialects are cards, not code
 

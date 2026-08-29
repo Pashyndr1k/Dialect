@@ -42,6 +42,8 @@ type Computed = (ir: PromptIR, profile: ModelProfile) => string | undefined;
 function cameraMove(ir: PromptIR): string | undefined {
   const cm = ir.cameraMove;
   if (!cm) return undefined;
+  // A locked-off camera has no speed; "slow static" is not a thing.
+  if (cm.move === 'static') return 'static camera';
   return cm.speed && cm.speed !== 'medium' ? `${cm.speed} ${cm.move}` : cm.move;
 }
 

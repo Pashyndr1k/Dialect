@@ -1,0 +1,29 @@
+id: dialogue-shot
+name: Dialogue shot
+description: >-
+  A cinematic shot carrying one spoken line. Closer framing, and the delivery
+  described rather than the emotion named.
+modality: video
+extends: cinematic-shot
+
+variables:
+  - name: line
+    label: The line
+    hint: What they actually say. Keep it to what fits the clip.
+    required: true
+  - name: delivery
+    label: Delivery
+    hint: Two or three qualities. One flat label reads dead.
+    default: quiet, controlled, almost warm
+
+ir:
+  shot:
+    size: medium-close
+  cameraMove:
+    move: static
+  dialogue:
+    - speaker: e1
+      line: "{{line}}"
+      delivery: ["{{delivery}}"]
+  texture:
+    skinBlock: true

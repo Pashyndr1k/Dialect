@@ -19,7 +19,9 @@ import {
   type Modality,
   type PromptIR,
 } from '@dialect/core';
+import { applyTemplate, chainFor, MissingVariablesError } from '@dialect/core';
 import { loadBuiltinRegistry } from '@dialect/core/node';
+import { loadBuiltinLibrary } from '@dialect/core/templates-node';
 import { AnthropicProvider } from '@dialect/providers';
 
 const USAGE = `dialect — compile a Prompt IR into one model's dialect
@@ -27,6 +29,8 @@ const USAGE = `dialect — compile a Prompt IR into one model's dialect
   dialect compile <ir.json> --target <model-id> [--prompt-only]
   dialect extract <image>   --target <model-id> [--budget <usd>] [--ir-out <file>]
   dialect targets [--job <job>]
+  dialect templates [--modality <image|video|audio>]
+  dialect apply <template-id> --target <model-id> [--set name=value ...] [--ir-out <file>]
 
 Options
   --target        model id from the registry, e.g. kling-3-omni
@@ -35,6 +39,7 @@ Options
   --budget        stop before spending more than this many dollars (default 1.00)
   --ir-out        write the extracted Prompt IR to a file, to edit and recompile
   --modality      what the prompt is for: image (default), video or audio
+  --set           fill one template variable; repeat for each
 
 extract needs Anthropic credentials: set ANTHROPIC_API_KEY, or run 'ant auth login'.
 `;
@@ -165,6 +170,93 @@ async function cmdExtract(): Promise<number> {
   return result.blocked ? 1 : 0;
 }
 
+
+async function cmdTemplates(): Promise<number> {
+  const library = await loadBuiltinLibrary();
+  const modality = flag('modality');
+
+  const rows = [...library.templates.values()]
+    .filter((t) => (modality ? t.modality === modality : true))
+    .sort((a, b) => a.modality.localeCompare(b.modality) || a.name.localeCompare(b.name));
+
+  if (rows.length === 0) {
+    stderr.write(modality ? `No ${modality} templates.\n` : 'The library is empty.\n');
+    return 1;
+  }
+
+  for (const t of rows) {
+    stdout.write(`${t.id.padEnd(18)} ${t.modality.padEnd(6)} ${t.name}\n`);
+    if (t.extends) stdout.write(`${' '.repeat(19)}extends ${t.extends}\n`);
+
+    // Variables come from the whole chain, so a child shows what it inherits.
+    const variables = chainFor(library, t.id).flatMap((x) => x.variables ?? []);
+    for (const v of variables) {
+      const mark = v.default !== undefined ? `= ${v.default}` : v.required ? '(required)' : '';
+      stdout.write(`${' '.repeat(21)}--set ${v.name}=…  ${mark}\n`);
+    }
+  }
+  return 0;
+}
+
+/** `--set name=value`, repeated. */
+function settings(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== '--set') continue;
+    const pair = argv[i + 1] ?? '';
+    const eq = pair.indexOf('=');
+    if (eq > 0) out[pair.slice(0, eq)] = pair.slice(eq + 1);
+  }
+  return out;
+}
+
+async function cmdApply(): Promise<number> {
+  const id = argv[3];
+  const target = flag('target');
+  if (!id || !target) {
+    stderr.write(USAGE);
+    return 2;
+  }
+
+  const library = await loadBuiltinLibrary();
+  const registry = await loadBuiltinRegistry();
+  const profile = getProfile(registry, target);
+
+  let ir;
+  try {
+    ({ ir } = applyTemplate(library, id, { values: settings() }));
+  } catch (err) {
+    if (err instanceof MissingVariablesError) {
+      stderr.write(`${err.message}\n`);
+      for (const name of err.missing) stderr.write(`  --set ${name}=…\n`);
+      return 2;
+    }
+    throw err;
+  }
+
+  const irOut = flag('ir-out');
+  if (irOut) {
+    await writeFile(irOut, `${JSON.stringify(ir, null, 2)}\n`, 'utf8');
+    stderr.write(`IR written to ${irOut}\n`);
+  }
+
+  const result = compile(ir, profile);
+  stdout.write(
+    argv.includes('--prompt-only')
+      ? `${result.render.text}\n`
+      : toDocument(result.render, profile, { title: ir.title }),
+  );
+
+  if (result.findings.length > 0) {
+    stderr.write('\n');
+    for (const f of result.findings) {
+      stderr.write(`${LEVEL_MARK[f.level] ?? '·'} [${f.ruleId}] ${f.message}\n`);
+      if (f.fix) stderr.write(`  → ${f.fix}\n`);
+    }
+  }
+  return result.blocked ? 1 : 0;
+}
+
 async function main(): Promise<number> {
   switch (argv[2]) {
     case 'compile':
@@ -173,6 +265,10 @@ async function main(): Promise<number> {
       return cmdExtract();
     case 'targets':
       return cmdTargets();
+    case 'templates':
+      return cmdTemplates();
+    case 'apply':
+      return cmdApply();
     default:
       stderr.write(USAGE);
       return 2;

@@ -1,0 +1,19 @@
+id: standard-negatives
+name: Standard negatives
+description: >-
+  The usual drift, stripped. Appends rather than replaces, so a document that
+  already carries its own avoid list keeps it.
+appliesTo: [image, video]
+ir:
+  constraints:
+    avoid+:
+      - smiling
+      - glamour makeup
+      - jewelry
+      - plastic smooth skin
+      - dramatic rim light
+      - colored background
+      - soft focus
+source:
+  name: The Prompting Handbook v1.2 (Magnific)
+  dated: "2026-07-01"

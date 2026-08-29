@@ -117,7 +117,10 @@ export function renderShotDescription(ir: PromptIR, profile: ModelProfile): Rend
   push('Atmosphere', ['mood'], sentence(ir.mood?.atmosphere));
 
   for (const line of ir.dialogue ?? []) {
-    const who = ir.subject?.entities?.find((e) => e.id === line.speaker)?.name ?? 'The subject';
+    const name = ir.subject?.entities?.find((e) => e.id === line.speaker)?.name ?? 'the subject';
+    // The clause opens a sentence, so it is capitalised even when the entity
+    // was named in lower case.
+    const who = name.charAt(0).toUpperCase() + name.slice(1);
     const how = line.delivery?.length ? `, ${line.delivery.join(', ')},` : '';
     // Dialogue is quoted verbatim so the model speaks it rather than paraphrasing it.
     push('Dialogue', ['dialogue'], `${who} says${how} "${line.line}"`);

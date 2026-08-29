@@ -1,0 +1,10 @@
+id: clean-audio
+name: Clean audio
+description: >-
+  Sound effects only. Generated music cannot be separated afterwards and
+  burned-in captions cannot be removed at all, so both are scored in the edit.
+appliesTo: [video]
+ir:
+  sound:
+    music: false
+    subtitles: false

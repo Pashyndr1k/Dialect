@@ -34,6 +34,7 @@ fields:
     # across separate generations.
     from: ["subject.entities[].description"]
     join: " "
+    fallback: as the subject line describes
 
   - name: Movement
     from: [subject.action]

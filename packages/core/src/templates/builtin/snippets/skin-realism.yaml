@@ -1,0 +1,10 @@
+id: skin-realism
+name: Skin realism
+description: >-
+  Wherever skin is visible and nothing says otherwise, models smooth it to
+  plastic. The skin-realism-block rule adds this on its own for close shots;
+  this snippet is for asking deliberately.
+appliesTo: [image, video]
+ir:
+  texture:
+    skinBlock: true

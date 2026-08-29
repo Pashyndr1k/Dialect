@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./node": "./src/registry/load-node.ts"
+    "./node": "./src/registry/load-node.ts",
+    "./templates-node": "./src/templates/load-node.ts"
   },
   "scripts": {
     "test": "vitest run",

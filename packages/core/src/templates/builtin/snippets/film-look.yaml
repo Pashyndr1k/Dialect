@@ -1,0 +1,15 @@
+id: film-look
+name: Film look
+description: >-
+  Kills the processed default that makes a render read as generated. Grain is
+  the one film artifact worth keeping; scratches and "old damaged film" are on
+  the banned list, not this one.
+appliesTo: [image, video]
+ir:
+  texture:
+    grain: fine-uniform
+  optics:
+    effect: gentle contrast with a soft highlight roll-off, the background melting into soft blur
+source:
+  name: The Prompting Handbook v1.2 (Magnific)
+  dated: "2026-07-01"
