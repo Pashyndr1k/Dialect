@@ -239,11 +239,21 @@ worse than a missing one — it teaches people to ignore the panel.
 
 ## Next
 
-Neither path has run against the live API — there were no credentials on this
-machine to try it with. Everything up to the network boundary is tested on both
-sides; the boundary itself is not. Drop a reference into the window and it will
-reach the host, read the key and make the call — that much is wired, and the
-failure paths around it are verified, but the successful one has never happened.
+The host path has run against the live API: a stored key, a real reference, and
+a scene back that matched the schema. The CLI path — the Anthropic SDK with an
+environment variable — still has not, though it shares everything above the
+transport.
+
+`live_extraction` in `src-tauri/src/anthropic.rs` is the test that proved it. It
+is `#[ignore]`d, because it is the only test that costs money:
+
+```bash
+cargo test --lib -- --ignored --nocapture live_extraction
+```
+
+Its fixtures are not in the repository — the schema is generated from the Zod
+one, and the reference is whatever image you point it at — so it says what it
+needs rather than failing on a path.
 
 The window still ships Tauri's placeholder icons, and the Rust host does nothing
 yet beyond hosting — the filesystem, keychain, ffmpeg and updates it is meant to

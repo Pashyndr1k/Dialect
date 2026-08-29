@@ -172,3 +172,105 @@ pub async fn anthropic_extract(request: ExtractRequest) -> Result<ExtractRespons
         },
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn fixture(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name)
+    }
+
+    /// The one test that costs money.
+    ///
+    /// Everything else about extraction is proved against a mock; this proves
+    /// the boundary the mock stands in for — that the stored key is reachable,
+    /// that the request shape is one the API accepts, and that structured
+    /// outputs come back as the schema we asked for. Ignored by default so a
+    /// plain `cargo test` never spends anything.
+    ///
+    ///     cargo test --  --ignored live_extraction
+    #[tokio::test]
+    #[ignore = "makes a real, billed API call"]
+    async fn live_extraction() {
+        // The fixtures are not in the repository: the schema is generated and
+        // the reference is whatever image you point it at. Say so rather than
+        // panicking on a path.
+        if !fixture("extraction.json").exists() || !fixture("reference.jpg").exists() {
+            eprintln!(
+                "skipped: put an image at {} and generate the schema into {}",
+                fixture("reference.jpg").display(),
+                fixture("extraction.json").display(),
+            );
+            return;
+        }
+
+        let payload: Value =
+            serde_json::from_str(&fs::read_to_string(fixture("extraction.json")).unwrap()).unwrap();
+        let image = fs::read(fixture("reference.jpg")).unwrap();
+
+        // Built the same way the web view builds it, so the shape is under test
+        // and not just the transport.
+        let request: ExtractRequest = serde_json::from_value(json!({
+            "system": payload["system"],
+            "instruction": payload["instruction"],
+            "images": [{
+                "media_type": "image/jpeg",
+                "base64": base64(&image),
+            }],
+            "schema": payload["schema"],
+            "model": "claude-opus-5",
+            "max_tokens": 16000,
+            "effort": null,
+        }))
+        .unwrap();
+
+        let response = anthropic_extract(request)
+            .await
+            .unwrap_or_else(|e| panic!("the live call failed: {e}"));
+
+        // Kept so the next thing that needs a real answer does not have to buy
+        // one: the TypeScript side can be checked against this offline.
+        let saved = fixture("last-response.json");
+        fs::write(&saved, serde_json::to_string_pretty(&response.value).unwrap()).unwrap();
+        println!("saved to {}", saved.display());
+
+        let scene = &response.value;
+        println!("model: {}", response.model);
+        println!(
+            "tokens in/out: {}/{}",
+            response.usage.input_tokens, response.usage.output_tokens
+        );
+        println!("{}", serde_json::to_string_pretty(scene).unwrap());
+
+        // The schema asked for these; if structured outputs held, they are here.
+        for key in ["headline", "entities", "lightingKey", "opticsEffect", "shotSize"] {
+            assert!(scene.get(key).is_some(), "the answer has no \"{key}\"");
+        }
+        assert!(
+            !scene["headline"].as_str().unwrap_or("").is_empty(),
+            "the headline came back empty"
+        );
+        assert!(response.usage.output_tokens > 0, "nothing was generated");
+    }
+
+    /// Minimal base64, so the test needs no extra dependency.
+    fn base64(bytes: &[u8]) -> String {
+        const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+        for chunk in bytes.chunks(3) {
+            let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+            let n = u32::from(b[0]) << 16 | u32::from(b[1]) << 8 | u32::from(b[2]);
+            for i in 0..4 {
+                if i <= chunk.len() {
+                    out.push(A[(n >> (18 - i * 6)) as usize & 0x3F] as char);
+                } else {
+                    out.push('=');
+                }
+            }
+        }
+        out
+    }
+}
