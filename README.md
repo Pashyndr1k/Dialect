@@ -30,12 +30,13 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Edit mode | `natural` targets — names the delta, pins the rest |
 | Engine rules | 11 implemented, each with its own file, source and tests |
 | Templates | partial IR with variables, snippets and inheritance |
+| Batch | resumable queue, persistent cache, budget across restarts |
 | Job routing | `bestFor` matching, exposed via `dialect targets --job` |
 | Extraction | reference image to IR, behind a provider-agnostic gateway |
 | Provider gateway | content-addressed cache, budget cap, spend reporting |
 | Adapters | Anthropic (`claude-opus-5`, structured outputs); a mock for tests |
 | Key storage | OS credential store via the Rust host, with a settings panel |
-| CLI | `compile`, `extract`, `apply`, `targets`, `templates` |
+| CLI | `compile`, `extract`, `batch`, `apply`, `targets`, `templates` |
 | Desktop shell | Tauri 2 window, compiling live with a chip editor |
 
 ## Try it
@@ -124,6 +125,27 @@ Running the Vite dev server in a plain browser, there is no host and so no
 credential store. The panel says so and falls back to localStorage in the clear
 rather than pretending otherwise. The command line still reads
 `ANTHROPIC_API_KEY`, which is the normal thing for a CLI to do.
+
+## A folder at a time
+
+```bash
+node apps/cli/src/main.ts batch ./refs --target nano-banana-2 --out ./prompts --budget 5
+```
+
+A prompt and an IR per reference, plus the run's state and cache inside the
+output folder. Point at the same folder again and it resumes: what was already
+read costs nothing, and the budget counts what earlier runs spent rather than
+starting over.
+
+Three things make a run of a thousand survivable, and all three are in core
+rather than in whichever surface is driving it:
+
+- **It resumes.** State is plain data written after every change, so a crash
+  loses at most one reference. An item left mid-flight is queued again.
+- **It retries only what might improve.** A rate limit is worth another attempt;
+  a file that is not an image is not.
+- **Running out of budget stops the run**, rather than burning through the
+  remainder failing one at a time. The items that never ran stay queued.
 
 ## Spending money
 

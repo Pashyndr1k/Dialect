@@ -16,3 +16,4 @@ export * from './compile.ts';
 export * from './providers/index.ts';
 export * from './extract/index.ts';
 export * from './templates/index.ts';
+export * from './batch/queue.ts';

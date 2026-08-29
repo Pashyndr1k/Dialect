@@ -22,6 +22,7 @@ import {
 import { applyTemplate, chainFor, MissingVariablesError } from '@dialect/core';
 import { loadBuiltinRegistry } from '@dialect/core/node';
 import { loadBuiltinLibrary } from '@dialect/core/templates-node';
+import { runBatch } from './batch.ts';
 import { AnthropicProvider } from '@dialect/providers';
 
 const USAGE = `dialect — compile a Prompt IR into one model's dialect
@@ -29,6 +30,7 @@ const USAGE = `dialect — compile a Prompt IR into one model's dialect
   dialect compile <ir.json> --target <model-id> [--prompt-only]
   dialect extract <image>   --target <model-id> [--budget <usd>] [--ir-out <file>]
   dialect targets [--job <job>]
+  dialect batch <folder>    --target <model-id> --out <dir> [--budget <usd>]
   dialect templates [--modality <image|video|audio>]
   dialect apply <template-id> --target <model-id> [--set name=value ...] [--ir-out <file>]
 
@@ -40,6 +42,10 @@ Options
   --ir-out        write the extracted Prompt IR to a file, to edit and recompile
   --modality      what the prompt is for: image (default), video or audio
   --set           fill one template variable; repeat for each
+  --out           where a batch writes its prompts, state and cache
+  --concurrency   how many references are read at once (default 4)
+  --name-as       output file name (default {{basename}}_{{target}}.txt)
+  --restart       ignore saved progress and run the folder again
 
 extract needs Anthropic credentials: set ANTHROPIC_API_KEY, or run 'ant auth login'.
 `;
@@ -257,6 +263,29 @@ async function cmdApply(): Promise<number> {
   return result.blocked ? 1 : 0;
 }
 
+
+async function cmdBatch(): Promise<number> {
+  const folder = argv[3];
+  const target = flag('target');
+  const out = flag('out');
+
+  if (!folder || !target || !out) {
+    stderr.write(USAGE);
+    return 2;
+  }
+
+  return runBatch({
+    folder,
+    out,
+    target,
+    registry: await loadBuiltinRegistry(),
+    budgetUsd: Number.parseFloat(flag('budget') ?? '5.00'),
+    concurrency: Number.parseInt(flag('concurrency') ?? '4', 10),
+    nameAs: flag('name-as') ?? '{{basename}}_{{target}}.txt',
+    restart: argv.includes('--restart'),
+  });
+}
+
 async function main(): Promise<number> {
   switch (argv[2]) {
     case 'compile':
@@ -265,6 +294,8 @@ async function main(): Promise<number> {
       return cmdExtract();
     case 'targets':
       return cmdTargets();
+    case 'batch':
+      return cmdBatch();
     case 'templates':
       return cmdTemplates();
     case 'apply':
