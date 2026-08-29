@@ -1,0 +1,33 @@
+id: nano-banana-2
+label: Nano Banana 2
+vendor: google
+family: image
+syntax: natural
+renderer: natural
+header: Nano Banana 2 prompt
+
+bestFor:
+  - image_edit
+  - product_shot
+  - brand
+  - high_volume
+  - cinematic_still
+routingNote: >-
+  The everyday workhorse for stills: strongest multi-reference consistency, and
+  the default for editing an existing frame rather than making a new one.
+
+limits:
+  maxRes: "4K"
+
+supports:
+  negativePrompt: false     # everything is said positively, in the scene
+  emitsGearNumbers: false
+  startEndFrame: false
+  refSyntax: "@image{n}"
+
+rules:
+  - max-look-words
+
+source:
+  name: The Prompting Handbook v1.2 (Magnific)
+  dated: "2026-07-01"

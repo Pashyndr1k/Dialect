@@ -1,0 +1,32 @@
+id: gpt-image-2
+label: GPT Image 2
+vendor: openai
+family: image
+syntax: natural
+renderer: natural
+header: GPT Image 2 prompt
+
+bestFor:
+  - layout
+  - infographic
+  - text_accurate
+  - social_ad
+routingNote: >-
+  Reach for it when the message is the design: the prompt becomes a layout
+  brief saying what the text reads, where each element sits, and what stays empty.
+
+limits:
+  maxRes: "4K"
+
+supports:
+  negativePrompt: false
+  # The one partial exception in testing: gear numbers do something here.
+  emitsGearNumbers: true
+  refSyntax: "@image{n}"
+
+rules:
+  - max-look-words
+
+source:
+  name: The Prompting Handbook v1.2 (Magnific)
+  dated: "2026-07-01"

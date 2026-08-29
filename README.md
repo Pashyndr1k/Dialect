@@ -24,11 +24,14 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Piece | State |
 | --- | --- |
 | Prompt IR schema | image / video / audio, one versioned shape |
-| Model registry | YAML cards, `kling-3-omni` and `seedance-2.5` |
-| Renderers | `field-list` (Kling), `shot-description` (Seedance) |
+| Model registry | YAML cards: 2 video, 2 image |
+| Renderers | `field-list`, `shot-description`, `natural` |
+| Generate mode | all four targets |
+| Edit mode | `natural` targets — names the delta, pins the rest |
 | Engine rules | 5 implemented, 6 named and pending |
+| Job routing | `bestFor` matching, exposed via `dialect targets --job` |
 | CLI | `compile`, `targets` |
-| Desktop shell | not started — see "Open decision" |
+| Desktop shell | waiting on the Rust + MSVC toolchain |
 
 ## Try it
 
@@ -83,9 +86,13 @@ gets switched off, not refactored around.
 | `warn` | compiles, but flagged with an offer to fix |
 | `block` | no prompt ships, because the result would be broken |
 
-## Open decision
+## Next
 
-The desktop shell is not started because Tauri needs a Rust toolchain and the
-MSVC C++ build tools, neither of which is installed here. Nothing above depends
-on that choice: the compiler is portable TypeScript and will be driven by
-whichever shell wins.
+The desktop shell is Tauri, pending the Rust toolchain and MSVC C++ build tools
+being installed. Nothing above depends on that: the compiler is portable
+TypeScript, and the same `compile()` will sit behind the window.
+
+Named but not yet built, roughly in order: the remaining engine rules
+(`quote-in-image-text`, `emotions-are-physical`, `skin-realism-block`,
+`clip-duration-limit`, `only-visible-and-audible`, `exit-frame-means-gone`),
+reference extraction, the batch queue, and the chip editor.

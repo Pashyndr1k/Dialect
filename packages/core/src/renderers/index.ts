@@ -1,6 +1,7 @@
 import type { Renderer } from './types.ts';
 import { renderFieldList } from './field-list.ts';
 import { renderShotDescription } from './shot-description.ts';
+import { renderNatural } from './natural.ts';
 
 /**
  * Renderers are written per dialect *form*, not per model. Several models share
@@ -10,6 +11,7 @@ import { renderShotDescription } from './shot-description.ts';
 export const RENDERERS: Record<string, Renderer> = {
   'field-list': renderFieldList,
   'shot-description': renderShotDescription,
+  natural: renderNatural,
 };
 
 export class UnknownRendererError extends Error {
@@ -24,4 +26,4 @@ export class UnknownRendererError extends Error {
 
 export * from './types.ts';
 export * from './document.ts';
-export { renderFieldList, renderShotDescription };
+export { renderFieldList, renderShotDescription, renderNatural };
