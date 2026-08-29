@@ -39,7 +39,14 @@ Phase 0–1 spine, running and tested. No GUI yet.
 
 ## Try it
 
-The window:
+On Windows, double-click **Dialect.bat**. The first run compiles the app, which
+takes a few minutes; every run after that starts instantly from the built exe.
+`Dialect.bat rebuild` forces a rebuild after code changes.
+
+**Dialect (dev).bat** runs it against the Vite dev server instead, so interface
+edits appear without a restart.
+
+From a terminal, on any platform:
 
 ```bash
 npm install && npm run tauri dev --prefix apps/desktop
