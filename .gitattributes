@@ -1,0 +1,7 @@
+# The golden test compares bytes. A CRLF conversion on checkout would break it
+# on a fresh clone while passing on the machine that wrote it — so line endings
+# are pinned to LF everywhere rather than left to core.autocrlf.
+* text=auto eol=lf
+
+# Fixtures are compared byte for byte: never touch them at all.
+packages/core/tests/golden/** -text
