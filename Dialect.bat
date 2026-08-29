@@ -57,6 +57,17 @@ if not exist "%EXE%" goto build
 goto launch
 
 :build
+:: A running copy holds the exe open, and cargo reports that as a bare
+:: "Access is denied" with no hint of what to close.
+tasklist /fi "imagename eq dialect.exe" /nh 2>nul | find /i "dialect.exe" >nul
+if not errorlevel 1 (
+  echo Dialect is already running, and its window holds the file this build has to
+  echo replace. Close it and run this again.
+  echo.
+  pause
+  exit /b 1
+)
+
 echo Building Dialect - the first build takes a few minutes, later ones are quick...
 echo.
 pushd apps\desktop

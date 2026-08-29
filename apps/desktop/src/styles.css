@@ -205,16 +205,25 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 }
 
 /* --- reference drop zone --- */
-.pane.dropping { background: var(--accent-soft); }
 .drop {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  flex-wrap: wrap; margin-bottom: 10px; padding: 9px 12px;
-  border: 1px dashed var(--rule); border-radius: 6px;
-  font-size: 12.5px; color: var(--ink-3); line-height: 1.4;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; min-height: 132px; margin-bottom: 12px; padding: 20px 16px;
+  border: 2px dashed var(--rule); border-radius: 8px;
+  background: var(--surface); text-align: center;
+  transition: border-color .12s, background .12s;
 }
-.pane.dropping .drop { border-color: var(--accent); color: var(--accent); }
-.drop .busy { color: var(--accent); }
-.drop .spend { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop-t { margin: 0; font-size: 14px; color: var(--ink-2); }
+.drop.over .drop-t { color: var(--accent); }
+.drop-n { margin: 0; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.drop-busy { margin: 0; font-size: 14px; color: var(--accent); }
+
+.solid {
+  font: inherit; font-size: 13px; font-weight: 550; cursor: pointer;
+  color: var(--surface); background: var(--accent);
+  border: 1px solid var(--accent); border-radius: 5px; padding: 7px 16px;
+}
+.solid:hover { filter: brightness(1.12); }
 .link {
   font: inherit; color: var(--accent); background: none; border: 0; padding: 0;
   cursor: pointer; text-decoration: underline; text-underline-offset: 2px;

@@ -13,6 +13,8 @@
  * command to fetch it, that is a property of the build rather than a promise.
  */
 
+import { invoke as call } from '@tauri-apps/api/core';
+
 const FALLBACK_KEY = 'dialect.settings.insecure.v1';
 
 export type SecretStore =
@@ -31,7 +33,6 @@ function hasHost(): boolean {
 }
 
 async function invoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
-  const { invoke: call } = await import('@tauri-apps/api/core');
   return call<T>(command, args);
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   assembleText,
   compile,
@@ -58,6 +58,7 @@ export function App() {
   const [spent, setSpent] = useState(0);
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     secretStatus(ANTHROPIC_KEY).then(
@@ -187,21 +188,43 @@ export function App() {
             </button>
           </div>
 
-          <div className="drop">
+          <div className={`drop${dragging ? ' over' : ''}`}>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void readReference(file);
+                // Cleared so choosing the same file twice fires again.
+                e.target.value = '';
+              }}
+            />
+
             {extracting ? (
-              <span className="busy">Reading {extracting}…</span>
-            ) : hasKey === false ? (
-              <span>
-                Drop a reference image to read it into IR — once a key is saved in{' '}
-                <button className="link" onClick={() => setSettingsOpen(true)}>
-                  Settings
-                </button>
-                .
-              </span>
+              <p className="drop-busy">Reading {extracting}…</p>
             ) : (
-              <span>Drop a reference image here to read it into IR.</span>
+              <>
+                <p className="drop-t">Drop a reference image here</p>
+                <button className="solid" onClick={() => fileInput.current?.click()}>
+                  Upload reference
+                </button>
+                <p className="drop-n">
+                  PNG, JPEG, WebP or GIF
+                  {hasKey === false ? (
+                    <>
+                      {' · needs a key in '}
+                      <button className="link" onClick={() => setSettingsOpen(true)}>
+                        Settings
+                      </button>
+                    </>
+                  ) : null}
+                </p>
+              </>
             )}
-            {spent > 0 ? <span className="spend">${spent.toFixed(4)} this session</span> : null}
+
+            {spent > 0 ? <p className="drop-n">${spent.toFixed(4)} spent this session</p> : null}
           </div>
 
           {extractError ? <p className="err">{extractError}</p> : null}
