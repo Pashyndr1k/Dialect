@@ -1,9 +1,12 @@
 {
   "name": "dialect",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.6",
   "description": "Compiles ideas and references into prompts written in each generative model's own dialect",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"

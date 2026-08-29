@@ -1,0 +1,47 @@
+{
+  "texture": {
+    "grain": "fine-uniform"
+  },
+  "optics": {
+    "effect": "gentle contrast with a soft highlight roll-off, the background melting into soft blur"
+  },
+  "constraints": {
+    "avoid": [
+      "smiling",
+      "glamour makeup",
+      "jewelry",
+      "plastic smooth skin",
+      "dramatic rim light",
+      "colored background",
+      "soft focus"
+    ]
+  },
+  "modality": "image",
+  "mode": "generate",
+  "subject": {
+    "headline": "a matte-black cologne bottle with a brushed steel cap, beaded with water",
+    "entities": [
+      {
+        "id": "e1",
+        "type": "product",
+        "name": "a matte-black cologne bottle with a brushed steel cap, beaded with water"
+      }
+    ]
+  },
+  "environment": {
+    "location": "on wet slate"
+  },
+  "shot": {
+    "size": "extreme-close-up",
+    "framing": "tight macro framing",
+    "aspectRatio": "4:5"
+  },
+  "lighting": {
+    "key": "hard raking light from the right, deep shadows stretching left"
+  },
+  "style": {
+    "medium": "photograph"
+  },
+  "irVersion": "1.0",
+  "title": "Cologne bottle on wet slate"
+}

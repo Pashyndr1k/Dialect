@@ -17,6 +17,15 @@ Three consequences follow, and they are the reason for the architecture:
 - **Edits happen by meaning.** You change the lighting or the shot size, not a
   string you hope the model reads the way you meant.
 
+## Version
+
+Two numbers, `major.minor`, shown beside the name in the window. The workspace
+root's `package.json` holds it; Cargo and Tauri get the same number with a `.0`
+on the end, and a test keeps the three from drifting apart.
+
+The minor number moves when a stage of the plan lands. It reaches 1.0 when the
+plan's phases are done — the current number is not modesty, it is the count.
+
 ## Status
 
 Phase 0–1 spine, running and tested. No GUI yet.

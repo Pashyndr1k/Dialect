@@ -22,7 +22,9 @@ ir:
   modality: image
   mode: generate
   subject:
-    headline: "{{product}} on {{surface}}"
+    # Just the product: the surface is the environment's to state, and saying
+    # it in both places puts it in the prompt twice.
+    headline: "{{product}}"
     entities:
       - id: e1
         type: product

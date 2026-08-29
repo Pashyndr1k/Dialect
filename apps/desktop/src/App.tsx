@@ -16,11 +16,15 @@ import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
 import { profiles, registry } from './registry.ts';
 import { Settings } from './Settings.tsx';
-import exampleIR from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
+import videoExample from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
+import imageExample from './example.image.json';
 
 const LEVEL_ORDER: Record<Finding['level'], number> = { block: 0, warn: 1, autofix: 2 };
 
 const READABLE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+/** The opening document follows the target, so the two never disagree. */
+const exampleFor = (family: string): unknown => (family === 'video' ? videoExample : imageExample);
 
 /**
  * One gateway for the window's lifetime, so its cache and its running total
@@ -49,8 +53,8 @@ function parseIR(text: string): { ir: PromptIR } | { error: string } {
 }
 
 export function App() {
-  const [irText, setIrText] = useState(() => JSON.stringify(exampleIR, null, 2));
-  const [target, setTarget] = useState('kling-3-omni');
+  const [irText, setIrText] = useState(() => JSON.stringify(imageExample, null, 2));
+  const [target, setTarget] = useState('nano-banana-2');
   const [disabled, setDisabled] = useState<ReadonlySet<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -250,11 +254,16 @@ export function App() {
     <div className="app">
       <header className="bar">
         <span className="brand">Dialect</span>
+        <span className="ver" title="version">{__APP_VERSION__}</span>
         <label className="field">
           <span className="field-k">Target</span>
           <select
             value={target}
             onChange={(e) => {
+              const next = getProfile(registry, e.target.value);
+              if (next.family !== profile.family && batch.length === 0) {
+                setIrText(JSON.stringify(exampleFor(next.family), null, 2));
+              }
               setTarget(e.target.value);
               setDisabled(new Set());
               setSelected(null);
@@ -292,7 +301,10 @@ export function App() {
         >
           <div className="pane-h">
             <h2>Source</h2>
-            <button className="ghost" onClick={() => setIrText(JSON.stringify(exampleIR, null, 2))}>
+            <button
+              className="ghost"
+              onClick={() => showIR(exampleFor(profile.family) as PromptIR)}
+            >
               Reset to example
             </button>
           </div>
