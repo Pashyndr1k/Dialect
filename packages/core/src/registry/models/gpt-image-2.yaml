@@ -26,6 +26,8 @@ supports:
 
 rules:
   - max-look-words
+  - emotions-are-physical
+  - skin-realism-block
 
 source:
   name: The Prompting Handbook v1.2 (Magnific)

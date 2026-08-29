@@ -48,9 +48,10 @@ rules:
   - one-action-one-move
   - max-tracked-entities
   - max-look-words
-  # Not yet implemented, listed here as the next batch to build:
-  #   quote-in-image-text, emotions-are-physical, skin-realism-block,
-  #   clip-duration-limit, only-visible-and-audible, exit-frame-means-gone
+  - emotions-are-physical
+  - only-visible-and-audible
+  - exit-frame-means-gone
+  - skin-realism-block
 
 source:
   name: kling_prompt.md (kling-3-prompt-director)

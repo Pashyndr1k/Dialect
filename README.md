@@ -28,7 +28,7 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Renderers | `field-list`, `shot-description`, `natural` |
 | Generate mode | all four targets |
 | Edit mode | `natural` targets — names the delta, pins the rest |
-| Engine rules | 5 implemented, 6 named and pending |
+| Engine rules | 11 implemented, each with its own file, source and tests |
 | Job routing | `bestFor` matching, exposed via `dialect targets --job` |
 | CLI | `compile`, `targets` |
 | Desktop shell | Tauri 2 window, compiling live with a chip editor |
@@ -101,6 +101,10 @@ Each rule is a file carrying its own source and date, because these are
 empirical findings about specific model versions and they age. A stale rule
 gets switched off, not refactored around.
 
+Heuristic rules read prose, so each one is tested twice: that it fires, and
+that it stays quiet on writing it must not touch. A rule that cries wolf is
+worse than a missing one — it teaches people to ignore the panel.
+
 | Level | Meaning |
 | --- | --- |
 | `autofix` | corrected silently, with a trace left in the source map |
@@ -113,7 +117,6 @@ The window still ships Tauri's placeholder icons, and the Rust host does
 nothing yet beyond hosting — the filesystem, keychain, ffmpeg and updates it is
 meant to own are all unwired.
 
-Named but not yet built, roughly in order: the remaining engine rules
-(`quote-in-image-text`, `emotions-are-physical`, `skin-realism-block`,
-`clip-duration-limit`, `only-visible-and-audible`, `exit-frame-means-gone`),
-reference extraction, the batch queue, and the chip editor.
+Named but not yet built, roughly in order: reference extraction (the first
+thing that needs an API key), the provider gateway with its cache and budget
+cap, the batch queue, and templates.
