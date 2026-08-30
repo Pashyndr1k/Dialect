@@ -1,9 +1,22 @@
-import { parseLibrary, templatesFor, type Library, type Modality } from '@dialect/core';
+import { invoke } from '@tauri-apps/api/core';
+import {
+  createLibrary,
+  parseLibrary,
+  parseTemplate,
+  templatesFor,
+  type Library,
+  type Modality,
+  type Template,
+} from '@dialect/core';
 
 /**
- * The template library, read out of the core package at build time — the same
- * arrangement as the model cards, and for the same reason: the window keeps no
- * Node dependency, so the browser preview behaves exactly like the packaged app.
+ * Templates: the ones that ship, and the ones someone made.
+ *
+ * The built-in ones are read out of the core package at build time — the same
+ * arrangement as the model cards, so the window keeps no Node dependency and
+ * the browser preview behaves exactly like the packaged app. The custom ones
+ * are files the host keeps, parsed by the same parser, because a template
+ * someone made must not be able to mean something a shipped one cannot.
  */
 const read = (glob: Record<string, string>) =>
   Object.entries(glob).map(([path, text]) => ({
@@ -13,7 +26,7 @@ const read = (glob: Record<string, string>) =>
 
 // The options have to be written out at each call: Vite reads this glob at
 // build time and will not follow a variable to find them.
-export const templateLibrary: Library = parseLibrary(
+export const builtinLibrary: Library = parseLibrary(
   read(
     import.meta.glob('../../../packages/core/src/templates/builtin/templates/*.yaml', {
       query: '?raw',
@@ -30,6 +43,63 @@ export const templateLibrary: Library = parseLibrary(
   ),
 );
 
+const hasHost = (): boolean =>
+  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+/** Kept in memory when there is no host, so the browser preview still works. */
+let inMemory: Template[] = [];
+
+export async function listTemplates(): Promise<Template[]> {
+  if (!hasHost()) return inMemory;
+
+  const stored = await invoke<Array<{ id: string; text: string }>>('templates_list', {});
+  return stored.flatMap((file) => {
+    try {
+      return [parseTemplate(file.text, `${file.id}.yaml`)];
+    } catch {
+      // One unreadable file must not hide the rest; it stays on disk to be
+      // fixed by hand.
+      return [];
+    }
+  });
+}
+
+export async function saveTemplate(id: string, text: string): Promise<void> {
+  if (!hasHost()) {
+    inMemory = [...inMemory.filter((t) => t.id !== id), parseTemplate(text, `${id}.yaml`)];
+    return;
+  }
+  await invoke<string>('template_save', { id, text });
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  if (!hasHost()) {
+    inMemory = inMemory.filter((t) => t.id !== id);
+    return;
+  }
+  await invoke<void>('template_delete', { id });
+}
+
+export async function openTemplatesFolder(): Promise<void> {
+  if (!hasHost()) return;
+  const dir = await invoke<string>('templates_folder', {});
+  const { openPath } = await import('@tauri-apps/plugin-opener');
+  await openPath(dir).catch(() => undefined);
+}
+
+/**
+ * The built-in templates plus the custom ones.
+ *
+ * A custom template wins an id clash, because someone who names theirs after a
+ * shipped one meant to replace it.
+ */
+export function libraryWith(custom: Template[]): Library {
+  const templates = new Map(builtinLibrary.templates);
+  for (const template of custom) templates.set(template.id, template);
+
+  return createLibrary([...templates.values()], [...builtinLibrary.snippets.values()]);
+}
+
 /** Only the templates that make sense for what is being made. */
-export const templatesForModality = (modality: Modality) =>
-  templatesFor(templateLibrary, modality).sort((a, b) => a.name.localeCompare(b.name));
+export const templatesForModality = (library: Library, modality: Modality): Template[] =>
+  templatesFor(library, modality).sort((a, b) => a.name.localeCompare(b.name));

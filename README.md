@@ -138,27 +138,62 @@ size from the same angle, a camera that never stops doing the same thing. They
 read what the prompts actually say rather than what the shots store, so a move
 inherited from the world is counted like one that was typed.
 
-## One button
+## Four ways in
 
-A reference is a reference. Which of the three ways it gets read is decided from
-its extension, in one list shared by the file dialog, the folder scan and the
-reader — three copies of a list of extensions is three chances for `.m4v` to
-work in one place and not another.
+A sentence, a voice, a file, a folder of them. One block, one choice, and then
+only what that choice needs — never controls for a thing nobody is doing.
 
-That decision forced a smaller one. ffmpeg needs a path, and a file dropped on a
-web view has bytes and no path, so a clip has to be chosen rather than dropped.
-Once one kind arrives as a path they all do, or a single button could not accept
-all three — so the host reads stills off disk too, and a picked folder is listed
-by the host rather than by the page.
+Nothing is dropped on the page any more. ffmpeg needs a path and a web view
+cannot give it one, so every reference is chosen; the host reads bytes off disk,
+draws the thumbnail, and lists what a folder holds.
 
-Dropping still works, and works for clips now: small enough, and the host writes
-the file down where ffmpeg can reach it, which is worth one round trip. Large
-enough and it says to use the button, before spending the time to encode it.
+Which of the three ways a reference gets read is decided from its extension, in
+one list shared by the file dialog, the folder scan and the reader. Three copies
+of a list of extensions is three chances for `.m4v` to work in one place and not
+another.
+
+Speaking is not its own destination: the words land in the same box typing
+fills, to be corrected before anything is spent on them. Recording happens in
+the window because only it has a microphone; transcribing happens on the host,
+because that is either a program on PATH or a request carrying a key. A whisper
+on PATH is preferred — free, private, no key — and a transcription API is the
+fallback. Where neither is there the button says which one to add rather than
+doing nothing quietly.
 
 A folder scan does not descend. A folder of references is a folder of
 references, and walking into a subfolder called `old` and reading forty more is
 a bill nobody asked for. It sorts the way a person numbered things, so `shot_2`
 comes before `shot_10`.
+
+## Templates from a prompt that works
+
+Someone has a prompt they trust and wants fifty more like it, each about a
+different character. The job is not to improve their prompt — it works, that is
+why it is here. The job is to find its seams.
+
+Everything describing *this particular subject* becomes a hole. Everything
+describing *how the thing is made* — the rendering, the framing, the light, the
+material language, the things to avoid — stays word for word. That fixed half is
+why the prompt works, and paraphrasing it is how a template stops working.
+
+At most five holes, and fewer is better: someone with a few words about their
+next character is not filling in a questionnaire. One hole for who they are
+beats seven for eyes, hair, jaw, build, boots, cloak, scars.
+
+Each variable keeps the value the example itself used, which is what makes the
+split checkable. The template is applied to its own defaults and rendered
+straight back: if that does not read like what was pasted in, the seam was drawn
+in the wrong place, and it can be seen before fifty prompts are built on top of
+it.
+
+A kind — text2img, img2img, text2vid, img2vid — sets the structural slots rather
+than asking for them, so a template that says it starts from an image has a
+start frame in it. A cast of one or two says how many people it carries, and two
+must stay distinguishable.
+
+They are saved as files beside the built-in ones, read by the same parser. A
+custom template cannot mean something a shipped one could not, and a word in one
+can be fixed in any editor.
 
 ## Writing from an idea
 

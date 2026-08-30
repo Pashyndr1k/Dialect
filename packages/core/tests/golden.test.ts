@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { compile } from '../src/compile.ts';
+import { assembleText } from '../src/renderers/types.ts';
 import { getProfile } from '../src/registry/load.ts';
 import { loadBuiltinRegistry } from '../src/registry/load-node.ts';
 import { toDocument } from '../src/renderers/document.ts';
@@ -61,6 +62,29 @@ describe('golden: Kling 3.0 — aged cowboy at the saloon bar', () => {
     );
     // Negative travels separately, so it is not among the body segments.
     expect(result.render.negative).toBeTruthy();
+  });
+});
+
+describe('who is in the picture', () => {
+  it('reaches an image prompt, not only a video one', async () => {
+    const ir = JSON.parse(await readFile(here('cowboy-saloon.ir.json'), 'utf8')) as PromptIR;
+    const registry = await loadBuiltinRegistry();
+
+    // A headline summarises; the description is what holds a face together, and
+    // for a long time the natural renderer dropped it on the floor.
+    const text = compile(ir, getProfile(registry, 'nano-banana-2')).render.text;
+    expect(text).toContain('weathered man in his late 60s');
+    expect(text).toContain('white walrus moustache');
+  });
+
+  it('is a block that can be switched off like any other', async () => {
+    const ir = JSON.parse(await readFile(here('cowboy-saloon.ir.json'), 'utf8')) as PromptIR;
+    const registry = await loadBuiltinRegistry();
+    const { render } = compile(ir, getProfile(registry, 'nano-banana-2'));
+
+    const subject = render.segments.find((s) => s.label === 'Subject');
+    expect(subject?.from).toContain('subject.entities');
+    expect(assembleText(render, (s) => s.label !== 'Subject')).not.toContain('walrus');
   });
 });
 

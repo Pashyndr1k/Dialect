@@ -316,10 +316,6 @@ export interface Found {
   bytes: number;
 }
 
-/** Write a dropped file down where ffmpeg can reach it, and say where. */
-export const parkFile = (name: string, base64: string): Promise<string> =>
-  invoke<string>('file_park', { name, base64 });
-
 export const scanFolder = (dir: string): Promise<Found[]> =>
   invoke<Found[]>('folder_scan', { dir });
 

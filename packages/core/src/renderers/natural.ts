@@ -91,6 +91,16 @@ export function renderNatural(ir: PromptIR, profile: ModelProfile): RenderResult
     ]),
   );
 
+  // A headline summarises; a description is the detail that holds a face or a
+  // product together across generations. Leaving it out was quietly losing the
+  // most important part of any document with someone in it — and it is exactly
+  // what a template built around a character puts its hole in.
+  push(
+    'Subject',
+    ['subject.entities'],
+    joinParts((ir.subject?.entities ?? []).map((e) => e.description)),
+  );
+
   for (const t of ir.textInImage ?? []) {
     push('Text', ['textInImage'], `The text reads ${textClause(t)}`);
   }

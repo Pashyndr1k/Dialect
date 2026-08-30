@@ -5,7 +5,7 @@ import type { ItemState } from '@dialect/core';
  *
  * `References` is what you gave the app: the files, what reading them will
  * cost, the button that starts, and how each one is getting on. It belongs on
- * the left, under the drop zone that took them.
+ * the left, under the block that took them in.
  *
  * `PromptActions` is what to do with the prompts that came back. It belongs on
  * the right, with the prompt itself.
@@ -81,7 +81,7 @@ export function References({
 
       {items.length === 0 ? (
         <p className="rows-empty">
-          Whatever you drop above is listed here, and stays listed while the window is open.
+          Whatever you bring in above is listed here, and stays listed while the window is open.
         </p>
       ) : null}
 

@@ -8,10 +8,12 @@
 
 mod anthropic;
 mod audio;
+mod customs;
 mod files;
 mod media;
 mod secrets;
 mod store;
+mod voice;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -41,8 +43,13 @@ pub fn run() {
             audio::audio_measure,
             files::file_read,
             files::file_thumb,
-            files::file_park,
             files::folder_scan,
+            customs::templates_list,
+            customs::template_save,
+            customs::template_delete,
+            customs::templates_folder,
+            voice::voice_tools,
+            voice::voice_transcribe,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

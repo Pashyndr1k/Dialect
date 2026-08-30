@@ -26,6 +26,14 @@ import {
   expandIdea,
   fillTemplate,
   ideaLabel,
+  applyTemplate,
+  createLibrary,
+  learnTemplate,
+  templateToYaml,
+  toDocument as renderDocument,
+  type CastSize,
+  type Template,
+  type TemplateKind,
   kindOf,
   modalityOfFamily,
   kindOfMediaType,
@@ -47,7 +55,8 @@ import { createQueue, runQueue } from '@dialect/core';
 import { PromptActions, References, type BatchItem } from './Batch.tsx';
 import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
-import { Idea } from './Idea.tsx';
+import { Input, type InputMode } from './Input.tsx';
+import { Templates } from './Templates.tsx';
 import { Shots } from './Shots.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
@@ -61,7 +70,6 @@ import {
   hasDesktop,
   measureAudio,
   mediaTools,
-  parkFile,
   pickFolder,
   pickReferences,
   readFile,
@@ -81,7 +89,15 @@ import {
 } from './store.ts';
 import { profiles, registry } from './registry.ts';
 import { Settings } from './Settings.tsx';
-import { templateLibrary, templatesForModality } from './templates.ts';
+import {
+  deleteTemplate,
+  libraryWith,
+  listTemplates,
+  openTemplatesFolder,
+  saveTemplate,
+  templatesForModality,
+} from './templates.ts';
+import { record, transcribe, voiceTools, type Recording } from './voice.ts';
 import videoExample from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
 import imageExample from './example.image.json';
 import audioExample from './example.audio.json';
@@ -140,19 +156,12 @@ function parseIR(text: string): { ir: PromptIR } | { error: string } {
  */
 const SURE_ENOUGH = 0.25;
 
-/**
- * Above this a dropped clip is not worth moving through the bridge as text.
- * The host refuses the same size; this only saves the wait before the refusal.
- */
-const DROP_LIMIT_BYTES = 96 * 1024 * 1024;
-
 export function App() {
   const [irText, setIrText] = useState(() => JSON.stringify(imageExample, null, 2));
   const [target, setTarget] = useState('nano-banana-2');
   const [disabled, setDisabled] = useState<ReadonlySet<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dragging, setDragging] = useState(false);
   const [extracting, setExtracting] = useState<string | null>(null);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [spent, setSpent] = useState(0);
@@ -162,9 +171,23 @@ export function App() {
   const folderInput = useRef<HTMLInputElement>(null);
 
   /** What the user typed instead of, or as well as, bringing a reference. */
+  const [mode, setMode] = useState<InputMode>('describe');
   const [idea, setIdea] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [writing, setWriting] = useState(false);
+
+  const [canSpeak, setCanSpeak] = useState(false);
+  const [speakNote, setSpeakNote] = useState('Checking what can transcribe…');
+  const [recording, setRecording] = useState(false);
+  const [hearing, setHearing] = useState(false);
+  const recorder = useRef<Recording | null>(null);
+
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [custom, setCustom] = useState<Template[]>([]);
+  const [learning, setLearning] = useState(false);
+  const [learned, setLearned] = useState<Template | null>(null);
+  const [learnedPreview, setLearnedPreview] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
 
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [activeRef, setActiveRef] = useState<string | null>(null);
@@ -199,6 +222,23 @@ export function App() {
   useEffect(() => {
     void loadLibrary().then(setLibrary);
   }, []);
+
+  useEffect(() => {
+    void listTemplates().then(setCustom, () => setCustom([]));
+  }, []);
+
+  useEffect(() => {
+    void voiceTools().then((t) => {
+      setCanSpeak(t.ready);
+      setSpeakNote(
+        t.ready
+          ? t.whisper
+            ? `Transcribed here by ${t.whisper}.`
+            : 'Transcribed by the service your key is for.'
+          : 'Speaking needs something that can transcribe: whisper on PATH, or a transcription key in Settings.',
+      );
+    });
+  }, [settingsOpen]);
 
   // An object URL holds the file open until it is revoked, so each one is
   // released as soon as another reference takes its place.
@@ -470,57 +510,25 @@ export function App() {
   };
 
   /**
-   * Files dropped on the page.
-   *
-   * A still is already here as bytes and needs nothing further. A clip or a
-   * track has to reach ffmpeg, which cannot read a web view, so the host writes
-   * it down first — worth the round trip for something small, and refused above
-   * a size where choosing the file is faster anyway.
+   * The browser fallback: files from a plain `<input>`, which has bytes but no
+   * path. Only reachable in the dev server, where there is no host to run
+   * ffmpeg — so only stills can be read, and the rest says why.
    */
   const takeFiles = async (incoming: File[]): Promise<void> => {
     const sources: Source[] = [];
-    const tooBig: string[] = [];
     let skipped = 0;
     let needsApp = 0;
 
     for (const file of incoming) {
       const kind = kindOfMediaType(file.type) ?? kindOf(file.name);
-      if (!kind) {
-        skipped += 1;
-        continue;
-      }
-      if (kind === 'image') {
-        sources.push({ kind, name: file.name, file });
-        continue;
-      }
-
-      if (!hasDesktop()) {
-        needsApp += 1;
-        continue;
-      }
-      // Checked before encoding rather than after: turning ninety megabytes
-      // into base64 to be told it is too big is a wait for nothing.
-      if (file.size > DROP_LIMIT_BYTES) {
-        tooBig.push(file.name);
-        continue;
-      }
-
-      try {
-        const path = await parkFile(file.name, await toBase64(file));
-        sources.push({ kind, name: file.name, path });
-      } catch (err) {
-        setExtractError(err instanceof Error ? err.message : String(err));
-        return;
-      }
+      if (!kind) skipped += 1;
+      else if (kind === 'image') sources.push({ kind, name: file.name, file });
+      else needsApp += 1;
     }
 
     await takeSources(sources, skipped);
 
-    if (tooBig.length > 0) {
-      setExtractError(
-        `${tooBig.join(', ')} — too large to drop. Choose it with Upload reference instead.`,
-      );
-    } else if (needsApp > 0 && sources.length === 0) {
+    if (needsApp > 0 && sources.length === 0) {
       setExtractError('Clips and tracks need the desktop app: a browser cannot reach ffmpeg.');
     }
   };
@@ -580,7 +588,7 @@ export function App() {
 
     try {
       const { ir } = templateId
-        ? await fillTemplate(gateway, idea, templateLibrary, templateId)
+        ? await fillTemplate(gateway, idea, activeLibrary, templateId)
         : await expandIdea(gateway, idea, { modality: modalityOfFamily(profile.family) });
 
       results.current.set(label, ir);
@@ -594,6 +602,123 @@ export function App() {
     } finally {
       setWriting(false);
       refreshCache();
+    }
+  };
+
+  const startSpeaking = async (): Promise<void> => {
+    setExtractError(null);
+    try {
+      recorder.current = await record();
+      setRecording(true);
+    } catch (err) {
+      setExtractError(
+        err instanceof Error
+          ? `Could not start recording: ${err.message}`
+          : 'Could not start recording.',
+      );
+    }
+  };
+
+  /**
+   * Stop, transcribe, and put the words in the box rather than acting on them.
+   *
+   * Speech recognition is wrong often enough that spending money on what it
+   * thought it heard, without anyone reading it first, would be a bad trade.
+   */
+  const stopSpeaking = async (): Promise<void> => {
+    const current = recorder.current;
+    if (!current) return;
+
+    recorder.current = null;
+    setRecording(false);
+    setHearing(true);
+
+    try {
+      const { base64, extension } = await current.stop();
+      const text = await transcribe(base64, extension);
+      setIdea((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setHearing(false);
+    }
+  };
+
+  // ------------------------------------------------------------ templates
+
+  const activeLibrary = useMemo(() => libraryWith(custom), [custom]);
+
+  const learnFromExample = async (
+    example: string,
+    kind: TemplateKind,
+    cast: CastSize,
+    name: string,
+  ): Promise<void> => {
+    setTemplateError(null);
+    setLearning(true);
+
+    try {
+      const taken = [...activeLibrary.templates.keys()];
+      const { template } = await learnTemplate(
+        gateway,
+        example,
+        { kind, cast, ...(name.trim() ? { name: name.trim() } : {}) },
+        taken,
+      );
+
+      setLearned(template);
+      setLearnedPreview(previewOf(template));
+    } catch (err) {
+      setTemplateError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLearning(false);
+      refreshCache();
+    }
+  };
+
+  /**
+   * The template applied to the values the example itself used, compiled.
+   *
+   * This is the only honest check on a learned template: if it does not come
+   * back reading like what was pasted in, the split between what varies and
+   * what is fixed was drawn in the wrong place.
+   */
+  const previewOf = (template: Template): string | null => {
+    try {
+      const { ir } = applyTemplate(createLibrary([template], []), template.id);
+      const family = template.modality === 'video' ? 'kling-3-omni' : 'nano-banana-2';
+      const target = getProfile(registry, family);
+      return renderDocument(compile(ir, target).render, target);
+    } catch (err) {
+      // A template that cannot be previewed can still be kept and edited by
+      // hand, so this says why rather than refusing to show the template.
+      return `This template could not be tried out: ${(err as Error).message}`;
+    }
+  };
+
+  const keepTemplate = async (): Promise<void> => {
+    if (!learned) return;
+    setTemplateError(null);
+
+    try {
+      await saveTemplate(learned.id, templateToYaml(learned));
+      setCustom(await listTemplates());
+      setTemplateId(learned.id);
+      setLearned(null);
+      setLearnedPreview(null);
+    } catch (err) {
+      setTemplateError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const removeTemplate = async (id: string): Promise<void> => {
+    setTemplateError(null);
+    try {
+      await deleteTemplate(id);
+      setCustom(await listTemplates());
+      if (templateId === id) setTemplateId('');
+    } catch (err) {
+      setTemplateError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -850,7 +975,10 @@ export function App() {
    * Only the templates that make sense for what is being made. A template that
    * cannot apply to the chosen target is not a choice, it is a mistake waiting.
    */
-  const templates = useMemo(() => templatesForModality(modalityOfFamily(profile.family)), [profile.family]);
+  const templates = useMemo(
+    () => templatesForModality(activeLibrary, modalityOfFamily(profile.family)),
+    [activeLibrary, profile.family],
+  );
 
   useEffect(() => {
     // Switching from a video target to an image one leaves a video template
@@ -919,20 +1047,32 @@ export function App() {
 
       {settingsOpen ? <Settings onClose={() => setSettingsOpen(false)} /> : null}
 
+      {templatesOpen ? (
+        <Templates
+          custom={custom}
+          learning={learning}
+          learned={learned}
+          preview={learnedPreview}
+          error={templateError}
+          onLearn={(example, kind, cast, name) =>
+            void learnFromExample(example, kind, cast, name)
+          }
+          onKeep={() => void keepTemplate()}
+          onDiscard={() => {
+            setLearned(null);
+            setLearnedPreview(null);
+          }}
+          onDelete={(id) => void removeTemplate(id)}
+          onOpenFolder={() => void openTemplatesFolder()}
+          onClose={() => {
+            setTemplatesOpen(false);
+            setTemplateError(null);
+          }}
+        />
+      ) : null}
+
       <main className="panes">
-        <section
-          className={`pane${dragging ? ' dropping' : ''}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            void takeFiles([...e.dataTransfer.files]);
-          }}
-        >
+        <section className="pane">
           <div className="pane-h">
             <h2>References</h2>
             <button className="ghost" onClick={resetSession}>
@@ -940,74 +1080,63 @@ export function App() {
             </button>
           </div>
 
-          <Idea
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*,video/*,audio/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              void takeFiles([...(e.target.files ?? [])]);
+              // Cleared so choosing the same file twice fires again.
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={folderInput}
+            type="file"
+            hidden
+            // Not in the TS DOM types, but every Chromium webview has it.
+            {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+            onChange={(e) => {
+              void takeFiles([...(e.target.files ?? [])]);
+              e.target.value = '';
+            }}
+          />
+
+          <Input
+            mode={mode}
             idea={idea}
             templateId={templateId}
             templates={templates}
-            busy={writing}
-            disabled={hasKey === false}
+            writing={writing}
+            recording={recording}
+            hearing={hearing}
+            busy={extracting}
+            noKey={hasKey === false}
+            canSpeak={canSpeak}
+            speakNote={speakNote}
+            canReadMedia={canReadMedia}
+            onMode={setMode}
             onIdea={setIdea}
             onTemplate={setTemplateId}
             onWrite={() => void writeFromIdea()}
+            onRecord={() => void startSpeaking()}
+            onStopRecording={() => void stopSpeaking()}
+            onFile={() => void chooseReferences()}
+            onFolder={() => void chooseFolder()}
+            onTemplates={() => setTemplatesOpen(true)}
           />
 
-          <div className={`drop${dragging ? ' over' : ''}`}>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/*,video/*,audio/*"
-              multiple
-              hidden
-              onChange={(e) => {
-                void takeFiles([...(e.target.files ?? [])]);
-                // Cleared so choosing the same file twice fires again.
-                e.target.value = '';
-              }}
-            />
-            <input
-              ref={folderInput}
-              type="file"
-              hidden
-              // Not in the TS DOM types, but every Chromium webview has it.
-              {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
-              onChange={(e) => {
-                void takeFiles([...(e.target.files ?? [])]);
-                e.target.value = '';
-              }}
-            />
-
-            {extracting ? (
-              <p className="drop-busy">Reading {extracting}…</p>
-            ) : (
-              <>
-                <p className="drop-t">Drop references here — one, or a folder of them</p>
-                <div className="drop-b">
-                  <button
-                    className="solid"
-                    title="Stills, clips or tracks — whichever it is, it is read as that"
-                    onClick={() => void chooseReferences()}
-                  >
-                    Upload reference
-                  </button>
-                  <button className="ghost" onClick={() => void chooseFolder()}>
-                    Upload folder
-                  </button>
-                </div>
-                <p className="drop-n">
-                  {canReadMedia
-                    ? 'Stills, clips or tracks — each is read as what it is'
-                    : 'Stills · clips and tracks need ffmpeg on PATH'}
-                  {hasKey === false ? (
-                    <>
-                      {' · needs a key in '}
-                      <button className="link" onClick={() => setSettingsOpen(true)}>
-                        Settings
-                      </button>
-                    </>
-                  ) : null}
-                </p>
-              </>
-            )}
+          <div className="spend">
+            {hasKey === false ? (
+              <p className="drop-n">
+                {'Nothing can be read or written until there is a key in '}
+                <button className="link" onClick={() => setSettingsOpen(true)}>
+                  Settings
+                </button>
+              </p>
+            ) : null}
 
             <p className="drop-n money">
               <span>${spent.toFixed(4)} spent this session</span>
