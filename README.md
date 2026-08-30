@@ -138,43 +138,54 @@ size from the same angle, a camera that never stops doing the same thing. They
 read what the prompts actually say rather than what the shots store, so a move
 inherited from the world is counted like one that was typed.
 
-## One block
+## The bundle
 
-What you want, and what you brought. They are not two channels: a sentence
-narrows a reference and a reference grounds a sentence, and either alone is a
-fair answer — so there is one box, one row of attachments, and one button that
-does whatever the two of them add up to.
+What you want and what you brought are sources in one bundle, and the prompt is
+what they add up to.
 
-They go to the model as **one question**. A document assembled from two answers
-— one that read the picture, one that read the words — agrees with neither. So
-the reference goes in as what exists, the words as what is wanted, and the
-answer comes back as a description of the result rather than as a note about a
-change.
+Their jobs are not fixed. Someone can describe a character and attach a
+photograph for its light; someone else can attach a photograph of a character
+and type the light. The same two things, opposite ways round — so the job
+belongs to each source rather than to its kind, and each attachment carries one:
+subject, style, detail, setting, framing, or auto.
 
-A chosen reference is attached, not read. Nothing is spent until the button is
-pressed, because what a reference costs depends on what gets typed next to it.
-Stills accumulate — a style reference and a character reference are two pictures
-of one intention — while a clip or a track is exclusive, since there is no
-sensible reading of a song and a photograph at once.
+A style source contributes how a thing looks and nothing about what is in it. A
+style reference of a snowy street puts no snow in the picture; it lends the
+grade, the light and the grain of that photograph. Getting that wrong is the
+most common way a reference ruins a prompt, so the composer is told it in those
+words.
 
-Speaking is not a third thing. It is a way of filling the box, so it is an icon
-beside the box, and the words land there to be corrected before anything is
-spent on them. Recording happens in the window because only it has a microphone;
-transcribing happens on the host, because that is either a program on PATH or a
-request carrying a key. A whisper on PATH is preferred — free, private, no key —
-with a transcription API as the fallback.
+It happens in two passes, and that is the point.
 
-Nothing is dropped on the page. ffmpeg needs a path and a web view cannot give
-it one, so every reference is chosen; the host reads bytes off disk, draws the
-thumbnail, and lists what a folder holds. Which of the three ways a reference
-gets read is decided from its extension, in one list shared by the file dialog,
-the folder scan and the reader.
+Reading a reference is expensive and answers a question that never changes:
+what is in this picture. Putting that reading together with what was typed is
+cheap, needs no pictures at all, and answers a question that changes every time
+a word does. So a reference is read once and the reading is kept — rewriting the
+sentence beside a photograph costs a text call rather than another look at the
+photograph, and the button's price falls after the first press to say so.
 
-A folder is the same question asked of many references: whatever is in the box,
-and whichever template is chosen, applies to every one of them. Twenty character
-sheets are twenty readings of one intention.
+The second pass is also the only place a job can be given. A single call shown a
+picture and a sentence can be told to weigh them; it cannot be told that this
+picture is here for its light and nothing else.
 
-A folder scan does not descend.## Writing from an idea
+Nothing is averaged. Two sources disagreeing inside one job are not split down
+the middle — that makes a third thing which is neither. The one whose job owns
+the field wins, and where two share a job the earlier leads.
+
+One reference, nothing typed, no template: the reading already is the answer,
+and composing would only pay to restate it.
+
+## What shapes it
+
+A model card and a template of your own are the same kind of choice — both
+decide the form the finished prompt takes — so they are one list, grouped by
+what they make, and taking one puts the other down.
+
+A learned template records the model it came from, because it came from a prompt
+that worked on that model. Picking the template picks the dialect with it, and
+there is nothing left to choose.
+
+## Writing from an idea
 
 The opposite job to reading a reference, and it needs the opposite instruction.
 Reading says: describe what is there, and where the picture does not tell you,

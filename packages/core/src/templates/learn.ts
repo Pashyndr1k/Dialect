@@ -145,7 +145,7 @@ export interface LearnOptions {
   cast: CastSize;
   /** Overrides the name the model proposes. */
   name?: string;
-  /** The model the example was written for, if it is known. Recorded, not used. */
+  /** The model the example was written for. Kept, so the template renders in it. */
   writtenFor?: string;
 }
 
@@ -227,6 +227,7 @@ export function learnedToTemplate(
     name,
     description: answer.description,
     modality,
+    ...(options.writtenFor ? { target: options.writtenFor } : {}),
     variables: [
       ...variablesOf(answer.variables),
       ...(startsFromAnImage(options.kind)
@@ -293,6 +294,7 @@ export function templateToYaml(template: Template): string {
     name: template.name,
     ...(template.description ? { description: template.description } : {}),
     modality: template.modality,
+    ...(template.target ? { target: template.target } : {}),
     ...(template.extends ? { extends: template.extends } : {}),
     ...(template.snippets?.length ? { snippets: template.snippets } : {}),
     ...(template.variables?.length ? { variables: template.variables } : {}),

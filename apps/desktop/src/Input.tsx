@@ -1,4 +1,4 @@
-import type { Template } from '@dialect/core';
+import { ROLE_LABEL, SOURCE_ROLES, type SourceRole } from '@dialect/core';
 
 /**
  * One block: what you want, and what you brought.
@@ -12,12 +12,12 @@ import type { Template } from '@dialect/core';
  * icon beside the box.
  */
 
-/** Roughly what one call costs. Small, but not nothing, so it is shown. */
-export const PER_CALL_USD = 0.02;
-
 export interface Attachment {
   name: string;
   kind: 'image' | 'video' | 'audio';
+  role: SourceRole;
+  /** What it turned out to say, once it has been read. */
+  read?: string;
 }
 
 function Mic({ recording }: { recording: boolean }) {
@@ -41,28 +41,24 @@ function Mic({ recording }: { recording: boolean }) {
 export function Input({
   idea,
   attached,
-  templateId,
-  templates,
   working,
   recording,
   hearing,
   canSpeak,
   speakNote,
   noKey,
+  cost,
   onIdea,
-  onTemplate,
+  onRole,
   onGo,
   onRecord,
   onStopRecording,
   onAttach,
   onDetach,
   onFolder,
-  onTemplates,
 }: {
   idea: string;
   attached: Attachment[];
-  templateId: string;
-  templates: Template[];
   /** Reading, writing, or both — the label the button carries while it runs. */
   working: string | null;
   recording: boolean;
@@ -70,15 +66,16 @@ export function Input({
   canSpeak: boolean;
   speakNote: string;
   noKey: boolean;
+  /** What pressing the button will cost, given what has already been read. */
+  cost: number;
   onIdea: (next: string) => void;
-  onTemplate: (next: string) => void;
+  onRole: (name: string, role: SourceRole) => void;
   onGo: () => void;
   onRecord: () => void;
   onStopRecording: () => void;
   onAttach: () => void;
   onDetach: (name: string) => void;
   onFolder: () => void;
-  onTemplates: () => void;
 }) {
   const ready = (idea.trim().length > 0 || attached.length > 0) && !working && !noKey;
 
@@ -110,8 +107,20 @@ export function Input({
       {attached.length > 0 ? (
         <ul className="refs">
           {attached.map((a) => (
-            <li key={a.name} className={`ref ${a.kind}`}>
+            <li key={a.name} className={`ref ${a.kind}`} title={a.read ?? a.name}>
               <span className="ref-n">{a.name}</span>
+              <select
+                className="ref-r"
+                value={a.role}
+                aria-label={`What ${a.name} is for`}
+                onChange={(e) => onRole(a.name, e.target.value as SourceRole)}
+              >
+                {SOURCE_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABEL[r]}
+                  </option>
+                ))}
+              </select>
               <button
                 className="ref-x"
                 aria-label={`Remove ${a.name}`}
@@ -132,26 +141,8 @@ export function Input({
           Folder
         </button>
 
-        <select
-          className="idea-s"
-          value={templateId}
-          title={templates.find((t) => t.id === templateId)?.description ?? 'No template'}
-          onChange={(e) => onTemplate(e.target.value)}
-        >
-          <option value="">No template</option>
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-
-        <button className="ghost" title="Make a template from a prompt you have" onClick={onTemplates}>
-          Edit
-        </button>
-
         <button className="solid go" disabled={!ready} onClick={onGo}>
-          {working ?? `Prompt · $${PER_CALL_USD.toFixed(2)}`}
+          {working ?? `Prompt · $${cost.toFixed(2)}`}
         </button>
       </div>
     </div>

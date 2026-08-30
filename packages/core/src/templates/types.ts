@@ -42,6 +42,14 @@ export interface Template {
   name: string;
   description?: string;
   modality: Modality;
+  /**
+   * The model this template is for.
+   *
+   * A learned template came from a prompt that worked on a particular model, so
+   * the dialect it renders in is part of the template rather than a separate
+   * choice — picking the template picks the model with it.
+   */
+  target?: string;
   /** Id of a template to build on. Its IR is merged first, so this one wins. */
   extends?: string;
   variables?: Variable[];

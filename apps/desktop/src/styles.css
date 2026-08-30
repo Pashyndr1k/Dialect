@@ -513,6 +513,11 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 .ref.video { border-left-color: var(--hot); }
 .ref.audio { border-left-color: var(--ink-3); }
 .ref-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+.ref-r {
+  font: inherit; font-size: 10.5px; padding: 0 2px; border: 0; border-radius: 3px;
+  background: transparent; color: var(--ink-3); cursor: pointer;
+}
+.ref-r:hover, .ref-r:focus { color: var(--accent); }
 .ref-x {
   background: none; border: 0; color: var(--ink-3); cursor: pointer;
   font-size: 13px; line-height: 1; padding: 0 2px;
@@ -523,6 +528,19 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 .in-row .ghost, .in-row .solid { margin-bottom: 0; }
 .in-row .idea-s { max-width: 150px; }
 .in-row .go { margin-left: auto; }
+
+/* --- what shapes the prompt: a model, or a template of your own --- */
+.shape {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  padding: 8px 10px; border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--surface);
+}
+.shape-s { flex: 1; min-width: 0; }
+.shape-n {
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-3); white-space: nowrap;
+}
+.shape .ghost { margin-bottom: 0; flex-shrink: 0; }
 
 .spend { margin-bottom: 12px; }
 .spend .drop-n { margin-bottom: 4px; }

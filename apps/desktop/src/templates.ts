@@ -3,9 +3,7 @@ import {
   createLibrary,
   parseLibrary,
   parseTemplate,
-  templatesFor,
   type Library,
-  type Modality,
   type Template,
 } from '@dialect/core';
 
@@ -100,6 +98,13 @@ export function libraryWith(custom: Template[]): Library {
   return createLibrary([...templates.values()], [...builtinLibrary.snippets.values()]);
 }
 
-/** Only the templates that make sense for what is being made. */
-export const templatesForModality = (library: Library, modality: Modality): Template[] =>
-  templatesFor(library, modality).sort((a, b) => a.name.localeCompare(b.name));
+/**
+ * Every template, ordered by what it makes and then by name.
+ *
+ * Not filtered to a chosen target: picking a template is picking what to make,
+ * and the target follows from it rather than the other way round.
+ */
+export const allTemplates = (library: Library): Template[] =>
+  [...library.templates.values()].sort(
+    (a, b) => a.modality.localeCompare(b.modality) || a.name.localeCompare(b.name),
+  );

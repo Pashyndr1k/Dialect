@@ -18,3 +18,4 @@ export * from './extract/index.ts';
 export * from './templates/index.ts';
 export * from './batch/queue.ts';
 export * from './sequence/index.ts';
+export * from './compose/index.ts';

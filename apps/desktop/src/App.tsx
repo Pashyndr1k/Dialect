@@ -20,9 +20,17 @@ import {
   compileSequence,
   sequenceFromIR,
   sequenceToDocument,
+  composeBundle,
   extractFromAudio,
   extractFromImages,
   extractFromVideo,
+  sceneLines,
+  shotLines,
+  songLines,
+  wordLines,
+  type Bundle,
+  type BundleItem,
+  type SourceRole,
   expandIdea,
   fillTemplate,
   ideaLabel,
@@ -56,6 +64,7 @@ import { PromptActions, References, type BatchItem } from './Batch.tsx';
 import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
 import { Input } from './Input.tsx';
+import { Shape } from './Shape.tsx';
 import { Templates } from './Templates.tsx';
 import { Shots } from './Shots.tsx';
 import { HostProvider } from './provider.ts';
@@ -95,7 +104,7 @@ import {
   listTemplates,
   openTemplatesFolder,
   saveTemplate,
-  templatesForModality,
+  allTemplates,
 } from './templates.ts';
 import { record, transcribe, voiceTools, type Recording } from './voice.ts';
 import videoExample from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
@@ -117,6 +126,16 @@ interface Source {
   name: string;
   path?: string;
   file?: File;
+  /** What this one is here for. `auto` lets the composer work it out. */
+  role: SourceRole;
+}
+
+/** What a reference turned out to say, kept so a second press costs nothing. */
+interface Reading {
+  lines: string[];
+  ir: PromptIR;
+  key: string;
+  thumb?: string;
 }
 
 /** The opening document follows the target, so the two never disagree. */
@@ -159,6 +178,10 @@ const SURE_ENOUGH = 0.25;
 /** More stills than this in one prompt stops adding anything and starts costing. */
 const MAX_ATTACHED = 4;
 
+/** Looking at a reference; and putting what everything says together. */
+const PER_READ_USD = 0.02;
+const PER_WRITE_USD = 0.01;
+
 export function App() {
   const [irText, setIrText] = useState(() => JSON.stringify(imageExample, null, 2));
   const [target, setTarget] = useState('nano-banana-2');
@@ -188,6 +211,23 @@ export function App() {
   const recorder = useRef<Recording | null>(null);
 
   const [templatesOpen, setTemplatesOpen] = useState(false);
+
+  /**
+   * Pick a model to render in.
+   *
+   * With nothing read yet, the opening document follows the family, so the
+   * window is never showing a song through a camera dialect.
+   */
+  const chooseModel = (id: string): void => {
+    const next = getProfile(registry, id);
+    if (next.family !== profile.family && batch.length === 0) {
+      setIrText(JSON.stringify(exampleFor(next.family), null, 2));
+    }
+    setTarget(id);
+    setDisabled(new Set());
+    setSelected(null);
+    setCopied(false);
+  };
   const [custom, setCustom] = useState<Template[]>([]);
   const [learning, setLearning] = useState(false);
   const [learned, setLearned] = useState<Template | null>(null);
@@ -281,6 +321,14 @@ export function App() {
   /** The references themselves, kept so a preview has something to show. */
   const held = useRef(new Map<string, Source>());
   const results = useRef(new Map<string, PromptIR>());
+  /**
+   * Readings, by reference name.
+   *
+   * A picture says the same thing however many times the sentence beside it is
+   * rewritten, so it is read once and the reading is kept. Changing a word then
+   * costs the composing call and nothing else.
+   */
+  const readings = useRef(new Map<string, Reading>());
   const abort = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -357,10 +405,11 @@ export function App() {
    */
   const readOne = async (sources: Source[]): Promise<PromptIR> => {
     const source = sources[0]!;
-    const { ir, key, thumb, cached } = await readByKind(sources);
+    const { ir, key } = await documentFor(sources);
 
     // Filed under a name and a picture, so what was paid for can be found
-    // again. A cached read still refreshes the date — it was used today.
+    // again. A read still refreshes the date — it was used today.
+    const thumb = readings.current.get(source.name)?.thumb;
     if (thumb) thumbs.current.set(source.name, thumb);
     setLibrary(
       await rememberRead({
@@ -370,7 +419,6 @@ export function App() {
         ...(thumb ? { thumb } : {}),
       }),
     );
-    if (cached) setExtractError(null);
 
     return ir;
   };
@@ -383,83 +431,114 @@ export function App() {
    * with neither of them. What the kind decides is only how the reference is
    * turned into something a model can look at.
    */
-  const readByKind = async (
-    sources: Source[],
-  ): Promise<{ ir: PromptIR; key: string; cached: boolean; thumb?: string }> => {
-    const first = sources[0];
-    if (!first) throw new Error('nothing to read');
+  /**
+   * What one reference says — asked once, and only about the reference.
+   *
+   * Nothing that was typed goes into this question. That is the point: the
+   * answer to "what is in this picture" does not change when the sentence beside
+   * it does, so it is worth keeping, and keeping it is what makes rewriting the
+   * sentence cheap.
+   */
+  const readSource = async (source: Source): Promise<Reading> => {
+    const kept = readings.current.get(source.name);
+    if (kept) return kept;
 
-    const { note, templateId: template } = asked.current;
-    const reference =
-      sources.length === 1 ? first.name : `${first.name} +${sources.length - 1}`;
+    const reference = source.name;
+    let reading: Reading;
 
-    const through = async (
-      parts: Array<{ mediaType: string; base64: string }>,
-      plain: () => Promise<{ ir: PromptIR; key: string; cached: boolean }>,
-    ) =>
-      template
-        ? await fillTemplate(gateway, note, activeLibrary, template, parts)
-        : await plain();
-
-    if (first.kind === 'video') {
-      const path = first.path!;
+    if (source.kind === 'video') {
+      const path = source.path!;
       const probe = await probeVideo(path);
       const frames = await videoFrames(path, 5);
-      const parts = frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 }));
 
-      const { ir, key, cached } = await through(parts, () =>
-        extractFromVideo(gateway, parts, {
-          reference,
-          durationS: probe.duration_s,
-          aspectRatio: probe.aspect_ratio,
-          ...(note ? { note } : {}),
-        }),
+      const { ir, shot, key } = await extractFromVideo(
+        gateway,
+        frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 })),
+        { reference, durationS: probe.duration_s, aspectRatio: probe.aspect_ratio },
       );
       // The first frame stands in for the clip.
-      return { ir, key, cached, thumb: `data:image/jpeg;base64,${frames[0]!.base64}` };
-    }
-
-    if (first.kind === 'audio') {
-      const m = await measureAudio(first.path!);
+      reading = { lines: shotLines(shot), ir, key, thumb: `data:image/jpeg;base64,${frames[0]!.base64}` };
+    } else if (source.kind === 'audio') {
+      const m = await measureAudio(source.path!);
       const parts = m.pictures.map((p) => ({ mediaType: 'image/jpeg', base64: p.base64 }));
 
-      const { ir, key, cached } = await through(parts, () =>
-        extractFromAudio(gateway, parts, {
-          reference,
-          durationS: m.probe.duration_s,
-          ...(note ? { note } : {}),
-          ...(m.tempo && m.tempo.confidence > SURE_ENOUGH ? { bpm: m.tempo.bpm } : {}),
-          ...(m.key && m.key.confidence > SURE_ENOUGH ? { musicalKey: m.key.name } : {}),
-          ...(m.lufs !== null ? { lufs: m.lufs } : {}),
-          ...(m.lra !== null ? { lra: m.lra } : {}),
-          ...(m.probe.title ? { title: m.probe.title } : {}),
-          ...(m.probe.artist ? { artist: m.probe.artist } : {}),
-          ...(m.probe.genre ? { taggedGenre: m.probe.genre } : {}),
-        }),
-      );
+      const { ir, song, key } = await extractFromAudio(gateway, parts, {
+        reference,
+        durationS: m.probe.duration_s,
+        ...(m.tempo && m.tempo.confidence > SURE_ENOUGH ? { bpm: m.tempo.bpm } : {}),
+        ...(m.key && m.key.confidence > SURE_ENOUGH ? { musicalKey: m.key.name } : {}),
+        ...(m.lufs !== null ? { lufs: m.lufs } : {}),
+        ...(m.lra !== null ? { lra: m.lra } : {}),
+        ...(m.probe.title ? { title: m.probe.title } : {}),
+        ...(m.probe.artist ? { artist: m.probe.artist } : {}),
+        ...(m.probe.genre ? { taggedGenre: m.probe.genre } : {}),
+      });
 
       const picture = m.pictures[0];
-      return {
+      reading = {
+        lines: songLines(song),
         ir,
         key,
-        cached,
         ...(picture ? { thumb: `data:image/jpeg;base64,${picture.base64}` } : {}),
       };
-    }
-
-    const parts = await Promise.all(
-      sources.map(async (source) => ({
+    } else {
+      const part = {
         mediaType: source.file?.type || mediaTypeOf(source.name),
         base64: source.file ? await toBase64(source.file) : (await readFile(source.path!)).base64,
+      };
+
+      const { ir, scene, key } = await extractFromImages(gateway, [part], { reference });
+      const thumb = source.file ? await thumbnail(source.file) : await thumbOf(source.path!);
+      reading = { lines: sceneLines(scene), ir, key, ...(thumb ? { thumb } : {}) };
+    }
+
+    readings.current.set(source.name, reading);
+    return reading;
+  };
+
+  /**
+   * The document a set of references and a sentence add up to.
+   *
+   * Reading each reference is one question; putting them together with what was
+   * typed is another. They stay apart because only the first is expensive and
+   * only the second changes when a word does — and because a job like "this one
+   * is here for its light" cannot be said to a call that is looking at the
+   * picture itself.
+   *
+   * One reference, nothing typed, no template: the reading already is the
+   * answer, and composing would only pay to restate it.
+   */
+  const documentFor = async (sources: Source[]): Promise<{ ir: PromptIR; key: string }> => {
+    const { note, templateId: template } = asked.current;
+    const read = await Promise.all(sources.map(async (s) => ({ source: s, reading: await readSource(s) })));
+
+    if (!template && sources.length === 1 && !note) {
+      const only = read[0]!;
+      return { ir: only.reading.ir, key: only.reading.key };
+    }
+
+    if (!template && sources.length === 0) {
+      const { ir, key } = await expandIdea(gateway, note, {
+        modality: modalityOfFamily(profile.family),
+      });
+      return { ir, key };
+    }
+
+    const items: BundleItem[] = [
+      ...(note ? [{ id: 'words', kind: 'words' as const, role: 'auto' as const, lines: wordLines(note) }] : []),
+      ...read.map(({ source, reading }) => ({
+        id: source.name,
+        kind: source.kind,
+        role: source.role,
+        lines: reading.lines,
       })),
-    );
+    ];
 
-    const { ir, key, cached } = await through(parts, () =>
-      extractFromImages(gateway, parts, { reference, ...(note ? { note } : {}) }),
-    );
-
-    const thumb = first.file ? await thumbnail(first.file) : await thumbOf(first.path!);
-    return { ir, key, cached, ...(thumb ? { thumb } : {}) };
+    const bundle: Bundle = { items, modality: modalityOfFamily(profile.family) };
+    const { ir, key } = await composeBundle(gateway, bundle, {
+      ...(template ? { templateId: template, library: activeLibrary } : {}),
+    });
+    return { ir, key };
   };
 
   const showIR = (next: PromptIR): void => {
@@ -554,7 +633,7 @@ export function App() {
     for (const file of incoming) {
       const kind = kindOfMediaType(file.type) ?? kindOf(file.name);
       if (!kind) skipped += 1;
-      else if (kind === 'image') sources.push({ kind, name: file.name, file });
+      else if (kind === 'image') sources.push({ kind, name: file.name, file, role: 'auto' });
       else needsApp += 1;
     }
 
@@ -638,6 +717,20 @@ export function App() {
    * have put it — there is only one kind of document, and nothing downstream
    * cares which way it arrived.
    */
+  /**
+   * What pressing the button will cost.
+   *
+   * A reference already read costs nothing to use again, so the number falls
+   * after the first press — which is the whole point of reading it apart from
+   * composing it, said without a sentence explaining it.
+   */
+  const cost = (() => {
+    const unread = attached.filter((a) => !readings.current.has(a.name)).length;
+    const composes =
+      templateId !== '' || attached.length > 1 || (attached.length > 0 && idea.trim() !== '');
+    return unread * PER_READ_USD + (composes || attached.length === 0 ? PER_WRITE_USD : 0);
+  })();
+
   /**
    * The one action: whatever the words and the references add up to.
    *
@@ -826,7 +919,7 @@ export function App() {
     for (const path of paths) {
       const name = nameOf(path);
       const kind = kindOf(name);
-      if (kind) sources.push({ kind, name, path });
+      if (kind) sources.push({ kind, name, path, role: 'auto' });
       else skipped += 1;
     }
     return [sources, skipped];
@@ -996,6 +1089,7 @@ export function App() {
   const resetSession = (): void => {
     held.current.clear();
     results.current.clear();
+    readings.current.clear();
     setBatch([]);
     setActiveRef(null);
     setPromptOf(null);
@@ -1075,16 +1169,13 @@ export function App() {
    * Only the templates that make sense for what is being made. A template that
    * cannot apply to the chosen target is not a choice, it is a mistake waiting.
    */
-  const templates = useMemo(
-    () => templatesForModality(activeLibrary, modalityOfFamily(profile.family)),
-    [activeLibrary, profile.family],
-  );
-
-  useEffect(() => {
-    // Switching from a video target to an image one leaves a video template
-    // selected and unusable, so it is dropped rather than left to fail.
-    if (templateId && !templates.some((t) => t.id === templateId)) setTemplateId('');
-  }, [templates, templateId]);
+  /**
+   * Every template, whatever it makes.
+   *
+   * They used to be filtered to the chosen target, which had it backwards:
+   * picking a template is picking what to make, and the target follows from it.
+   */
+  const templates = useMemo(() => allTemplates(activeLibrary), [activeLibrary]);
 
   const isOn = (s: Segment): boolean => !disabled.has(s.label);
 
@@ -1117,29 +1208,6 @@ export function App() {
       <header className="bar">
         <span className="brand">Dialect</span>
         <span className="ver" title="version">{__APP_VERSION__}</span>
-        <label className="field">
-          <span className="field-k">Target</span>
-          <select
-            title={profile.routingNote?.trim().replace(/\s+/g, ' ')}
-            value={target}
-            onChange={(e) => {
-              const next = getProfile(registry, e.target.value);
-              if (next.family !== profile.family && batch.length === 0) {
-                setIrText(JSON.stringify(exampleFor(next.family), null, 2));
-              }
-              setTarget(e.target.value);
-              setDisabled(new Set());
-              setSelected(null);
-              setCopied(false);
-            }}
-          >
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label} · {p.family}
-              </option>
-            ))}
-          </select>
-        </label>
         <button className="ghost bar-end" onClick={() => setSettingsOpen(true)}>
           Settings
         </button>
@@ -1206,24 +1274,59 @@ export function App() {
 
           <Input
             idea={idea}
-            attached={attached.map((a) => ({ name: a.name, kind: a.kind }))}
-            templateId={templateId}
-            templates={templates}
+            attached={attached.map((a) => ({
+              name: a.name,
+              kind: a.kind,
+              role: a.role,
+              ...(readings.current.get(a.name)?.lines[0]
+                ? { read: readings.current.get(a.name)!.lines[0]! }
+                : {}),
+            }))}
             working={writing ? 'Working…' : extracting ? `Reading ${extracting}…` : null}
             recording={recording}
             hearing={hearing}
             canSpeak={canSpeak}
             speakNote={speakNote}
             noKey={hasKey === false}
+            cost={cost}
             onIdea={setIdea}
-            onTemplate={setTemplateId}
+            onRole={(name, role) =>
+              setAttached((prev) => prev.map((a) => (a.name === name ? { ...a, role } : a)))
+            }
             onGo={() => void makePrompt()}
             onRecord={() => void startSpeaking()}
             onStopRecording={() => void stopSpeaking()}
             onAttach={() => void chooseReferences()}
             onDetach={(name) => setAttached((prev) => prev.filter((a) => a.name !== name))}
             onFolder={() => void chooseFolder()}
-            onTemplates={() => setTemplatesOpen(true)}
+          />
+
+          <Shape
+            target={target}
+            templateId={templateId}
+            profiles={profiles}
+            templates={templates}
+            onModel={(id) => {
+              chooseModel(id);
+              // A model and a template are the same choice made two ways, so
+              // taking one puts the other down.
+              setTemplateId('');
+            }}
+            onTemplate={(id) => {
+              setTemplateId(id);
+              const picked = templates.find((t) => t.id === id);
+              // The template came from a prompt that worked on some model, so
+              // that model comes with it. Failing that, whatever is already
+              // selected if it makes the right kind of thing — switching to a
+              // video template should not move anyone off Kling.
+              const model =
+                picked?.target ??
+                (profile.family === picked?.modality
+                  ? target
+                  : profiles.find((p) => p.family === picked?.modality)?.id);
+              if (model) chooseModel(model);
+            }}
+            onEdit={() => setTemplatesOpen(true)}
           />
 
           <div className="spend">
