@@ -214,51 +214,60 @@ export function App() {
     setSelected(null);
   };
 
-  /** Reset to example is a document, not a reference: nothing to preview. */
-  const showExample = (next: PromptIR): void => {
-    showIR(next);
-    setActiveRef(null);
-    setPromptOf(null);
-  };
-
   /**
-   * One reference is read straight away. Several are staged, because a dozen
-   * is a spend worth seeing before it happens.
+   * Anything dropped joins the list at the top and stays for the session.
+   *
+   * One reference is read straight away — a single deliberate act. Several are
+   * staged and wait for a decision, because a dozen is a spend worth seeing
+   * before it happens.
    */
-  const takeFiles = async (files: File[]): Promise<void> => {
+  const takeFiles = async (incoming: File[]): Promise<void> => {
     setExtractError(null);
 
-    const usable = files.filter((f) => READABLE.has(f.type));
-    const rejected = files.length - usable.length;
+    const usable = incoming.filter((f) => READABLE.has(f.type));
+    const rejected = incoming.length - usable.length;
+
     if (usable.length === 0) {
       setExtractError(
         `Nothing readable there. Drop PNG, JPEG, WebP or GIF${rejected > 0 ? ` — ${rejected} file(s) were something else` : ''}.`,
       );
       return;
     }
-    if (rejected > 0) {
-      setExtractError(`Skipped ${rejected} file(s) that were not images.`);
+
+    // Names are the identity, so dropping the same file twice does not read it
+    // twice or split the list.
+    const fresh = usable.filter((f) => !held.current.has(f.name));
+    if (fresh.length === 0) {
+      setExtractError(
+        usable.length === 1
+          ? `${usable[0]!.name} is already in the list.`
+          : 'Those are all in the list already.',
+      );
+      setActiveRef(usable[0]!.name);
+      return;
     }
+    if (rejected > 0) setExtractError(`Skipped ${rejected} file(s) that were not images.`);
 
-    if (usable.length === 1) {
-      const file = usable[0]!;
-      setBatch([]);
-      held.current.clear();
-      results.current.clear();
-      held.current.set(file.name, file);
-      // Shown straight away: the preview is about what you dropped, not about
-      // whether reading it worked.
+    for (const file of fresh) held.current.set(file.name, file);
+    const mark = (id: string, patch: Partial<BatchItem>): void =>
+      setBatch((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+
+    if (fresh.length === 1) {
+      const file = fresh[0]!;
+      setBatch((prev) => [{ id: file.name, name: file.name, state: 'running' }, ...prev]);
       setActiveRef(file.name);
-
       setExtracting(file.name);
+
       try {
         const ir = await readOne(file);
-        showIR(ir);
         results.current.set(file.name, ir);
-        setActiveRef(file.name);
+        showIR(ir);
         setPromptOf(file.name);
+        mark(file.name, { state: 'done' });
       } catch (err) {
-        setExtractError(err instanceof Error ? err.message : String(err));
+        const message = err instanceof Error ? err.message : String(err);
+        setExtractError(message);
+        mark(file.name, { state: 'failed', error: message });
       } finally {
         setExtracting(null);
         refreshCache();
@@ -266,15 +275,13 @@ export function App() {
       return;
     }
 
-    held.current.clear();
-    results.current.clear();
-    setActiveRef(null);
-
-    for (const file of usable) held.current.set(file.name, file);
-    setBatch(usable.map((f) => ({ id: f.name, name: f.name, state: 'staged' as const })));
+    setBatch((prev) => [
+      ...fresh.map((f) => ({ id: f.name, name: f.name, state: 'staged' as const })),
+      ...prev,
+    ]);
     // Show the first straight away, so the set can be looked through before
     // anyone decides to pay for it.
-    setActiveRef(usable[0]!.name);
+    setActiveRef(fresh[0]!.name);
   };
 
   const runBatch = async (): Promise<void> => {
@@ -284,22 +291,22 @@ export function App() {
     const controller = new AbortController();
     abort.current = controller;
 
-    const state = createQueue(
-      [...held.current.keys()].map((name) => ({ id: name, ref: name })),
-    );
+    const waiting = batch.filter((i) => i.state === 'staged' || i.state === 'queued');
+    const state = createQueue(waiting.map((i) => ({ id: i.id, ref: i.id })));
 
     try {
       await runQueue(state, {
         concurrency: 3,
         signal: controller.signal,
         onChange: (s) => {
-          setBatch(
-            s.items.map((i) => ({
-              id: i.id,
-              name: i.id,
-              state: i.state,
-              ...(i.error ? { error: i.error } : {}),
-            })),
+          const byId = new Map(s.items.map((i) => [i.id, i]));
+          setBatch((prev) =>
+            prev.map((item) => {
+              const run = byId.get(item.id);
+              return run
+                ? { ...item, state: run.state, ...(run.error ? { error: run.error } : {}) }
+                : item;
+            }),
           );
         },
         work: async (item) => {
@@ -392,13 +399,16 @@ export function App() {
     }
   };
 
-  const clearBatch = (): void => {
+  /** Back to nothing: no references, no results, the example document again. */
+  const resetSession = (): void => {
     held.current.clear();
     results.current.clear();
     setBatch([]);
     setActiveRef(null);
     setPromptOf(null);
     setSavedTo(null);
+    setExtractError(null);
+    showIR(exampleFor(profile.family) as PromptIR);
   };
 
   const parsed = useMemo(() => parseIR(irText), [irText]);
@@ -490,6 +500,9 @@ export function App() {
         >
           <div className="pane-h">
             <h2>References</h2>
+            <button className="ghost" onClick={resetSession}>
+              Reset
+            </button>
           </div>
 
           <div className={`drop${dragging ? ' over' : ''}`}>
@@ -585,7 +598,6 @@ export function App() {
             running={running}
             onRun={() => void runBatch()}
             onStop={() => abort.current?.abort()}
-            onClear={clearBatch}
             onSelect={openFromBatch}
           />
         </section>
@@ -696,15 +708,7 @@ export function App() {
           ) : null}
 
           <div className="block doc">
-            <h3>
-              Document
-              <button
-                className="ghost doc-reset"
-                onClick={() => showExample(exampleFor(profile.family) as PromptIR)}
-              >
-                Reset to example
-              </button>
-            </h3>
+            <h3>Document</h3>
             <textarea
               className="ir"
               spellCheck={false}

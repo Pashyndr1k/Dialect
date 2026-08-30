@@ -225,10 +225,14 @@ than the editor's guess at them.
 Editing a field rewrites the IR, so every target recompiles, not just the one on
 screen. Where a field came from a reference, the panel says which one.
 
-Drop one reference and it is read straight away. Drop several — or a whole
-folder — and they are staged instead, with what the run will cost, because a
-dozen is a spend worth seeing before it happens. Rows report their own state as
-the queue works through them.
+The reference list is always on screen and keeps everything the session has
+seen. Anything dropped joins it at the top: one reference is read straight away,
+several are staged and wait for a decision, because a dozen is a spend worth
+seeing before it happens. Dropping the same file twice says so rather than
+reading it again.
+
+Pick any row to see that reference and, if it has been read, its prompt. Reset
+empties the session and puts the example document back.
 
 A finished batch is worked with three ways: open any row into the editor, copy
 one row's prompt from the row itself, or save the lot to a folder you pick. The

@@ -39,7 +39,6 @@ export function References({
   running,
   onRun,
   onStop,
-  onClear,
   onSelect,
 }: {
   items: BatchItem[];
@@ -47,11 +46,8 @@ export function References({
   running: boolean;
   onRun: () => void;
   onStop: () => void;
-  onClear: () => void;
   onSelect: (id: string) => void;
 }) {
-  if (items.length === 0) return null;
-
   const waiting = countOf(items, 'staged', 'queued');
   const reading = countOf(items, 'running');
   const done = countOf(items, 'done');
@@ -60,9 +56,13 @@ export function References({
     <div className="batch">
       <div className="batch-h">
         <h3>
-          {items.length} reference{items.length === 1 ? '' : 's'}
+          This session
           <span className="batch-c">
-            {running ? `reading ${done + reading} of ${items.length}` : `${done} read`}
+            {items.length === 0
+              ? 'nothing yet'
+              : running
+                ? `reading ${done + reading} of ${items.length}`
+                : `${items.length} reference${items.length === 1 ? '' : 's'} · ${done} read`}
           </span>
         </h3>
 
@@ -71,20 +71,19 @@ export function References({
             <button className="ghost" onClick={onStop}>
               Stop
             </button>
-          ) : (
-            <>
-              {waiting > 0 ? (
-                <button className="solid" onClick={onRun}>
-                  Read {waiting} · about ${(waiting * PER_REFERENCE_USD).toFixed(2)}
-                </button>
-              ) : null}
-              <button className="ghost" onClick={onClear}>
-                Clear
-              </button>
-            </>
-          )}
+          ) : waiting > 0 ? (
+            <button className="solid" onClick={onRun}>
+              Read {waiting} · about ${(waiting * PER_REFERENCE_USD).toFixed(2)}
+            </button>
+          ) : null}
         </div>
       </div>
+
+      {items.length === 0 ? (
+        <p className="rows-empty">
+          Whatever you drop above is listed here, and stays listed while the window is open.
+        </p>
+      ) : null}
 
       <ul className="rows-b">
         {items.map((item) => (
