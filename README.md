@@ -197,17 +197,22 @@ cannot surprise you:
 
 Two panes, and which side a thing belongs on is not a matter of taste.
 
-**Left is everything that goes in**: the references, the document, what the
-session has cost, what the cache is holding, and the button that starts a run.
+**Left is what you gave it**: the references, a preview of the one being worked
+on, how each is getting on, what reading them costs, and what the cache already
+holds.
 
-**Right is everything to do with the prompt**: which result is showing, the
-prompt itself, the blocks it is made of, the fields behind them, and what the
-rules had to say.
+**Right is what it made**: the document extracted from a reference, the prompt
+that compiles from it, the blocks that prompt is made of, the fields behind
+them, and what the rules had to say.
 
-A batch obeys the same line. What was dropped and what reading it will cost are
-input, so they sit under the drop zone. The results are prompts, so they sit
-above the prompt they let you choose between — pick a row and its prompt shows,
-exactly as a single reference does. The same five files never appear twice.
+The IR sits on the right for the same reason the prompt does — it is a result,
+not something anyone typed. Putting it on the left had split one thing across
+both panes, with its raw form on one side and the fields that edit it on the
+other.
+
+Pick any reference to see it, read or not. Its prompt appears if there is one,
+and the header stays quiet if there is not, rather than labelling the example
+with someone else's file name.
 
 Between the panes sit the chips: one per segment of the prompt.
 

@@ -2,14 +2,15 @@
  * The window is two panes, and which side a thing belongs on is not a matter of
  * taste:
  *
- *   Left  — everything that goes in. The references, the document, what the
- *           session has cost, what the cache is holding.
- *   Right — everything to do with the prompt. Which result is showing, the
- *           prompt itself, the blocks it is made of, the fields behind them,
- *           and what the rules had to say.
+ *   Left  — what you gave the app. The references, how each one is getting on,
+ *           what reading them costs, and what the cache already holds.
+ *   Right — what the app made. The document it extracted, the prompt that
+ *           compiles from it, the blocks that prompt is made of, the fields
+ *           behind them, and what the rules had to say.
  *
- * A batch's results are results, so they live on the right, above the prompt
- * they let you choose between.
+ * The IR belongs on the right for the same reason the prompt does: it is a
+ * result, not something anyone typed. It sits under the prompt because that is
+ * the order you reach for them in.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,7 +26,7 @@ import {
   type Segment,
 } from '@dialect/core';
 import { createQueue, runQueue } from '@dialect/core';
-import { BatchControls, BatchResults, type BatchItem } from './Batch.tsx';
+import { PromptActions, References, type BatchItem } from './Batch.tsx';
 import { Fields } from './Fields.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
@@ -96,9 +97,30 @@ export function App() {
   const folderInput = useRef<HTMLInputElement>(null);
 
   const [batch, setBatch] = useState<BatchItem[]>([]);
-  const [batchOpen, setBatchOpen] = useState<string | null>(null);
+  const [activeRef, setActiveRef] = useState<string | null>(null);
+  /**
+   * Which reference the prompt on the right actually came from. Not the same
+   * as what is being previewed: you can look at a reference that has not been
+   * read, and the header must not claim its prompt is on screen.
+   */
+  const [promptOf, setPromptOf] = useState<string | null>(null);
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [cache, setCache] = useState<{ entries: number; bytes: number } | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  // An object URL holds the file open until it is revoked, so each one is
+  // released as soon as another reference takes its place.
+  useEffect(() => {
+    const file = activeRef ? held.current.get(activeRef) : undefined;
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [activeRef, batch]);
 
   const refreshCache = (): void => {
     void cacheStats().then(setCache);
@@ -107,7 +129,8 @@ export function App() {
   const [running, setRunning] = useState(false);
   // Files and their extracted IRs live outside React state: neither is
   // serialisable, and neither belongs in a render.
-  const staged = useRef(new Map<string, File>());
+  /** The dropped files themselves, kept so a preview has bytes to show. */
+  const held = useRef(new Map<string, File>());
   const results = useRef(new Map<string, PromptIR>());
   const abort = useRef<AbortController | null>(null);
 
@@ -191,6 +214,13 @@ export function App() {
     setSelected(null);
   };
 
+  /** Reset to example is a document, not a reference: nothing to preview. */
+  const showExample = (next: PromptIR): void => {
+    showIR(next);
+    setActiveRef(null);
+    setPromptOf(null);
+  };
+
   /**
    * One reference is read straight away. Several are staged, because a dozen
    * is a spend worth seeing before it happens.
@@ -213,12 +243,20 @@ export function App() {
     if (usable.length === 1) {
       const file = usable[0]!;
       setBatch([]);
-      staged.current.clear();
+      held.current.clear();
       results.current.clear();
+      held.current.set(file.name, file);
+      // Shown straight away: the preview is about what you dropped, not about
+      // whether reading it worked.
+      setActiveRef(file.name);
 
       setExtracting(file.name);
       try {
-        showIR(await readOne(file));
+        const ir = await readOne(file);
+        showIR(ir);
+        results.current.set(file.name, ir);
+        setActiveRef(file.name);
+        setPromptOf(file.name);
       } catch (err) {
         setExtractError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -228,12 +266,15 @@ export function App() {
       return;
     }
 
-    staged.current.clear();
+    held.current.clear();
     results.current.clear();
-    setBatchOpen(null);
+    setActiveRef(null);
 
-    for (const file of usable) staged.current.set(file.name, file);
+    for (const file of usable) held.current.set(file.name, file);
     setBatch(usable.map((f) => ({ id: f.name, name: f.name, state: 'staged' as const })));
+    // Show the first straight away, so the set can be looked through before
+    // anyone decides to pay for it.
+    setActiveRef(usable[0]!.name);
   };
 
   const runBatch = async (): Promise<void> => {
@@ -244,7 +285,7 @@ export function App() {
     abort.current = controller;
 
     const state = createQueue(
-      [...staged.current.keys()].map((name) => ({ id: name, ref: name })),
+      [...held.current.keys()].map((name) => ({ id: name, ref: name })),
     );
 
     try {
@@ -262,7 +303,7 @@ export function App() {
           );
         },
         work: async (item) => {
-          const file = staged.current.get(item.id);
+          const file = held.current.get(item.id);
           if (!file) throw new Error('that file is no longer here');
           results.current.set(item.id, await readOne(file));
           return item.id;
@@ -277,7 +318,8 @@ export function App() {
         const ir = results.current.get(first.id);
         if (ir) {
           showIR(ir);
-          setBatchOpen(first.id);
+          setActiveRef(first.id);
+          setPromptOf(first.id);
         }
       }
     } finally {
@@ -288,10 +330,16 @@ export function App() {
   };
 
   const openFromBatch = (id: string): void => {
+    setActiveRef(id);
+    // A reference that failed, or has not been read yet, still shows its
+    // picture; there is simply no prompt to go with it.
     const ir = results.current.get(id);
-    if (!ir) return;
-    showIR(ir);
-    setBatchOpen(id);
+    if (ir) {
+      showIR(ir);
+      setPromptOf(id);
+    } else {
+      setPromptOf(null);
+    }
   };
 
   /** The finished references, compiled against whatever target is showing. */
@@ -321,11 +369,6 @@ export function App() {
     window.setTimeout(() => setCopied(false), 1600);
   };
 
-  const copyOne = async (id: string): Promise<void> => {
-    const one = finished().find((f) => f.id === id);
-    if (one) await navigator.clipboard.writeText(one.document);
-  };
-
   const saveAll = async (): Promise<void> => {
     setExtractError(null);
     const all = finished();
@@ -350,10 +393,11 @@ export function App() {
   };
 
   const clearBatch = (): void => {
-    staged.current.clear();
+    held.current.clear();
     results.current.clear();
     setBatch([]);
-    setBatchOpen(null);
+    setActiveRef(null);
+    setPromptOf(null);
     setSavedTo(null);
   };
 
@@ -445,13 +489,7 @@ export function App() {
           }}
         >
           <div className="pane-h">
-            <h2>Source</h2>
-            <button
-              className="ghost"
-              onClick={() => showIR(exampleFor(profile.family) as PromptIR)}
-            >
-              Reset to example
-            </button>
+            <h2>References</h2>
           </div>
 
           <div className={`drop${dragging ? ' over' : ''}`}>
@@ -530,45 +568,44 @@ export function App() {
               ) : null}
             </p>
 
-            <BatchControls
-              items={batch}
-              running={running}
-              onRun={() => void runBatch()}
-              onStop={() => abort.current?.abort()}
-              onClear={clearBatch}
-            />
           </div>
 
           {extractError ? <p className="err">{extractError}</p> : null}
 
-          <textarea
-            className="ir"
-            spellCheck={false}
-            value={irText}
-            onChange={(e) => setIrText(e.target.value)}
+          {preview && activeRef ? (
+            <figure className="preview">
+              <img src={preview} alt={`The reference being worked on: ${activeRef}`} />
+              <figcaption>{activeRef}</figcaption>
+            </figure>
+          ) : null}
+
+          <References
+            items={batch}
+            selected={activeRef}
+            running={running}
+            onRun={() => void runBatch()}
+            onStop={() => abort.current?.abort()}
+            onClear={clearBatch}
+            onSelect={openFromBatch}
           />
-          {'error' in parsed ? <p className="err">This is not valid JSON: {parsed.error}</p> : null}
         </section>
 
         <section className="pane">
           <div className="pane-h">
             <h2>
               Prompt
-              {batchOpen ? <span className="pane-of">{batchOpen}</span> : null}
+              {promptOf ? <span className="pane-of">{promptOf}</span> : null}
             </h2>
             <button className="ghost" onClick={() => void copy()} disabled={!promptText}>
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
 
-          <BatchResults
-            items={batch}
-            selected={batchOpen}
-            onSelect={openFromBatch}
-            onCopyOne={(id) => void copyOne(id)}
-            onCopyAll={() => void copyAll()}
-            onSaveAll={() => void saveAll()}
+          <PromptActions
+            done={batch.filter((i) => i.state === 'done').length}
             saved={savedTo}
+            onSaveAll={() => void saveAll()}
+            onCopyAll={() => void copyAll()}
           />
 
           {compiled && 'failure' in compiled ? (
@@ -657,6 +694,27 @@ export function App() {
               </div>
             </>
           ) : null}
+
+          <div className="block doc">
+            <h3>
+              Document
+              <button
+                className="ghost doc-reset"
+                onClick={() => showExample(exampleFor(profile.family) as PromptIR)}
+              >
+                Reset to example
+              </button>
+            </h3>
+            <textarea
+              className="ir"
+              spellCheck={false}
+              value={irText}
+              onChange={(e) => setIrText(e.target.value)}
+            />
+            {'error' in parsed ? (
+              <p className="err">This is not valid JSON: {parsed.error}</p>
+            ) : null}
+          </div>
         </section>
       </main>
     </div>

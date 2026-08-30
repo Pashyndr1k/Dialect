@@ -307,8 +307,7 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   font-size: 11.5px; color: var(--ink); background: none; border: 0; padding: 0;
   cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.row-name:disabled { color: var(--ink-3); cursor: default; }
-.row-name:hover:not(:disabled) { color: var(--accent); }
+.row-name:hover { color: var(--accent); }
 .row-state { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
 .row-b.running .row-state { color: var(--accent); }
 .row-b.done .row-state { color: var(--accent); }
@@ -343,11 +342,34 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 }
 
 /* --- staging, under the drop zone --- */
-.staging {
-  display: flex; align-items: center; justify-content: center;
-  gap: 10px; flex-wrap: wrap; margin-top: 4px;
-  padding-top: 12px; border-top: 1px solid var(--rule);
-  width: 100%;
+.prompt-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 10px 12px;
+  border: 1px solid var(--rule); border-radius: 6px; background: var(--surface);
 }
-.staging-c { font-size: 12.5px; color: var(--ink-2); }
-.staging .ghost, .staging .solid { margin-bottom: 0; }
+.pa-c { flex: 1; font-size: 12.5px; color: var(--ink-2); }
+.prompt-actions .ghost, .prompt-actions .solid { margin-bottom: 0; }
+.pa-saved {
+  flex-basis: 100%; margin: 0; font-size: 11.5px; color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.doc { margin-top: 22px; }
+.doc h3 { justify-content: space-between; }
+.doc-reset { margin-bottom: 0; letter-spacing: 0; text-transform: none; }
+.doc .ir { min-height: 220px; }
+
+/* --- the reference being worked on --- */
+.preview {
+  flex-shrink: 0; margin: 0 0 12px; padding: 10px;
+  border: 1px solid var(--rule); border-radius: 6px; background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.preview img {
+  max-width: 100%; max-height: 260px; border-radius: 4px;
+  background: var(--surface-2); object-fit: contain;
+}
+.preview figcaption {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  overflow-wrap: anywhere; text-align: center;
+}
