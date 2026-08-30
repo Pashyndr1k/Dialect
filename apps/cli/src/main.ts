@@ -23,6 +23,7 @@ import { applyTemplate, chainFor, MissingVariablesError } from '@dialect/core';
 import { loadBuiltinRegistry } from '@dialect/core/node';
 import { loadBuiltinLibrary } from '@dialect/core/templates-node';
 import { runBatch } from './batch.ts';
+import { manifestFor, newKeypair, publicKeyOf, signSet } from './sign.ts';
 import { AnthropicProvider } from '@dialect/providers';
 
 const USAGE = `dialect — compile a Prompt IR into one model's dialect
@@ -33,6 +34,8 @@ const USAGE = `dialect — compile a Prompt IR into one model's dialect
   dialect batch <folder>    --target <model-id> --out <dir> [--budget <usd>]
   dialect templates [--modality <image|video|audio>]
   dialect apply <template-id> --target <model-id> [--set name=value ...] [--ir-out <file>]
+  dialect keygen            [--key-out <file>]
+  dialect sign <cards-dir>  --key <file> --version <n> [--channel <name>]
 
 Options
   --target        model id from the registry, e.g. kling-3-omni
@@ -46,6 +49,10 @@ Options
   --concurrency   how many references are read at once (default 4)
   --name-as       output file name (default {{basename}}_{{target}}.txt)
   --restart       ignore saved progress and run the folder again
+  --key           the signing key, as written by keygen
+  --key-out       where keygen writes the private key (default dialect-key.pem)
+  --version       the set's version. A machine will not install an older one.
+  --channel       which set this is (default dialect-models)
 
 extract needs Anthropic credentials: set ANTHROPIC_API_KEY, or run 'ant auth login'.
 `;
@@ -286,6 +293,57 @@ async function cmdBatch(): Promise<number> {
   });
 }
 
+/**
+ * Make a publisher key.
+ *
+ * The public half is what a machine is told to trust; the private half signs
+ * and never leaves here. Printed once and written once, because a key that is
+ * emailed around is not a key.
+ */
+async function cmdKeygen(): Promise<number> {
+  const out = flag('key-out') ?? 'dialect-key.pem';
+  const { publicKeyHex, privateKeyPem } = newKeypair();
+
+  await writeFile(out, privateKeyPem, { mode: 0o600 });
+  stdout.write(`Private key written to ${out}. Keep it; it is the only one.\n\n`);
+  stdout.write(`Trust this on any machine that should accept your card sets:\n`);
+  stdout.write(`${publicKeyHex}\n`);
+  return 0;
+}
+
+/**
+ * Sign a folder of cards so a machine that trusts the key will install them.
+ *
+ * The version has to be given rather than guessed: it is what stops a set being
+ * replaced by an older one, and a number invented here would be a number nobody
+ * decided.
+ */
+async function cmdSign(): Promise<number> {
+  const dir = argv[3];
+  const keyPath = flag('key');
+  const version = Number(flag('version'));
+
+  if (!dir || !keyPath || !Number.isInteger(version) || version < 1) {
+    stderr.write('sign needs a folder, --key <file> and --version <n>\n');
+    return 2;
+  }
+
+  const privateKeyPem = await readFile(keyPath, 'utf8');
+  const manifest = await manifestFor(dir, {
+    channel: flag('channel') ?? 'dialect-models',
+    version,
+  });
+  await signSet(dir, manifest, privateKeyPem);
+
+  stdout.write(`${manifest.channel} v${manifest.version}, ${manifest.files.length} cards\n`);
+  for (const file of manifest.files) {
+    stdout.write(`  ${file.name}  ${file.sha256.slice(0, 12)}\n`);
+  }
+  stdout.write(`\nSigned by ${publicKeyOf(privateKeyPem)}\n`);
+  stdout.write(`Point the app at ${dir} — or serve that folder — to install it.\n`);
+  return 0;
+}
+
 async function main(): Promise<number> {
   switch (argv[2]) {
     case 'compile':
@@ -300,6 +358,10 @@ async function main(): Promise<number> {
       return cmdTemplates();
     case 'apply':
       return cmdApply();
+    case 'keygen':
+      return cmdKeygen();
+    case 'sign':
+      return cmdSign();
     default:
       stderr.write(USAGE);
       return 2;

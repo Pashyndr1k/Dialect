@@ -10,6 +10,7 @@ export * from './ir/types.ts';
 export * from './ir/paths.ts';
 export * from './registry/types.ts';
 export * from './registry/load.ts';
+export * from './registry/layers.ts';
 export * from './renderers/index.ts';
 export * from './rules/index.ts';
 export * from './compile.ts';

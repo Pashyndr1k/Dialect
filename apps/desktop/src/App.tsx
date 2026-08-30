@@ -96,7 +96,9 @@ import {
   type OutFile,
   type Session,
 } from './store.ts';
-import { profiles, registry } from './registry.ts';
+import { BUILTIN, sortProfiles } from './registry.ts';
+import { loadRegistry } from './channel.ts';
+import { Cards } from './Cards.tsx';
 import { Settings } from './Settings.tsx';
 import {
   deleteTemplate,
@@ -224,6 +226,21 @@ export function App() {
   const recorder = useRef<Recording | null>(null);
 
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [cardsOpen, setCardsOpen] = useState(false);
+
+  /**
+   * The cards actually in force: what shipped, plus an installed set, plus any
+   * written by hand. Read once at startup and after an install, because the
+   * other two layers live with the host.
+   */
+  const [loaded, setLoaded] = useState(BUILTIN);
+  const registry = loaded.registry;
+  const profiles = useMemo(() => sortProfiles(loaded), [loaded]);
+
+  const refreshCards = (): void => {
+    void loadRegistry().then(setLoaded);
+  };
+  useEffect(refreshCards, []);
 
   /**
    * Pick a model to render in.
@@ -1130,7 +1147,12 @@ export function App() {
   };
 
   const parsed = useMemo(() => parseIR(irText), [irText]);
-  const profile = useMemo(() => getProfile(registry, target), [target]);
+  const profile = useMemo(() => {
+    // An installed set can drop the card that was selected. Falling back to
+    // whatever is there beats throwing on the next render.
+    const known = registry.profiles.get(target);
+    return known ?? profiles[0] ?? getProfile(BUILTIN.registry, 'nano-banana-2');
+  }, [registry, profiles, target]);
 
   const compiled = useMemo(() => {
     if ('error' in parsed) return null;
@@ -1238,12 +1260,31 @@ export function App() {
       <header className="bar">
         <span className="brand">Dialect</span>
         <span className="ver" title="version">{__APP_VERSION__}</span>
-        <button className="ghost bar-end" onClick={() => setSettingsOpen(true)}>
+        <button
+          className="ghost bar-end"
+          title={`${BUILTIN.registry.profiles.size} cards shipped; ${registry.profiles.size} in use`}
+          onClick={() => setCardsOpen(true)}
+        >
+          Cards
+          {loaded.rejected.length > 0 ? (
+            <span className="count">{loaded.rejected.length}</span>
+          ) : null}
+        </button>
+        <button className="ghost" onClick={() => setSettingsOpen(true)}>
           Settings
         </button>
       </header>
 
       {settingsOpen ? <Settings onClose={() => setSettingsOpen(false)} /> : null}
+
+      {cardsOpen ? (
+        <Cards
+          rejected={loaded.rejected}
+          cardCount={registry.profiles.size}
+          onChanged={refreshCards}
+          onClose={() => setCardsOpen(false)}
+        />
+      ) : null}
 
       {templatesOpen ? (
         <Templates

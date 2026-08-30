@@ -173,6 +173,8 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 
 /* --- settings sheet --- */
 .bar-end { margin-left: auto; margin-bottom: 0; }
+.bar .ghost { margin-bottom: 0; }
+.bar .count { margin-left: 5px; }
 
 .sheet {
   position: fixed; inset: 0; z-index: 20;

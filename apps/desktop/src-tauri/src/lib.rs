@@ -8,6 +8,7 @@
 
 mod anthropic;
 mod audio;
+mod channel;
 mod customs;
 mod files;
 mod media;
@@ -44,6 +45,15 @@ pub fn run() {
             files::file_read,
             files::file_thumb,
             files::folder_scan,
+            channel::channel_trust,
+            channel::channel_distrust,
+            channel::channel_status,
+            channel::channel_cards,
+            channel::channel_check,
+            channel::channel_install,
+            channel::channel_revert,
+            channel::cards_folder,
+            channel::my_cards,
             customs::templates_list,
             customs::template_save,
             customs::template_delete,

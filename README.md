@@ -257,6 +257,53 @@ short honest list beats a long invented one.
 
 Lyrics are not transcribed. That needs a speech model, and nothing here has one.
 
+## Cards that arrive after the build
+
+Model cards are dated. The formula a model wants this month is not the one it
+wanted last, and the card is the only thing between that change and a wrong
+prompt — so the set has to be replaceable without a new binary.
+
+Which makes it a supply chain, and the design says so out loud. A card decides
+what every prompt says: its field list *is* the formula, its defaults are what
+goes in unasked. Anyone who can drop a file in that folder can rewrite what this
+app produces without touching a line of its code.
+
+So a set installs only if it carries an Ed25519 signature from a key trusted
+beforehand, and every file in it hashes to what the signed manifest says. The
+signature covers the manifest bytes exactly as fetched, never a
+re-serialisation: a manifest that round-trips differently would verify something
+nobody signed. Verification happens in the host rather than the window, for the
+plain reason that the window is the thing being replaced.
+
+Nothing is ever half-installed. A set is fetched whole, verified whole, staged,
+and only then swapped in — a broken update leaves the working one exactly where
+it was, which is the only reason any of this is worth doing. An older version
+does not replace a newer one unless someone insists, which is how you get off a
+set that turned out wrong.
+
+`dialect keygen` makes a publisher key and prints the half to trust; `dialect
+sign` writes the manifest and its signature beside the cards. A folder is as
+good as a URL — that is how a set reaches a machine that is not online, and how
+one is tried before it is published.
+
+The two halves are written in different languages, so a fixture signed by the
+command line is checked against the host's verifier in the test suite. A
+disagreement about what Ed25519 over those bytes means would otherwise turn up
+on someone's machine when an update refuses to install.
+
+## Cards you write yourself
+
+Three layers: what the build shipped, what a signed set brought, what you wrote.
+Later wins by id, so a hand-written card overrides either — which is what the
+cards being data was always for.
+
+Loading stopped being all-or-nothing at the same time. A set of eleven cards
+where one is malformed gives ten cards and a complaint, and the card underneath
+the broken one still stands. A card naming a renderer this build has never heard
+of is refused at load rather than at render — finding that out when someone
+presses the button, having already paid to read a reference, is finding out too
+late.
+
 ## The key
 
 Extraction needs an Anthropic key. It is typed into the app's own settings panel
