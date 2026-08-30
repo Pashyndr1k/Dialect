@@ -1,0 +1,376 @@
+/**
+ * The live pass: every prompt, once, against a real model.
+ *
+ * This project has a lot of carefully written system prompts and, until this
+ * ran, almost none of them had ever been read by the thing they were written
+ * for. Every test drives a MockProvider that hands back whatever the test said
+ * — which proves the plumbing and proves nothing whatever about the prompts.
+ *
+ * So each step here exercises one prompt end to end and writes down what came
+ * back. The point is not that it did not throw. The point is the answer, in
+ * full, in a file, so a person can read it and say whether the prompt asked for
+ * the right thing.
+ *
+ * `--dry` builds every request and prints it without calling anything. That is
+ * how the wording gets reviewed before a penny is spent, and how this file was
+ * itself checked.
+ */
+
+import { spawnSync } from 'node:child_process';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import {
+  composeBundle,
+  expandIdea,
+  extractFromAudio,
+  extractFromImages,
+  extractFromVideo,
+  fillTemplate,
+  Gateway,
+  learnTemplate,
+  sceneLines,
+  type Bundle,
+  type ImagePart,
+  type Provider,
+  type ProviderResult,
+  type StructuredRequest,
+  ZERO_USAGE,
+} from '@dialect/core';
+import { loadBuiltinLibrary } from '@dialect/core/templates-node';
+
+/**
+ * A stand-in answer, shaped like whatever was asked for.
+ *
+ * A dry run that threw on the first call only ever showed the first request —
+ * so `compose`, which reads a reference before composing anything, reported the
+ * reading and never built the thing it exists to check. Answering instead of
+ * throwing lets every step run to its end with no model involved.
+ */
+function stubFor(schema: unknown): unknown {
+  const def = (schema as { def?: Record<string, unknown> }).def;
+  const kind = def?.['type'] as string | undefined;
+
+  switch (kind) {
+    case 'object': {
+      const shape = (def?.['shape'] ?? {}) as Record<string, unknown>;
+      return Object.fromEntries(Object.entries(shape).map(([k, v]) => [k, stubFor(v)]));
+    }
+    case 'array':
+      return [];
+    case 'number':
+      return 1;
+    case 'boolean':
+      return false;
+    case 'enum': {
+      const entries = def?.['entries'] as Record<string, string> | undefined;
+      return Object.values(entries ?? {})[0] ?? '';
+    }
+    case 'optional':
+    case 'nullable':
+      return stubFor(def?.['innerType']);
+    default:
+      return 'stub';
+  }
+}
+
+/** Records what it was asked and answers with a stub, so a step runs to its end. */
+class DryProvider implements Provider {
+  readonly id = 'dry';
+  readonly model = 'none';
+  readonly seen: Array<StructuredRequest<unknown>> = [];
+
+  async extract<T>(request: StructuredRequest<T>): Promise<ProviderResult<T>> {
+    this.seen.push(request as StructuredRequest<unknown>);
+
+    const parsed = request.schema.safeParse(stubFor(request.schema));
+    if (!parsed.success) {
+      throw new Error(
+        `the stub did not satisfy ${request.schemaVersion} — the request was still recorded`,
+      );
+    }
+    return { value: parsed.data, usage: ZERO_USAGE, model: 'none' };
+  }
+}
+
+function describeRequest(request: StructuredRequest<unknown>, n: number, of: number): string {
+  const shape = (request.schema as unknown as { shape?: object }).shape;
+  return [
+    `=== request ${n} of ${of} ===`,
+    `# schema: ${request.schemaVersion}`,
+    `# images: ${request.images?.length ?? 0}`,
+    `# fields: ${shape ? Object.keys(shape).join(', ') : '(not an object schema)'}`,
+    '',
+    '--- SYSTEM ---',
+    request.system,
+    '',
+    '--- INSTRUCTION ---',
+    request.instruction,
+    '',
+  ].join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Media, from one clip
+// ---------------------------------------------------------------------------
+
+function ffmpeg(args: string[]): Buffer | undefined {
+  const out = spawnSync('ffmpeg', ['-v', 'error', ...args], { maxBuffer: 64 * 1024 * 1024 });
+  return out.status === 0 && out.stdout.length > 0 ? out.stdout : undefined;
+}
+
+const asPart = (bytes: Buffer): ImagePart => ({
+  mediaType: 'image/jpeg',
+  base64: bytes.toString('base64'),
+});
+
+/**
+ * Every modality out of one file.
+ *
+ * A clip holds a still, a sequence of stills, and — if it was recorded with
+ * sound — something to draw a spectrogram of. One fixture rather than three
+ * keeps the probe honest about what it is actually testing.
+ */
+function mediaFrom(clip: string): {
+  stills: ImagePart[];
+  frames: ImagePart[];
+  sound: ImagePart[];
+} {
+  const at = (t: string) =>
+    ffmpeg(['-ss', t, '-i', clip, '-frames:v', '1', '-vf', "scale='min(768,iw)':-2", '-q:v', '4', '-f', 'image2', '-']);
+
+  const stills = [at('0.5')].filter(Boolean).map((b) => asPart(b!));
+  const frames = ['0.3', '1.6', '3.0', '4.4', '5.8']
+    .map(at)
+    .filter(Boolean)
+    .map((b) => asPart(b!));
+
+  const spectrogram = ffmpeg([
+    '-i', clip,
+    '-lavfi', 'showspectrumpic=s=1024x512:mode=combined:legend=disabled:scale=log',
+    '-frames:v', '1', '-c:v', 'mjpeg', '-q:v', '3', '-f', 'image2', '-',
+  ]);
+
+  return { stills, frames, sound: spectrogram ? [asPart(spectrogram)] : [] };
+}
+
+// ---------------------------------------------------------------------------
+// The steps
+// ---------------------------------------------------------------------------
+
+export interface Step {
+  name: string;
+  /** What this one proves that no other step does. */
+  proves: string;
+  run(gateway: Gateway, media: ReturnType<typeof mediaFrom>): Promise<unknown>;
+}
+
+const EXAMPLE_PROMPT = `Full-body character concept for a dark fantasy RPG. A
+grizzled dwarven smith, broad and low-slung, beard braided with iron rings, soot
+ground into the creases of his hands. Hand-painted texture, thick confident
+brushwork, visible canvas grain. Three-quarter view, neutral A-pose, plain slate
+background, even studio light with a warm rim from the left. No text, no
+watermark, no border.`;
+
+export async function stepsFor(): Promise<Step[]> {
+  const library = await loadBuiltinLibrary();
+
+  return [
+    {
+      name: 'read-image',
+      proves: 'EXTRACTION_SYSTEM — the only prompt with any live history',
+      run: async (gateway, media) =>
+        (await extractFromImages(gateway, media.stills, { reference: 'probe.jpg' })).scene,
+    },
+    {
+      name: 'read-image-with-words',
+      proves: 'notedInstruction — that a note steers a reading without becoming a diff',
+      run: async (gateway, media) =>
+        (
+          await extractFromImages(gateway, media.stills, {
+            reference: 'probe.jpg',
+            note: 'at night, and older',
+          })
+        ).scene,
+    },
+    {
+      name: 'read-clip',
+      proves: 'SHOT_SYSTEM — that movement is read from how frames differ',
+      run: async (gateway, media) =>
+        (await extractFromVideo(gateway, media.frames, { reference: 'probe.mp4', durationS: 6.4 }))
+          .shot,
+    },
+    {
+      name: 'read-track',
+      proves: 'SONG_SYSTEM — that a spectrogram yields something, and admits what it cannot tell',
+      run: async (gateway, media) =>
+        (await extractFromAudio(gateway, media.sound, { reference: 'probe.mp3', durationS: 6.4 }))
+          .song,
+    },
+    {
+      name: 'idea-to-document',
+      proves: 'IDEA_SYSTEM — that it decides rather than hedges',
+      run: async (gateway) =>
+        (await expandIdea(gateway, 'a red door in the rain', { modality: 'image' })).ir,
+    },
+    {
+      name: 'idea-into-template',
+      proves: "TEMPLATE_SYSTEM — that it answers the template's questions and nothing else",
+      run: async (gateway) =>
+        (await fillTemplate(gateway, 'a cowboy at a bar', library, 'cinematic-shot')).values,
+    },
+    {
+      name: 'compose',
+      proves: 'COMPOSE_SYSTEM — the one that has never run, and the one roles depend on',
+      run: async (gateway, media) => {
+        // A reading is needed first, so this step is the expensive one.
+        const read = await extractFromImages(gateway, media.stills, { reference: 'subject.jpg' });
+
+        const bundle: Bundle = {
+          modality: 'image',
+          items: [
+            { id: 'words', kind: 'words', role: 'auto', lines: ['make it a winter street at dusk'] },
+            { id: 'subject.jpg', kind: 'image', role: 'subject', lines: sceneLines(read.scene) },
+          ],
+        };
+        return (await composeBundle(gateway, bundle)).ir;
+      },
+    },
+    {
+      name: 'learn-template',
+      proves: 'LEARN_SYSTEM — that it finds the seams instead of rewriting the prompt',
+      run: async (gateway) =>
+        (
+          await learnTemplate(gateway, EXAMPLE_PROMPT, {
+            kind: 'text2img',
+            cast: 1,
+            name: 'Probe characters',
+          })
+        ).template,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Running
+// ---------------------------------------------------------------------------
+
+export interface ProbeOptions {
+  clip: string;
+  out: string;
+  dry: boolean;
+  only?: string[];
+  provider: Provider;
+  budgetUsd: number;
+  log: (line: string) => void;
+}
+
+export interface StepOutcome {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
+export async function runProbe(options: ProbeOptions): Promise<StepOutcome[]> {
+  const { log } = options;
+  const media = mediaFrom(options.clip);
+
+  log(`media: ${media.stills.length} still, ${media.frames.length} frames, ${media.sound.length} spectrogram\n`);
+  if (media.stills.length === 0) {
+    throw new Error(`ffmpeg produced nothing from ${options.clip}. Is it on PATH?`);
+  }
+
+  const all = await stepsFor();
+  const steps = options.only ? all.filter((s) => options.only!.includes(s.name)) : all;
+  await mkdir(options.out, { recursive: true });
+
+  const outcomes: StepOutcome[] = [];
+
+  for (const step of steps) {
+    // A fresh gateway per step: one step's spend must not silently cap another,
+    // and a dry step must not carry a real provider into the next.
+    const dryProvider = options.dry ? new DryProvider() : undefined;
+    const gateway = new Gateway(dryProvider ?? options.provider, {
+      budgetUsd: options.budgetUsd,
+    });
+
+    log(`── ${step.name}\n   ${step.proves}\n`);
+    let failure: string | undefined;
+
+    try {
+      const answer = await step.run(gateway, media);
+      if (!options.dry) {
+        await writeFile(
+          join(options.out, `${step.name}.json`),
+          `${JSON.stringify(answer, null, 2)}\n`,
+        );
+      }
+    } catch (err) {
+      failure = err instanceof Error ? err.message : String(err);
+    }
+
+    if (dryProvider) {
+      // Written whether or not the step finished: a request that was built is
+      // worth reading even if what came after it fell over.
+      const seen = dryProvider.seen;
+      await writeFile(
+        join(options.out, `${step.name}.request.txt`),
+        [
+          `# ${step.name} — ${step.proves}`,
+          '',
+          ...seen.map((r, i) => describeRequest(r, i + 1, seen.length)),
+        ].join('\n'),
+      );
+
+      const words = seen.reduce((n, r) => n + (r.system + r.instruction).split(/\s+/).length, 0);
+      const images = seen.reduce((n, r) => n + (r.images?.length ?? 0), 0);
+      const detail = `${seen.length} request${seen.length === 1 ? '' : 's'}, ${images} images, ~${words} words`;
+
+      log(`   built · ${detail}${failure ? ` · ${failure}` : ''}\n\n`);
+      outcomes.push({ name: step.name, ok: seen.length > 0 && !failure, detail });
+      continue;
+    }
+
+    if (failure) {
+      log(`   FAILED · ${failure}\n\n`);
+      outcomes.push({ name: step.name, ok: false, detail: failure });
+      continue;
+    }
+
+    log(`   ok · $${gateway.spentUsd.toFixed(4)} · ${step.name}.json\n\n`);
+    outcomes.push({ name: step.name, ok: true, detail: `$${gateway.spentUsd.toFixed(4)}` });
+  }
+
+  return outcomes;
+}
+
+/** The report, so a run can be read later rather than scrolled past. */
+export async function writeReport(
+  dir: string,
+  outcomes: StepOutcome[],
+  dry: boolean,
+): Promise<void> {
+  const lines = [
+    `# Live pass — ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+    dry ? '\nDry: every request was built, none was sent.\n' : '',
+    ...outcomes.map((o) => `- ${o.ok ? 'ok' : 'FAILED'}  ${o.name}  ${o.detail}`),
+    '',
+    dry
+      ? 'Read the .request.txt files: that is exactly what a live run would send.'
+      : 'Read the .json files. The question is not whether they parsed — it is whether the answer is any good.',
+    '',
+  ];
+  await writeFile(join(dir, 'report.md'), lines.join('\n'));
+}
+
+/** Used by the CLI to say where the fixture clip lives. */
+export const DEFAULT_CLIP = join(
+  process.cwd(),
+  'apps/desktop/src-tauri/tests/fixtures/clip.mp4',
+);
+
+export const clipExists = async (path: string): Promise<boolean> =>
+  readFile(path).then(
+    () => true,
+    () => false,
+  );

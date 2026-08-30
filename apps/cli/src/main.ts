@@ -24,6 +24,7 @@ import { loadBuiltinRegistry } from '@dialect/core/node';
 import { loadBuiltinLibrary } from '@dialect/core/templates-node';
 import { runBatch } from './batch.ts';
 import { manifestFor, newKeypair, publicKeyOf, signSet } from './sign.ts';
+import { clipExists, DEFAULT_CLIP, runProbe, writeReport } from './probe.ts';
 import { AnthropicProvider } from '@dialect/providers';
 
 const USAGE = `dialect — compile a Prompt IR into one model's dialect
@@ -36,6 +37,7 @@ const USAGE = `dialect — compile a Prompt IR into one model's dialect
   dialect apply <template-id> --target <model-id> [--set name=value ...] [--ir-out <file>]
   dialect keygen            [--key-out <file>]
   dialect sign <cards-dir>  --key <file> --version <n> [--channel <name>]
+  dialect probe             --out <dir> [--dry] [--budget <usd>] [--only a,b]
 
 Options
   --target        model id from the registry, e.g. kling-3-omni
@@ -53,6 +55,9 @@ Options
   --key-out       where keygen writes the private key (default dialect-key.pem)
   --version       the set's version. A machine will not install an older one.
   --channel       which set this is (default dialect-models)
+  --dry           build every request and print it; call nothing, spend nothing
+  --only          run just these probe steps, by name, comma-separated
+  --clip          the media the probe reads (default the test fixture)
 
 extract needs Anthropic credentials: set ANTHROPIC_API_KEY, or run 'ant auth login'.
 `;
@@ -344,6 +349,54 @@ async function cmdSign(): Promise<number> {
   return 0;
 }
 
+/**
+ * Run every prompt once against a real model, and write down what came back.
+ *
+ * The tests drive a mock that returns whatever the test said, so they prove the
+ * plumbing and nothing about the prompts. This is the only thing that does.
+ */
+async function cmdProbe(): Promise<number> {
+  const out = flag('out') ?? 'probe';
+  const dry = argv.includes('--dry');
+  const clip = flag('clip') ?? DEFAULT_CLIP;
+  const only = flag('only')?.split(',').map((s) => s.trim());
+  const budgetUsd = Number(flag('budget') ?? '0.60');
+
+  if (!(await clipExists(clip))) {
+    stderr.write(`No media at ${clip}. Pass --clip <file>.
+`);
+    return 2;
+  }
+
+  // A dry run must not need credentials: reviewing the wording is the step
+  // before deciding whether to pay for the answers.
+  const provider = dry
+    ? ({ id: 'none', model: 'none', extract: () => { throw new Error('dry'); } } as never)
+    : new AnthropicProvider();
+
+  stdout.write(
+    dry
+      ? 'Dry run: building every request, sending none.\n\n'
+      : `Live run, capped at $${budgetUsd.toFixed(2)} per step. This spends real money.\n\n`,
+  );
+
+  const outcomes = await runProbe({
+    clip,
+    out,
+    dry,
+    ...(only ? { only } : {}),
+    provider,
+    budgetUsd,
+    log: (line) => stdout.write(line),
+  });
+  await writeReport(out, outcomes, dry);
+
+  const failed = outcomes.filter((o) => !o.ok);
+  stdout.write(`${outcomes.length - failed.length}/${outcomes.length} · report in ${out}/report.md
+`);
+  return failed.length === 0 ? 0 : 1;
+}
+
 async function main(): Promise<number> {
   switch (argv[2]) {
     case 'compile':
@@ -362,6 +415,8 @@ async function main(): Promise<number> {
       return cmdKeygen();
     case 'sign':
       return cmdSign();
+    case 'probe':
+      return cmdProbe();
     default:
       stderr.write(USAGE);
       return 2;
