@@ -1,0 +1,57 @@
+{
+  "id": "probe-characters",
+  "name": "Probe characters",
+  "description": "Turns a one-line character idea into a hand-painted full-body concept sheet on a neutral studio backdrop — reach for it when building a cast for a dark fantasy RPG.",
+  "modality": "image",
+  "variables": [
+    {
+      "name": "character_description",
+      "label": "Character description",
+      "hint": "A sentence or two naming who they are, then two or three concrete physical details — build, hair or beard, wardrobe, wear and grime. E.g. 'A gaunt elven poacher, wiry and long-limbed, hair matted with pine resin, deerhide coat patched at the elbows.'",
+      "default": "A grizzled dwarven smith, broad and low-slung, beard braided with iron rings, soot ground into the creases of his hands."
+    }
+  ],
+  "ir": {
+    "modality": "image",
+    "mode": "generate",
+    "subject": {
+      "headline": "full-body character concept on a plain slate backdrop",
+      "entities": [
+        {
+          "id": "e1",
+          "type": "person",
+          "name": "the character",
+          "description": "{{character_description}}"
+        }
+      ],
+      "action": "standing in a neutral A-pose for a character sheet"
+    },
+    "environment": {
+      "location": "plain slate background",
+      "description": "plain slate background, featureless studio sweep with no props or set dressing"
+    },
+    "shot": {
+      "angle": "Three-quarter view"
+    },
+    "lighting": {
+      "key": "even studio light",
+      "sources": [
+        "warm rim from the left"
+      ]
+    },
+    "optics": {},
+    "palette": {
+      "dominant": []
+    },
+    "texture": {},
+    "style": {
+      "medium": "Hand-painted texture, thick confident brushwork, visible canvas grain. No text, no watermark, no border.",
+      "genre": "dark fantasy RPG character concept"
+    },
+    "mood": {}
+  },
+  "source": {
+    "name": "Learned from an example prompt",
+    "dated": "2026-08-30"
+  }
+}

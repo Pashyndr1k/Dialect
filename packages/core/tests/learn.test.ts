@@ -70,6 +70,7 @@ const LEARNED_IMAGE: LearnedImageTemplate = {
   genre: 'dark fantasy',
   atmosphere: '',
   textInImage: [],
+  avoid: ['no text', 'no watermark', 'no border'],
 };
 
 const LEARNED_VIDEO: LearnedVideoTemplate = {
@@ -198,6 +199,43 @@ describe('the template it produces', () => {
     expect(learnedToTemplate(blank, { kind: 'text2img', cast: 1 }).variables?.[0]?.required).toBe(
       true,
     );
+  });
+});
+
+describe('what the example says not to do', () => {
+  it('lands beside the document rather than inside its style', () => {
+    const template = learnedToTemplate(LEARNED_IMAGE, { kind: 'text2img', cast: 1 });
+    const ir = template.ir as Record<string, Record<string, unknown>>;
+
+    expect(ir['constraints']?.['avoid']).toEqual(['no text', 'no watermark', 'no border']);
+    // The first live run put them in the medium, where every dialect reads them
+    // as part of the style instead of as the negatives they are.
+    expect(String(ir['style']?.['medium'])).not.toContain('no watermark');
+  });
+
+  it('is absent when the example asks for nothing', () => {
+    const template = learnedToTemplate({ ...LEARNED_IMAGE, avoid: ['  ', ''] }, {
+      kind: 'text2img',
+      cast: 1,
+    });
+    expect((template.ir as Record<string, unknown>)['constraints']).toBeUndefined();
+  });
+
+  it('reaches the negative prompt of a dialect that has one', () => {
+    const template = learnedToTemplate(LEARNED_IMAGE, { kind: 'text2img', cast: 1 });
+    const { ir } = applyTemplate(createLibrary([template], []), template.id);
+
+    const { render } = compile(ir, getProfile(registry, 'kling-3-omni'));
+    expect(render.negative ?? '').toContain('no watermark');
+  });
+
+  it('records the model the example was written for', () => {
+    const template = learnedToTemplate(LEARNED_IMAGE, {
+      kind: 'text2img',
+      cast: 1,
+      writtenFor: 'nano-banana-2',
+    });
+    expect(template.target).toBe('nano-banana-2');
   });
 });
 

@@ -898,7 +898,15 @@ export function App() {
       const { template } = await learnTemplate(
         gateway,
         example,
-        { kind, cast, ...(name.trim() ? { name: name.trim() } : {}) },
+        {
+          kind,
+          cast,
+          ...(name.trim() ? { name: name.trim() } : {}),
+          // The model in force is the one the pasted prompt was written for, and
+          // a template that remembers it needs nothing chosen alongside it later.
+          // Without this every learned template landed with no target at all.
+          writtenFor: target,
+        },
         taken,
       );
 

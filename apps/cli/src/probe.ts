@@ -245,6 +245,8 @@ export async function stepsFor(): Promise<Step[]> {
             kind: 'text2img',
             cast: 1,
             name: 'Probe characters',
+            // As the window does it, or the probe would not be probing the window.
+            writtenFor: 'nano-banana-2',
           })
         ).template,
     },

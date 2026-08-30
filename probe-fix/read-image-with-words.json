@@ -1,0 +1,71 @@
+{
+  "headline": "dancers on a glowing vintage CRT screen in a dark room at night",
+  "entities": [
+    {
+      "name": "vintage CRT television",
+      "type": "object",
+      "description": "boxy cathode-ray tube set with a rounded, slightly convex glass screen recessed behind a thick bezel; dark grey-brown plastic housing with a moulded inner frame and softly rounded corners, dust-dulled surface catching a faint sheen along the top edge; the picture fills the tube with heavy static speckle, horizontal scanline banding and a bright halation bloom near the centre"
+    },
+    {
+      "name": "central dancing man",
+      "type": "person",
+      "description": "slim young man, short cropped dark hair, in a dark long-sleeved shirt and dark narrow trousers with pale shoes; body turned three-quarters, one knee bent forward, arms bent close to the torso, head tipped down and slightly to one side; rendered in cold monochrome with a bright rim of light along his shoulders and back"
+    },
+    {
+      "name": "dancer in patterned dress at left",
+      "type": "person",
+      "description": "woman with long dark hair, wearing a short light-toned patterned dress and low boots, one arm raised with elbow bent, hips angled away from camera, silhouette edged in white glare"
+    },
+    {
+      "name": "dancer in dark shirt left of centre",
+      "type": "person",
+      "description": "figure in an untucked dark shirt and dark trousers, both fists raised near chest height, one leg lifted mid-step, face lost to the bright backlight"
+    },
+    {
+      "name": "dancer with curly hair right of centre",
+      "type": "person",
+      "description": "person with a full halo of curly hair, light sleeveless top and pale shorts or short skirt, arms outstretched sideways, one heel kicked back"
+    },
+    {
+      "name": "dancer at far right",
+      "type": "person",
+      "description": "figure in a light patterned top and dark trousers, arms bent and lifted, turned partly away, mostly a bright-edged silhouette against the glowing wall"
+    },
+    {
+      "name": "further dancers in the haze",
+      "type": "person",
+      "description": "two or three additional indistinct bodies deeper in the room, reduced to grey shapes and pale limb streaks in the smoke and static"
+    }
+  ],
+  "action": "a group of people dance in a smoke-filled room, replayed on the screen of an old television standing in an unlit space",
+  "location": "a dark room with a switched-on CRT television",
+  "locationDescription": "foreground: near-black surroundings with only the faint edge of the television's plastic casing catching light, the set filling most of the frame; mid-ground: the rounded glass screen, its picture curving at the corners, speckled with dense white static; inside the picture a room with a smooth curved wall and pale floor, banks of light blasting from behind the dancers to bleach the far wall into a white glare, thick haze in the air scattering the beams; the room's edges fall off into grey murk on both sides",
+  "timeOfDay": "night",
+  "era": "vintage — mid-twentieth-century television set, dancers styled in an earlier decade",
+  "shotSize": "medium-wide",
+  "angle": "eye level, square-on to the screen, slightly centred on the tube",
+  "aspectRatio": "16:9",
+  "lightingKey": "the television's own emitted glow",
+  "lightingSources": [
+    "hard backlight banks inside the televised scene bleaching the rear wall",
+    "scattered bloom through the haze in the picture",
+    "weak spill from the screen grazing the plastic bezel"
+  ],
+  "contrast": "very high — bright screen against near-black room, crushed blacks",
+  "colorTemp": "cold, blue-white",
+  "opticsEffect": "the screen's picture holds soft, slightly smeared detail while the dark casing and surrounding room fall away into featureless black; the glass curvature stretches the image at the corners",
+  "palette": [
+    "#0a0e12",
+    "#1c2530",
+    "#5b7183",
+    "#9fb6c6",
+    "#e6f0f6",
+    "#2b3239"
+  ],
+  "grade": "cool monochrome-blue, high-contrast, heavily bloomed",
+  "grain": "heavy",
+  "medium": "photograph of a television screen, analogue video texture",
+  "genre": "retro-analogue interior still",
+  "atmosphere": "dust and smoke hang visibly in the backlight, static crawls across the glass, limbs frozen mid-step with bright edges, the surrounding room swallowed in dark",
+  "textInImage": []
+}

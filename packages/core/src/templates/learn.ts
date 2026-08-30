@@ -36,8 +36,10 @@ const SPEEDS = ['slow', 'medium', 'fast'] as const;
  * that leaves the number alone would hand back an answer bought for the old one.
  * 2: the enum fields opened up, after the first live run failed on a grain the
  * model had no legal way to leave blank.
+ * 3: somewhere to put the negatives, which the prompt already asked about and
+ * the schema had no field for.
  */
-export const LEARN_VERSION = '2';
+export const LEARN_VERSION = '3';
 
 /**
  * What the template makes, and what it starts from.
@@ -89,6 +91,19 @@ const learned = {
   variables: z
     .array(LearnedVariable)
     .describe('every {{hole}} you left, in the order someone should be asked for them'),
+  /**
+   * A reading has no use for this — a photograph has nothing it was asked to
+   * avoid — but a working prompt very often ends in a list of them, and the
+   * first live run put "No text, no watermark, no border" into the medium for
+   * want of anywhere else. That reads as part of the style to every dialect,
+   * instead of as the negatives it is.
+   */
+  avoid: z
+    .array(z.string())
+    .describe(
+      'what the example says not to do — no text, no watermark, extra fingers. Each on its ' +
+        'own, in the example\'s own words. Empty if it asks for nothing.',
+    ),
 };
 
 /**
@@ -275,6 +290,11 @@ export function learnedToTemplate(
       : sceneToIR(closedUp(answer) as never, { reference: 'example', modality: 'image' });
 
   const fragment = fragmentOf(ir);
+
+  // Negatives belong beside the document, not inside its style: a dialect with
+  // a negative prompt puts them there, and one without says nothing at all.
+  const avoid = (answer.avoid ?? []).map((a) => a.trim()).filter(Boolean);
+  if (avoid.length > 0) fragment['constraints'] = { avoid };
 
   // The structural slots belong to the kind, not to the model's reading of the
   // example: a template that says it starts from an image must start from one.
