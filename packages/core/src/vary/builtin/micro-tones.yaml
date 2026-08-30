@@ -1,0 +1,158 @@
+id: micro-tones
+name: Micro-tones
+axis: mood
+about: "A tone to hold the idea against — deadpan 1990s corporate video, and forty-nine others."
+source:
+  name: micro_tones.json
+  dated: "2026-08-30"
+entries:
+  - id: micro_tone_01
+    name: "Absurdist Corporate Training Video"
+    text: "Deadpan, low-budget 1990s VHS aesthetic where deeply unsettling or surreal concepts are explained using cheerful corporate buzzwords."
+  - id: micro_tone_02
+    name: "Neon Noir"
+    text: "Rain-slicked streets, cynical inner monologues, heavy synthwave ambiance, and high-contrast neon lighting masking moral decay."
+  - id: micro_tone_03
+    name: "High-Fantasy Mockumentary"
+    text: "Handheld cameras and awkward talking-head interviews, but the subjects are wizards, goblins, or mythological creatures dealing with mundane problems."
+  - id: micro_tone_04
+    name: "Gothic Soap Opera"
+    text: "Over-the-top melodrama, lingering stares, dramatic gasps, and complex family betrayals set in gloomy, candlelit, cobweb-filled manors."
+  - id: micro_tone_05
+    name: "Cassette Futurism Procedural"
+    text: "A gritty detective story set in a retro-future universe filled with chunky mechanical keyboards, floppy disks, green CRT monitors, and analog static."
+  - id: micro_tone_06
+    name: "Daylight Folk Horror"
+    text: "Bright, sunny, and deceptively idyllic rural settings where pagan rituals, smiling villagers, and unsettling isolation create slow-building dread."
+  - id: micro_tone_07
+    name: "Slapstick Bureaucracy"
+    text: "Fast-paced physical comedy and absurd escalations born entirely out of navigating ridiculously complex rules, paperwork, or office hierarchies."
+  - id: micro_tone_08
+    name: "Mumblecore Sci-Fi"
+    text: "Highly naturalistic, overlapping, improvised-feeling dialogue focusing on relationship drama, set against a backdrop of massive sci-fi events they largely ignore."
+  - id: micro_tone_09
+    name: "Corporate Cosmic Horror"
+    text: "The terrifying realization that the company you work for is controlled by, or actively worships, an ancient, incomprehensible, mind-shattering entity."
+  - id: micro_tone_10
+    name: "Late-Night Infomercial Fever Dream"
+    text: "Hyper-enthusiastic hosts, repetitive sales pitches, and garish graphics that slowly devolve into a hypnotic, nightmarish, or surreal psychological spiral."
+  - id: micro_tone_11
+    name: "Rust-Belt Magical Realism"
+    text: "Gritty, economically depressed industrial towns where everyday people treat subtle, unexplainable magic as just another mundane fact of life."
+  - id: micro_tone_12
+    name: "Balletic Gun-Fu"
+    text: "Hyper-stylized, meticulously choreographed combat that feels like a high-art dance piece, emphasizing rhythm, symmetry, and slow-motion elegance."
+  - id: micro_tone_13
+    name: "Analog Horror Sci-Fi"
+    text: "Found footage, distorted audio, and creepy public service announcements hiding a terrifying extraterrestrial or interdimensional threat."
+  - id: micro_tone_14
+    name: "Culinary Mockumentary"
+    text: "The intense, pretentious, high-stakes atmosphere of a Michelin-star chef documentary applied to completely ridiculous or low-brow subject matter."
+  - id: micro_tone_15
+    name: "Wuxia Office Politics"
+    text: "Standard corporate conflicts (stealing lunches, claiming credit) are treated with the epic gravity, wire-fu action, and honor codes of a martial arts epic."
+  - id: micro_tone_16
+    name: "Suburban Paranormal Found-Footage"
+    text: "Shaky smartphone or security cam footage in a sterile, boring suburban home where domestic peace is disrupted by terrifying, unseen poltergeist activity."
+  - id: micro_tone_17
+    name: "Passive-Aggressive Action Comedy"
+    text: "Characters engage in high-octane car chases and shootouts, but the dialogue is entirely focused on petty grievances and polite but biting insults."
+  - id: micro_tone_18
+    name: "Giallo-Inspired Fashion Slasher"
+    text: "Highly stylized, saturated primary colors, leather gloves, avant-garde electronic music, and glamorous settings masking brutal, stylized violence."
+  - id: micro_tone_19
+    name: "Biopunk Medical Drama"
+    text: "The high-pressure, fast-paced environment of an ER, but the doctors are dealing with runaway genetic modifications, organic tech, and body horror."
+  - id: micro_tone_20
+    name: "Deadpan Apocalyptic Sitcom"
+    text: "The world has ended in fire and ash, but the surviving characters just sit on a ruined couch making sarcastic, low-energy jokes about their new reality."
+  - id: micro_tone_21
+    name: "Steampunk Political Thriller"
+    text: "Brass, steam, and clockwork technology serving as the backdrop for tense espionage, back-room deals, and assassination plots."
+  - id: micro_tone_22
+    name: "Epistolary Romance (Digital)"
+    text: "A love story told entirely through the frantic, obsessive exchange of text messages, voicemails, and screen-recordings, with no face-to-face interaction."
+  - id: micro_tone_23
+    name: "Cold War Espionage Musical"
+    text: "Tense spy drop-offs, wiretaps, and double-agents, but the characters occasionally burst into highly choreographed, secretive musical numbers."
+  - id: micro_tone_24
+    name: "Psychedelic Road Movie"
+    text: "A journey down a long desert highway that becomes increasingly hallucinatory, colorful, and detached from reality the further they drive."
+  - id: micro_tone_25
+    name: "Utopian Propaganda Reel"
+    text: "Forced smiles, gleaming white architecture, and cheerful mid-Atlantic voiceovers hiding a sinister, heavily controlled dystopian reality."
+  - id: micro_tone_26
+    name: "Hardboiled Domestic Dispute"
+    text: "The cynical, poetic, hard-hitting dialogue of a 1930s pulp detective novel applied to a couple arguing over whose turn it is to do the dishes."
+  - id: micro_tone_27
+    name: "Kaiju Disaster Romance"
+    text: "Massive monsters are destroying a metropolitan city in the background, but the story is intimately focused on two people falling in love amidst the rubble."
+  - id: micro_tone_28
+    name: "1980s Mall-Pop Coming-of-Age"
+    text: "Neon windbreakers, synth-pop montages, food courts, and the innocent, high-stakes emotional drama of high school crushes."
+  - id: micro_tone_29
+    name: "Sleep-Deprivation Surrealism"
+    text: "The blurry, illogical, time-skipping sensation of being awake for 72 hours, where shadows move and conversations stop making linear sense."
+  - id: micro_tone_30
+    name: "Cozy Murder Mystery"
+    text: "A charming, picturesque village filled with quirky locals who drink tea and knit, while a surprisingly brutal murder is solved by a busybody amateur."
+  - id: micro_tone_31
+    name: "Y2K Tech-Optimism Drama"
+    text: "Frosted tips, translucent electronics, dial-up sounds, and the naive, frantic excitement of the late 90s dot-com boom."
+  - id: micro_tone_32
+    name: "Neo-Victorian Ghost Story"
+    text: "Repressed emotions, strict etiquette, rigid corsets, and creeping psychological terror fueled by bumps in the night in a foggy London townhouse."
+  - id: micro_tone_33
+    name: "DIY Public Access Television"
+    text: "Zero-budget, awkward silences, terrible green screens, and earnest but incompetent hosts trying to broadcast a show to a local audience."
+  - id: micro_tone_34
+    name: "Hyper-Caffeinated Anime Parody"
+    text: "Screaming internal monologues, intense speed lines, dramatic camera angles, and exaggerated reactions to completely mundane events."
+  - id: micro_tone_35
+    name: "Urban Mythological Epic"
+    text: "Ancient gods and monsters living disguised in a modern, gritty metropolis, conducting epic battles in subway tunnels and dive bars."
+  - id: micro_tone_36
+    name: "Solarpunk Slice-of-Life"
+    text: "A bright, lush, sustainable future where technology and nature harmonize, focusing on gentle, low-stakes community problems and gardening."
+  - id: micro_tone_37
+    name: "Claustrophobic Creature Feature"
+    text: "Characters trapped in a tiny, locked environment (a submarine, a bunker) being slowly hunted by an unseen, deadly biological entity."
+  - id: micro_tone_38
+    name: "Stoner Heist"
+    text: "An incredibly complex, Ocean's 11-style robbery planned and executed by people who are deeply distracted, hungry, and confused."
+  - id: micro_tone_39
+    name: "Melodramatic Teen Soap"
+    text: "Beautiful 25-year-olds playing high schoolers, staring longingly into lockers, accompanied by moody indie-pop and devastating betrayal."
+  - id: micro_tone_40
+    name: "Deep Space Maritime Thriller"
+    text: "Spaceships treated like 18th-century naval galleons or WWII submarines, complete with sonar pings, creaking hulls, and stoic captains."
+  - id: micro_tone_41
+    name: "Psychological Eco-Terror"
+    text: "Nature itself becomes hostile and hallucinatory, using plants, spores, or animal behavior to slowly drive the human characters insane."
+  - id: micro_tone_42
+    name: "High-Society Farce"
+    text: "Rich aristocrats in tuxedos and gowns engaging in rapid-fire witty banter, mistaken identities, and frantic running through mansion doors."
+  - id: micro_tone_43
+    name: "Glitch-Art Existentialism"
+    text: "The fabric of reality keeps stuttering, freezing, or corrupting like a broken digital file as the protagonist questions their own existence."
+  - id: micro_tone_44
+    name: "Historical Revisionist Heist"
+    text: "A slick, modern heist movie structure, but set during a major historical event (e.g., stealing the Declaration of Independence while it's being signed)."
+  - id: micro_tone_45
+    name: "AI Sentience Rom-Com"
+    text: "A bubbly, lighthearted romantic comedy where one of the leads is a highly logical, slightly awkward artificial intelligence learning to flirt."
+  - id: micro_tone_46
+    name: "Holiday Macabre"
+    text: "The cheerful music, bright lights, and forced joy of Christmas or Thanksgiving contrasted sharply against dark, violent, or cynical events."
+  - id: micro_tone_47
+    name: "Post-Scarcity Mumblecore"
+    text: "In a future where money doesn't exist and every need is met by robots, twenty-somethings still whine about aimlessness and artistic block."
+  - id: micro_tone_48
+    name: "Neo-Western Melodrama"
+    text: "Modern vehicles and clothes, but shot like a classic John Ford western with sweeping deserts, stoic staredowns, and themes of frontier justice."
+  - id: micro_tone_49
+    name: "Cybernetic Noir"
+    text: "A hardboiled detective story where memories can be hacked, limbs are mechanical, and the femme fatale is a rogue android."
+  - id: micro_tone_50
+    name: "Suburban Mid-Century Tragedy"
+    text: "Immaculate 1950s manicured lawns and pastel kitchens masking crushing psychological despair, alcoholism, and the suffocation of conformity."

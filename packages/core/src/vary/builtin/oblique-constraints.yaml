@@ -1,0 +1,98 @@
+id: oblique-constraints
+name: Oblique constraints
+axis: any
+about: "One thing that must be true, chosen to push a familiar idea sideways."
+source:
+  name: oblique_constraints.json
+  dated: "2026-08-30"
+entries:
+  - id: constraint_01
+    name: "The Incongruous Backdrop"
+    text: "The scene must take place in a location that completely contradicts the emotional tone of the dialogue (e.g., a heartbreaking breakup inside a bright, noisy children's indoor playplace)."
+  - id: constraint_02
+    name: "The Single-Object Focus"
+    text: "A specific, seemingly mundane physical object (e.g., a leaking pen, a grandfather clock, a specific houseplant) must remain in the frame or be visually referenced in every single shot."
+  - id: constraint_03
+    name: "The Temporal Pressure Cooker"
+    text: "The entire narrative must take place in real-time within the span of exactly 60 seconds of the characters' lives, even if the video itself runs longer."
+  - id: constraint_04
+    name: "Atmospheric Isolation"
+    text: "A heavy weather phenomenon (e.g., a sudden dense localized fog, torrential rain indoors, or unexplainable zero-gravity) must actively interfere with the characters' physical objectives."
+  - id: constraint_05
+    name: "The Spatial Limit"
+    text: "The characters are physically confined to an extremely restricted space (e.g., inside an elevator, under a dining table during a party, or tucked into the backseat of a moving rideshare)."
+  - id: constraint_06
+    name: "Verbal Absence"
+    text: "The main conflict of the film must be introduced, escalated, and entirely resolved without a single character speaking a word out loud."
+  - id: constraint_07
+    name: "Secret Motivation"
+    text: "One character must act entirely based on a highly specific, bizarre motivation that is never explained to the audience, yet their actions must remain logically consistent."
+  - id: constraint_08
+    name: "The Inanimate Lever"
+    text: "An inanimate object must be treated by the characters as if it has immense emotional leverage, authority, or status over them."
+  - id: constraint_09
+    name: "The Polite Antagonist"
+    text: "The 'villain' or obstacle in the story must be aggressively polite, helpful, and reasonable, making it incredibly difficult for the protagonist to fight against them."
+  - id: constraint_10
+    name: "Cognitive Dissonance"
+    text: "A character must casually perform a highly complex, intense, or dangerous physical action while having a completely mundane, relaxed conversation about something trivial."
+  - id: constraint_11
+    name: "The Inverted Climax"
+    text: "The emotional or physical climax of the short film must occur within the first 30 seconds, and the rest of the film handles the immediate, strange aftermath."
+  - id: constraint_12
+    name: "The Echo Effect"
+    text: "The film must end on the exact same shot and line of dialogue it started with, but the context of the story must completely change what that shot/line means."
+  - id: constraint_13
+    name: "Non-Linear Anchor"
+    text: "The narrative constantly cuts back to a single, recurring 'anchor shot' (e.g., a boiling kettle, a foot tapping, a hand on a doorknob) that advances by a split second each time we see it."
+  - id: constraint_14
+    name: "The False Commercial Break"
+    text: "The story is moving along a standard narrative path when it is suddenly interrupted by a highly specific 'in-universe' commercial or media broadcast that holds the key to solving the main plot."
+  - id: constraint_15
+    name: "Rhythmic Acceleration"
+    text: "The pacing of the edits must mathematically speed up. The first shot lasts 60 seconds, the next 30, then 15, down to rapid-fire 1-frame flashes at the climax."
+  - id: constraint_16
+    name: "The Reluctant Endorsement"
+    text: "The protagonist actively dislikes or is entirely indifferent to the product/service being advertised, but is forced by unusual circumstances to use it anyway."
+  - id: constraint_17
+    name: "Cosmic Scale, Tiny Problem"
+    text: "The visual style and music must mimic an epic, high-stakes cinematic blockbuster, but the actual problem being solved is completely trivial (e.g., finding a matching sock)."
+  - id: constraint_18
+    name: "Product as a Threat"
+    text: "The product/service being advertised is treated with extreme caution, awe, or mild terror by the characters, as if it is too powerful for human hands."
+  - id: constraint_19
+    name: "The Fourth Wall Fracture"
+    text: "A character breaks character to argue with the voiceover narrator about how the script is being written or how they are being framed."
+  - id: constraint_20
+    name: "The Accidental Hero"
+    text: "The product saves the day entirely by accident or via a bizarre chain of domino-effect coincidences, rather than through its intended function."
+  - id: constraint_21
+    name: "Material Evolution"
+    text: "The medium of the animation must change as the character's emotional state shifts (e.g., starting as a flat 2D sketch, transitioning to claymation when stressed, and resolving in polished 3D)."
+  - id: constraint_22
+    name: "Defiant Physics"
+    text: "One fundamental law of physics is broken for only one specific character (e.g., gravity doesn't apply to them, or they move at half-speed while the rest of the world is normal)."
+  - id: constraint_23
+    name: "Background Rebellion"
+    text: "The background environment or background characters are actively trying to sabotage the main characters' scene without the main characters noticing."
+  - id: constraint_24
+    name: "The Scale Shift"
+    text: "The entire narrative relies on a sudden, drastic shift in scale (e.g., a massive epic battle is revealed to be taking place between dust mites on a laptop keyboard)."
+  - id: constraint_25
+    name: "Textual Reality"
+    text: "On-screen text, subtitles, or UI graphic elements physically exist in the world, and characters can step over them, trip on them, or use them as weapons."
+  - id: constraint_26
+    name: "Corporate Noir"
+    text: "A completely mundane workplace scenario is treated with the dark, cynical, shadow-heavy tone of a 1940s detective film noir."
+  - id: constraint_27
+    name: "Sitcom Horror"
+    text: "A terrifying, suspenseful situation is shot and written with the cheerful lighting, multi-cam setup, and lighthearted dialogue tropes of a 90s family sitcom."
+  - id: constraint_28
+    name: "Mythological Modern"
+    text: "Modern tech or lifestyle problems are discussed using the high-fantasy, archaic, dramatic vocabulary of ancient Greek gods or medieval knights."
+  - id: constraint_29
+    name: "Deadpan Absurdist"
+    text: "A completely impossible, surreal event occurs, but the characters react with total boredom and treat it like an annoying daily chore."
+  - id: constraint_30
+    name: "The Wholesome Dystopia"
+    text: "The environment is visually a grim, heavily surveilled cyberpunk or dystopian wasteland, but the characters are incredibly happy, kind to each other, and focused on trivial, joyful neighborly interactions."

@@ -21,3 +21,4 @@ export * from './batch/queue.ts';
 export * from './sequence/index.ts';
 export * from './compose/index.ts';
 export * from './sources/index.ts';
+export * from './vary/index.ts';

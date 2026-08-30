@@ -191,6 +191,29 @@ kept source costs nothing — the button's price says so.
 They are files, like the templates, because a description is exactly the kind of
 thing someone wants to open and fix a word in.
 
+## Twenty at once
+
+Variation is composition, not extraction — it carries no pictures — so twenty
+versions of a character cost about what one reading of a photograph does. And a
+variant is a difference rather than a document: everything off the axis is
+already decided, so the answer is a handful of fields, not two hundred words
+again.
+
+The third reason is not about cost. Twenty separate calls produce twenty similar
+answers, because nothing tells any of them what the others said. One call
+producing twenty is the only version of this that actually varies, and the
+instruction spends most of its words on that: spread them, do not build a
+gradient, a slightly darker version of the last is not a version.
+
+An axis names what may move — who it is, how it looks, how it feels, the
+framing, the moment — and everything else is held. The document says what it
+currently is on that axis, so nothing offers it back.
+
+A deck can push a run sideways: one card drawn from it becomes a constraint all
+the variants must satisfy, structurally rather than as a detail at the edge. The
+decks are data like everything else, and the four that ship carry a hundred and
+fifteen cards between them.
+
 ## What shapes it
 
 A model card and a template of your own are the same kind of choice — both

@@ -1,0 +1,53 @@
+id: motion-presets
+name: Motion presets
+axis: moment
+about: "How the camera and the bodies move: a commercial, a documentary, a security tape."
+source:
+  name: video_motion_presets.json
+  dated: "2026-08-30"
+entries:
+  - id: motion_01
+    name: "TV Commercial"
+    text: "Ultra-smooth robotic camera arm movement. Actors move with practiced, perfect posture and exaggerated enthusiasm. Crisp, perfectly enunciated speech with zero hesitation. Micro-pauses used strictly for product emphasis. Fluid and deliberate pacing."
+  - id: motion_02
+    name: "Short Comedy Skit"
+    text: "Static camera lock-off with sudden comedic snap-zooms. Sharp physical comedy and exaggerated facial reactions. Rapid, fast-paced dialogue punctuated by sudden, deadpan 2-second pauses. Complete stillness between actions."
+  - id: motion_03
+    name: "3D Pixar Animation"
+    text: "Smooth bezier-curve camera movement. Exaggerated squash-and-stretch physics with bouncy character motion. Highly expressive facial morphs and broad theatrical gestures. Energetic, melodic speech. Pauses filled with micro-actions like blinks and ear twitches."
+  - id: motion_04
+    name: "Dramatic Film"
+    text: "Smooth dolly track push-in with cinematic 24fps motion blur. Restrained naturalistic acting with subtle micro-expressions. Slow and measured speech carrying heavy subtext. Long 3-to-4-second pregnant pauses. Grounded gravity and heavy physical weight."
+  - id: motion_05
+    name: "Sitcom"
+    text: "Multi-cam setup feel with static wide lock-offs and slow mechanical panning. Staged theatrical blocking. Actors project loudly and distinctly. Fast-paced setup-and-punchline dialogue followed by artificial 3-second pauses holding for imaginary audience laughter."
+  - id: motion_06
+    name: "90s Soap Opera"
+    text: "Slow dramatic zoom-in on faces. Rigid posture, melodramatic gasps, and slow, dramatic head turns. Breathy, intense speech with slightly delayed character reactions. Unnaturally long pauses maintaining uncomfortable eye contact."
+  - id: motion_07
+    name: "MTV Retro"
+    text: "Chaotic handheld camera with rapid whip pans and sudden speed-ramping. Characters exhibit high-energy frenetic movement, constant pacing, and fidgeting. Overlapping, chaotic dialogue spoken rapidly. Zero pauses; actors frequently break the fourth wall."
+  - id: motion_08
+    name: "Documentary Footage"
+    text: "Shaky handheld camera with occasional autofocus hunting. Unchoreographed raw motion. Actors look slightly off-camera. Naturalistic, stumbling speech filled with 'ums', hesitations, and false starts. Awkward, organic pauses and reactive panning."
+  - id: motion_09
+    name: "Action Camera (GoPro)"
+    text: "First-person action camera movement with high-frequency vibration and aggressive body-mounted physics. Athletic, urgent character motion. Sparse, breathless dialogue yelled over ambient noise. Constant physical exertion with no conversational pauses."
+  - id: motion_10
+    name: "FPV Drone Footage"
+    text: "Continuous flying FPV drone movement, banking turns, and sweeping rolls. Actors perform broad, continuous stunts or running. Distant or shouted speech. Continuous action flow with no dialogue pauses and smooth aerodynamic trajectories."
+  - id: motion_11
+    name: "Classic Anime"
+    text: "Kinetic camera sweeps with zero digital motion blur. Dramatic held poses followed by high-speed bursts of action. Fast, minimal mouth flaps. Highly intense yelled dialogue or whispered inner monologues. Tense 2-second silent stand-offs."
+  - id: motion_12
+    name: "Claymation"
+    text: "Stop-motion frame rate with 12fps timing and tactile displacement. Jerky physical movement and charmingly stiff actor gestures. Slightly desynced dialogue. Charmingly clunky pacing with brief, stuttering pauses between distinct physical actions."
+  - id: motion_13
+    name: "2D Animated Film"
+    text: "Dynamic weight shifting and fluid character action smears. Highly expressive, perfectly lip-synced speech. Flowing continuous motion without rigid stops. Theatrical momentum and energetic character tracking."
+  - id: motion_14
+    name: "Silent Film Era"
+    text: "Locked-down static tripod camera. 18fps over-cranked, jerky motion. Exaggerated physical pantomime and fast walking speeds. Frantic mouthing of dialogue with zero audible speech. Highly expressive full-body acting with zero audio pauses."
+  - id: motion_15
+    name: "Surveillance / CCTV"
+    text: "Slow mechanical motorized panning from a fixed high-angle perspective. Low framerate stutter. Subjects are entirely unaware of the camera. Completely mundane, unchoreographed actions. Distant, muffled, or inaudible speech with slow real-time pacing and no narrative cuts."
