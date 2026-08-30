@@ -1,4 +1,5 @@
 import type { ItemState } from '@dialect/core';
+import { PER_READ_USD } from './prices.ts';
 
 /**
  * A batch, split along the line the window is split on.
@@ -27,8 +28,7 @@ const LABEL: Record<BatchItem['state'], string> = {
   failed: 'failed',
 };
 
-/** Roughly what one reference costs on the default model. Deliberately rough. */
-const PER_REFERENCE_USD = 0.07;
+
 
 const countOf = (items: BatchItem[], ...states: Array<BatchItem['state']>): number =>
   items.filter((i) => states.includes(i.state)).length;
@@ -73,7 +73,7 @@ export function References({
             </button>
           ) : waiting > 0 ? (
             <button className="solid" onClick={onRun}>
-              Read {waiting} · about ${(waiting * PER_REFERENCE_USD).toFixed(2)}
+              Read {waiting} · about ${(waiting * PER_READ_USD).toFixed(2)}
             </button>
           ) : null}
         </div>

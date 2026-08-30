@@ -95,6 +95,30 @@ describe('the gateway', () => {
     expect(provider.calls).toHaveLength(2);
   });
 
+  it('carries a total forward, so a resumed session does not start its budget again', async () => {
+    const { provider, gateway } = gatewayWith([SCENE, SCENE], 0.015);
+
+    // What the window closed on.
+    gateway.restoreSpend(0.014);
+    expect(gateway.spentUsd).toBeCloseTo(0.014);
+
+    await extractFromImage(gateway, IMAGE, { reference: 'a.png' });
+    await expect(
+      extractFromImage(gateway, { ...IMAGE, base64: 'Yg==' }, { reference: 'b.png' }),
+    ).rejects.toBeInstanceOf(BudgetExceededError);
+    expect(provider.calls).toHaveLength(1);
+  });
+
+  it('will not let a total be wound back, which would clear the cap', async () => {
+    const { gateway } = gatewayWith([SCENE], 1);
+    await extractFromImage(gateway, IMAGE, { reference: 'a.png' });
+
+    const spent = gateway.spentUsd;
+    gateway.restoreSpend(0);
+    gateway.restoreSpend(Number.NaN);
+    expect(gateway.spentUsd).toBe(spent);
+  });
+
   it('refuses before spending past the cap, not after', async () => {
     const { provider, gateway } = gatewayWith([SCENE, SCENE, SCENE], 0.015);
 

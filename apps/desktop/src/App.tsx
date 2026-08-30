@@ -65,6 +65,7 @@ import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
 import { Input } from './Input.tsx';
 import { Shape, type ShapeMode } from './Shape.tsx';
+import { estimate } from './prices.ts';
 import { Templates } from './Templates.tsx';
 import { Shots } from './Shots.tsx';
 import { HostProvider } from './provider.ts';
@@ -180,9 +181,6 @@ const SURE_ENOUGH = 0.25;
 /** More stills than this in one prompt stops adding anything and starts costing. */
 const MAX_ATTACHED = 4;
 
-/** Looking at a reference; and putting what everything says together. */
-const PER_READ_USD = 0.02;
-const PER_WRITE_USD = 0.01;
 
 /**
  * Where a template that names no model lands.
@@ -386,6 +384,8 @@ export function App() {
       if (registry.profiles.has(session.target)) setTarget(session.target);
       if (session.ir) setIrText(JSON.stringify(session.ir, null, 2));
       setSpent(session.spentUsd);
+      // The cap has to know too, or a resumed session starts its budget again.
+      gateway.restoreSpend(session.spentUsd);
 
       if (session.items.length > 0) {
         for (const item of session.items) {
@@ -775,7 +775,7 @@ export function App() {
     const unread = attached.filter((a) => !readings.current.has(a.name)).length;
     const composes =
       templateId !== '' || attached.length > 1 || (attached.length > 0 && idea.trim() !== '');
-    return unread * PER_READ_USD + (composes || attached.length === 0 ? PER_WRITE_USD : 0);
+    return estimate(unread, composes || attached.length === 0);
   })();
 
   /**

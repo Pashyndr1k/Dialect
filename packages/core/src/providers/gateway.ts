@@ -52,6 +52,18 @@ export class Gateway {
     return this.#spentUsd;
   }
 
+  /**
+   * Carry a running total in from a session being resumed.
+   *
+   * Without this the cap forgot everything spent before the window closed: the
+   * screen said four dollars gone and the gateway would still allow five more.
+   * Monotonic on purpose — a total can be brought forward, never wound back,
+   * so this cannot be used to clear the cap.
+   */
+  restoreSpend(total: number): void {
+    if (Number.isFinite(total) && total > this.#spentUsd) this.#spentUsd = total;
+  }
+
   get remainingUsd(): number | undefined {
     return this.#budgetUsd === undefined ? undefined : this.#budgetUsd - this.#spentUsd;
   }
