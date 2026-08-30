@@ -19,7 +19,9 @@ import {
   compile,
   extractFromImage,
   Gateway,
+  ExtractedScene,
   getProfile,
+  sceneToIR,
   toDocument,
   type Finding,
   type PromptIR,
@@ -27,14 +29,20 @@ import {
 } from '@dialect/core';
 import { createQueue, runQueue } from '@dialect/core';
 import { PromptActions, References, type BatchItem } from './Batch.tsx';
+import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
 import {
+  cachedAnswer,
   cacheStats,
   clearCache,
-  HostCache,
+  hostCache,
+  loadLibrary,
   loadSession,
+  rememberRead,
+  thumbnail,
+  type LibraryEntry,
   saveSession,
   savePromptsTo,
   SESSION_VERSION,
@@ -59,7 +67,7 @@ const exampleFor = (family: string): unknown => (family === 'video' ? videoExamp
  * survive between drops. Re-reading the same reference costs nothing.
  */
 const gateway = new Gateway(new HostProvider(), {
-  cache: new HostCache(),
+  cache: hostCache,
   budgetUsd: 5,
   onSpend: (_usage, total) => window.dispatchEvent(new CustomEvent('dialect:spend', { detail: total })),
 });
@@ -107,13 +115,22 @@ export function App() {
   const [savedTo, setSavedTo] = useState<string | null>(null);
   const [cache, setCache] = useState<{ entries: number; bytes: number } | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  /** Thumbnails for references restored from the library, which have no file. */
+  const thumbs = useRef(new Map<string, string | null>());
+  const [library, setLibrary] = useState<LibraryEntry[]>([]);
+  const [restoring, setRestoring] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadLibrary().then(setLibrary);
+  }, []);
 
   // An object URL holds the file open until it is revoked, so each one is
   // released as soon as another reference takes its place.
   useEffect(() => {
     const file = activeRef ? held.current.get(activeRef) : undefined;
     if (!file) {
-      setPreview(null);
+      // No file, but perhaps a thumbnail kept from when there was one.
+      setPreview(activeRef ? (thumbs.current.get(activeRef) ?? null) : null);
       return;
     }
 
@@ -200,11 +217,24 @@ export function App() {
   }, [batch, target, spent, irText]);
 
   const readOne = async (file: File): Promise<PromptIR> => {
-    const { ir: extracted } = await extractFromImage(
+    const { ir: extracted, key, cached } = await extractFromImage(
       gateway,
       { mediaType: file.type, base64: await toBase64(file) },
       { reference: file.name },
     );
+
+    // Filed under a name and a picture, so what was paid for can be found
+    // again. A cached read still refreshes the date — it was used today.
+    const thumb = await thumbnail(file);
+    const entry: LibraryEntry = {
+      key,
+      ref: file.name,
+      readAt: new Date().toISOString(),
+      ...(thumb ? { thumb } : {}),
+    };
+    setLibrary(await rememberRead(entry));
+    if (cached) setExtractError(null);
+
     return extracted;
   };
 
@@ -399,6 +429,42 @@ export function App() {
     }
   };
 
+  /**
+   * Bring back a reference read earlier. The picture is the thumbnail that was
+   * kept — the original file is long gone — and the prompt comes from the
+   * answer already in the cache, so this costs nothing.
+   */
+  const restoreFromLibrary = async (entry: LibraryEntry): Promise<void> => {
+    setRestoring(entry.key);
+    setExtractError(null);
+
+    try {
+      const answer = await cachedAnswer(entry.key);
+      const scene = ExtractedScene.safeParse(answer);
+      if (!scene.success) {
+        setExtractError(
+          `The stored answer for ${entry.ref} no longer matches what the app expects. ` +
+            `Reading it again would cost money, so nothing was changed.`,
+        );
+        return;
+      }
+
+      const ir = sceneToIR(scene.data, { reference: entry.ref });
+      results.current.set(entry.ref, ir);
+      thumbs.current.set(entry.ref, entry.thumb ?? null);
+
+      setBatch((prev) => [
+        { id: entry.ref, name: entry.ref, state: 'done' as const, cached: true },
+        ...prev.filter((i) => i.id !== entry.ref),
+      ]);
+      setActiveRef(entry.ref);
+      setPromptOf(entry.ref);
+      showIR(ir);
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   /** Back to nothing: no references, no results, the example document again. */
   const resetSession = (): void => {
     held.current.clear();
@@ -569,9 +635,10 @@ export function App() {
                     className="link"
                     title="Reading those references again would cost money"
                     onClick={() =>
-                      void clearCache().then(() => {
+                      void clearCache().then(async () => {
                         refreshCache();
                         setSpent(0);
+                        setLibrary(await loadLibrary());
                       })
                     }
                   >
@@ -599,6 +666,12 @@ export function App() {
             onRun={() => void runBatch()}
             onStop={() => abort.current?.abort()}
             onSelect={openFromBatch}
+          />
+
+          <Library
+            entries={library.filter((e) => !batch.some((i) => i.id === e.ref))}
+            busy={restoring}
+            onRestore={(entry) => void restoreFromLibrary(entry)}
           />
         </section>
 

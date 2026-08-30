@@ -29,6 +29,8 @@ pub fn run() {
             store::session_set,
             store::session_clear,
             store::save_prompts,
+            store::library_get,
+            store::library_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

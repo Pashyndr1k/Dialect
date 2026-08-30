@@ -26,6 +26,8 @@ export interface ExtractResult {
   scene: ExtractedScene;
   usage: ProviderUsage;
   cached: boolean;
+  /** The cache key this answer is filed under. */
+  key: string;
 }
 
 function nonEmpty(value: string | undefined): string | undefined {
@@ -117,5 +119,6 @@ export async function extractFromImage(
     scene: result.value,
     usage: result.usage,
     cached: result.cached,
+    key: result.key,
   };
 }

@@ -27,6 +27,11 @@ export interface GatewayOptions {
 export interface GatewayResult<T> extends ProviderResult<T> {
   /** True when nothing was spent because the answer was already known. */
   cached: boolean;
+  /**
+   * Where this answer sits in the cache. Handed back so a caller can keep its
+   * own index — the key alone says nothing a person would recognise.
+   */
+  key: string;
 }
 
 export class Gateway {
@@ -77,6 +82,7 @@ export class Gateway {
           usage: ZERO_USAGE,
           model: this.#provider.model,
           cached: true,
+          key,
         };
       }
     }
@@ -91,6 +97,6 @@ export class Gateway {
     this.#onSpend?.(result.usage, this.#spentUsd);
 
     await this.#cache.set(key, result.value);
-    return { ...result, cached: false };
+    return { ...result, cached: false, key };
   }
 }

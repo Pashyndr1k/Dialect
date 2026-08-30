@@ -164,8 +164,14 @@ view cannot keep either for itself.
 
 **The cache** holds answers that were paid for, keyed by the hash of the image
 and the question. Read a reference once and reading it again is free — after a
-restart as much as before one. Settings says how much is kept and offers to
-clear it, which is the only way to end up paying twice.
+restart as much as before one.
+
+A cache entry is a hash and a blob, though: no name, no picture, nothing anyone
+could pick out of a list. So beside it sits **the library** — what each entry
+was called, when it was read, and a thumbnail small enough to keep. References
+read on earlier days appear under the session's own list, and choosing one
+brings its prompt back without paying again. Without that index the cache only
+paid off by accident, when you happened to drop the same file twice.
 
 **The session** holds what was on screen: which references were read and what
 came back. The files themselves cannot be kept — a dropped file is gone once

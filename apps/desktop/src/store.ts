@@ -65,8 +65,23 @@ export async function cacheStats(): Promise<CacheStats | null> {
 }
 
 export async function clearCache(): Promise<number> {
+  memoryLibrary = [];
   if (!hasHost()) return 0;
   return invoke<number>('cache_clear', {});
+}
+
+/**
+ * The one cache the window uses.
+ *
+ * A shared instance, not a new one per call: without a host the fallback lives
+ * in the instance, so a second HostCache would look into an empty map and
+ * report a miss for something already there.
+ */
+export const hostCache = new HostCache();
+
+/** Read an answer straight out of the cache, for a reference already paid for. */
+export async function cachedAnswer(key: string): Promise<unknown | undefined> {
+  return hostCache.get(key);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +132,73 @@ export async function saveSession(session: Session): Promise<void> {
 export async function clearSession(): Promise<void> {
   memorySession = undefined;
   if (hasHost()) await invoke<void>('session_clear', {}).catch(() => undefined);
+}
+
+// ---------------------------------------------------------------------------
+// The library: what the cache holds, in terms a person recognises
+// ---------------------------------------------------------------------------
+
+/**
+ * A cache entry is keyed by a hash and holds only an answer — no name, no
+ * picture, nothing anyone could pick out of a list. This is the index over
+ * them, so a reference read last week can be found instead of paid for twice.
+ */
+export interface LibraryEntry {
+  /** The cache key the answer is filed under. */
+  key: string;
+  /** What the file was called. */
+  ref: string;
+  /** ISO timestamp of the read that paid for it. */
+  readAt: string;
+  /** A small JPEG data URL, so it can be recognised on sight. */
+  thumb?: string;
+}
+
+let memoryLibrary: LibraryEntry[] = [];
+
+export async function loadLibrary(): Promise<LibraryEntry[]> {
+  if (!hasHost()) return memoryLibrary;
+  try {
+    const parsed: unknown = JSON.parse(await invoke<string>('library_get', {}));
+    return Array.isArray(parsed) ? (parsed as LibraryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Newest first, one entry per key: re-reading a reference updates its date. */
+export async function rememberRead(entry: LibraryEntry): Promise<LibraryEntry[]> {
+  const next = [entry, ...(await loadLibrary()).filter((e) => e.key !== entry.key)];
+
+  if (!hasHost()) memoryLibrary = next;
+  else {
+    try {
+      await invoke<void>('library_set', { value: JSON.stringify(next) });
+    } catch {
+      // The answer is still cached; only its label is lost.
+    }
+  }
+  return next;
+}
+
+/** A small picture is worth keeping; a large one is not. */
+export async function thumbnail(file: File, max = 240): Promise<string | undefined> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    return canvas.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------------------

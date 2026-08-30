@@ -9,8 +9,13 @@
 //!
 //! The session holds what the window was showing: which references were read
 //! and what came back. The files themselves cannot be kept — a dropped file is
-//! gone once the page reloads — so this is a record, not a resumable job. Drop
-//! the same folder again and the cache makes it free.
+//! gone once the page reloads — so this is a record, not a resumable job.
+//!
+//! The library is what makes the cache usable. Cache entries are keyed by a
+//! hash and hold only an answer: no name, no picture, nothing a person could
+//! recognise. The library is the index over them — what each one was called,
+//! when it was read, and a thumbnail small enough to keep — so a reference read
+//! last week can be found and brought back instead of paid for twice.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -117,7 +122,44 @@ pub fn clear_in(dir: &Path) -> Result<u64, String> {
 
 #[tauri::command]
 pub fn cache_clear(app: AppHandle) -> Result<u64, String> {
-    clear_in(&cache_dir(&app)?)
+    let removed = clear_in(&cache_dir(&app)?)?;
+    // The index without the answers it points at is worse than neither.
+    write_library(&library_path(&app)?, "[]")?;
+    Ok(removed)
+}
+
+// ---------------------------------------------------------------------------
+// The library: what the cache is holding, in terms a person recognises
+// ---------------------------------------------------------------------------
+
+fn library_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = data_dir(app)?;
+    fs::create_dir_all(&dir).map_err(|e| format!("Could not make the data directory: {e}"))?;
+    Ok(dir.join("library.json"))
+}
+
+pub fn read_library(path: &Path) -> Result<String, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(text),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("[]".to_string()),
+        Err(e) => Err(format!("Could not read the library: {e}")),
+    }
+}
+
+pub fn write_library(path: &Path, value: &str) -> Result<(), String> {
+    let temp = path.with_extension("tmp");
+    fs::write(&temp, value).map_err(|e| format!("Could not write the library: {e}"))?;
+    fs::rename(&temp, path).map_err(|e| format!("Could not store the library: {e}"))
+}
+
+#[tauri::command]
+pub fn library_get(app: AppHandle) -> Result<String, String> {
+    read_library(&library_path(&app)?)
+}
+
+#[tauri::command]
+pub fn library_set(app: AppHandle, value: String) -> Result<(), String> {
+    write_library(&library_path(&app)?, &value)
 }
 
 // ---------------------------------------------------------------------------
@@ -279,6 +321,23 @@ mod tests {
         assert!(write_all(&dir, &bad).is_err());
 
         fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn the_library_starts_empty_rather_than_missing() {
+        let dir = scratch("library");
+        let path = dir.join("library.json");
+
+        // A first run has no file, and that is an empty library, not an error.
+        assert_eq!(read_library(&path).unwrap(), "[]");
+
+        write_library(&path, r#"[{"key":"abc","ref":"one.png"}]"#).unwrap();
+        assert!(read_library(&path).unwrap().contains("one.png"));
+
+        write_library(&path, "[]").unwrap();
+        assert_eq!(read_library(&path).unwrap(), "[]");
+
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
