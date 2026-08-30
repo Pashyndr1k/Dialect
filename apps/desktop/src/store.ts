@@ -293,3 +293,47 @@ export const probeVideo = (path: string): Promise<VideoProbe> =>
 
 export const videoFrames = (path: string, count = 5): Promise<VideoFrame[]> =>
   invoke<VideoFrame[]>('media_frames', { path, count });
+
+// ---------------------------------------------------------------------------
+// Reading a track
+// ---------------------------------------------------------------------------
+
+export interface AudioTags {
+  duration_s: number;
+  sample_rate: number;
+  channels: number;
+  title: string | null;
+  artist: string | null;
+  genre: string | null;
+}
+
+export interface Measured {
+  probe: AudioTags;
+  tempo: { bpm: number; confidence: number } | null;
+  key: { name: string; confidence: number } | null;
+  lufs: number | null;
+  lra: number | null;
+  /** A spectrogram and a waveform, in that order. */
+  pictures: Array<{ kind: string; base64: string }>;
+}
+
+/**
+ * A track comes in by path, for the same reason a clip does: the host has to
+ * run ffmpeg over it, and a file dropped on the page has no path on disk.
+ */
+export async function pickAudio(): Promise<string | null> {
+  if (!hasHost()) {
+    throw new Error('Reading a track needs the desktop app: a browser cannot reach ffmpeg.');
+  }
+
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const path = await open({
+    multiple: false,
+    title: 'Choose a track',
+    filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'opus'] }],
+  });
+  return typeof path === 'string' ? path : null;
+}
+
+export const measureAudio = (path: string): Promise<Measured> =>
+  invoke<Measured>('audio_measure', { path });

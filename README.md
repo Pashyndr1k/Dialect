@@ -157,6 +157,33 @@ then has to be corrected.
 ffmpeg is found on PATH rather than bundled. Shipping a copy is a release
 concern; the button says what it needs and stays disabled without it.
 
+## Reading a track
+
+A model cannot listen, and unlike a clip there is no frame to show it. So the
+job splits by what each side is good at.
+
+What can be measured is measured and handed over as fact: length, loudness,
+tempo, key. Tempo comes from the onset envelope — loudness over time,
+differenced so only rises count — autocorrelated between 60 and 200 BPM, with
+the peak interpolated because a whole frame is worth several BPM up there. Key
+comes from twelve pitch classes summed across five octaves, read with Goertzel
+rather than a full spectrum since those sixty frequencies are the only ones that
+matter, then correlated against the Krumhansl–Schmuckler profiles.
+
+Both carry how sure they are, and that is the point of measuring at all.
+Ambient with no pulse still produces a number; stated as fact it would mislead,
+so below a threshold nothing is said. A prompt claiming 140 BPM about a 90 BPM
+track is worse than one that never mentions tempo.
+
+What is left is judgement — genre, instruments, mood, where the sections change
+— and that goes to the model with a picture of the sound: a spectrogram and a
+waveform. Those genuinely show density, brightness, dynamics and structure. They
+do not show what a saxophone is, and the prompt says so, with somewhere for the
+model to record what it could not tell. Everything named will be generated, so a
+short honest list beats a long invented one.
+
+Lyrics are not transcribed. That needs a speech model, and nothing here has one.
+
 ## The key
 
 Extraction needs an Anthropic key. It is typed into the app's own settings panel

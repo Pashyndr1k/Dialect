@@ -20,6 +20,7 @@ import {
   compileSequence,
   sequenceFromIR,
   sequenceToDocument,
+  extractFromAudio,
   extractFromImage,
   extractFromVideo,
   Gateway,
@@ -47,7 +48,9 @@ import {
   hostCache,
   loadLibrary,
   loadSession,
+  measureAudio,
   mediaTools,
+  pickAudio,
   pickVideo,
   probeVideo,
   rememberRead,
@@ -102,6 +105,12 @@ function parseIR(text: string): { ir: PromptIR } | { error: string } {
   }
 }
 
+/**
+ * Below this, a measurement is a number the arithmetic produced rather than
+ * something the track actually does. Stated as fact it would mislead.
+ */
+const SURE_ENOUGH = 0.25;
+
 export function App() {
   const [irText, setIrText] = useState(() => JSON.stringify(imageExample, null, 2));
   const [target, setTarget] = useState('nano-banana-2');
@@ -141,7 +150,7 @@ export function App() {
    */
   const [shots, setShots] = useState<SequenceShot[] | null>(null);
   const [openShot, setOpenShot] = useState<string | null>(null);
-  const [canReadClips, setCanReadClips] = useState(false);
+  const [canReadMedia, setCanReadClips] = useState(false);
 
   useEffect(() => {
     void mediaTools().then((t) => setCanReadClips(t.ffmpeg && t.ffprobe));
@@ -466,12 +475,23 @@ export function App() {
    * The name is the path's last segment, which is what everything else keys on
    * — the same name in the list, the library and the saved file.
    */
-  const takeVideo = async (): Promise<void> => {
+  /**
+   * A file the host reads: chosen rather than dropped, because ffmpeg needs a
+   * path and a dropped file has none.
+   *
+   * Everything around the reading is the same whether it is a clip or a track —
+   * stage it, run it, keep what came back, say so if it failed — so only the
+   * reading itself is passed in.
+   */
+  const readFromPath = async (
+    pick: () => Promise<string | null>,
+    read: (path: string, name: string) => Promise<{ ir: PromptIR; key: string; thumb?: string }>,
+  ): Promise<void> => {
     setExtractError(null);
 
     let path: string | null;
     try {
-      path = await pickVideo();
+      path = await pick();
     } catch (err) {
       setExtractError(err instanceof Error ? err.message : String(err));
       return;
@@ -490,25 +510,21 @@ export function App() {
     setExtracting(name);
 
     try {
-      const probe = await probeVideo(path);
-      const frames = await videoFrames(path, 5);
-
-      // The first frame stands in for the clip, since there is no file object
-      // to make an object URL from.
-      const thumb = `data:image/jpeg;base64,${frames[0]!.base64}`;
-      thumbs.current.set(name, thumb);
-
-      const { ir, key } = await extractFromVideo(
-        gateway,
-        frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 })),
-        { reference: name, durationS: probe.duration_s, aspectRatio: probe.aspect_ratio },
-      );
+      const { ir, key, thumb } = await read(path, name);
+      if (thumb) thumbs.current.set(name, thumb);
 
       results.current.set(name, ir);
       showIR(ir);
       setPromptOf(name);
       setBatch((prev) => prev.map((i) => (i.id === name ? { ...i, state: 'done' } : i)));
-      setLibrary(await rememberRead({ key, ref: name, readAt: new Date().toISOString(), thumb }));
+      setLibrary(
+        await rememberRead({
+          key,
+          ref: name,
+          readAt: new Date().toISOString(),
+          ...(thumb ? { thumb } : {}),
+        }),
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setExtractError(message);
@@ -520,6 +536,59 @@ export function App() {
       refreshCache();
     }
   };
+
+  const takeVideo = (): Promise<void> =>
+    readFromPath(pickVideo, async (path, name) => {
+      const probe = await probeVideo(path);
+      const frames = await videoFrames(path, 5);
+
+      const { ir, key } = await extractFromVideo(
+        gateway,
+        frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 })),
+        { reference: name, durationS: probe.duration_s, aspectRatio: probe.aspect_ratio },
+      );
+
+      // The first frame stands in for the clip, since there is no file object
+      // to make an object URL from.
+      return { ir, key, thumb: `data:image/jpeg;base64,${frames[0]!.base64}` };
+    });
+
+  /**
+   * A track is measured before it is read, and only what was measured
+   * *confidently* is stated as fact.
+   *
+   * Ambient with no pulse still produces a number from an autocorrelation, and
+   * telling a model a piece is 143 BPM when it has no tempo at all is worse
+   * than saying nothing — which is the whole reason the measurement carries how
+   * sure it is.
+   */
+  const takeAudio = (): Promise<void> =>
+    readFromPath(pickAudio, async (path, name) => {
+      const m = await measureAudio(path);
+
+      const { ir, key } = await extractFromAudio(
+        gateway,
+        m.pictures.map((p) => ({ mediaType: 'image/jpeg', base64: p.base64 })),
+        {
+          reference: name,
+          durationS: m.probe.duration_s,
+          ...(m.tempo && m.tempo.confidence > SURE_ENOUGH ? { bpm: m.tempo.bpm } : {}),
+          ...(m.key && m.key.confidence > SURE_ENOUGH ? { musicalKey: m.key.name } : {}),
+          ...(m.lufs !== null ? { lufs: m.lufs } : {}),
+          ...(m.lra !== null ? { lra: m.lra } : {}),
+          ...(m.probe.title ? { title: m.probe.title } : {}),
+          ...(m.probe.artist ? { artist: m.probe.artist } : {}),
+          ...(m.probe.genre ? { taggedGenre: m.probe.genre } : {}),
+        },
+      );
+
+      const first = m.pictures[0];
+      return {
+        ir,
+        key,
+        ...(first ? { thumb: `data:image/jpeg;base64,${first.base64}` } : {}),
+      };
+    });
 
   /**
    * Bring back a reference read earlier. The picture is the thumbnail that was
@@ -756,9 +825,9 @@ export function App() {
                   </button>
                   <button
                     className="ghost"
-                    disabled={!canReadClips}
+                    disabled={!canReadMedia}
                     title={
-                      canReadClips
+                      canReadMedia
                         ? 'Read a video clip as one shot'
                         : 'Needs ffmpeg on PATH to read a clip'
                     }
@@ -766,9 +835,21 @@ export function App() {
                   >
                     Upload clip
                   </button>
+                  <button
+                    className="ghost"
+                    disabled={!canReadMedia}
+                    title={
+                      canReadMedia
+                        ? 'Measure a track and read the picture of its sound'
+                        : 'Needs ffmpeg on PATH to read a track'
+                    }
+                    onClick={() => void takeAudio()}
+                  >
+                    Upload track
+                  </button>
                 </div>
                 <p className="drop-n">
-                  PNG, JPEG, WebP or GIF{canReadClips ? ' · MP4, MOV, WebM' : ''}
+                  PNG, JPEG, WebP or GIF{canReadMedia ? ' · MP4, MOV, WebM · MP3, WAV, FLAC' : ''}
                   {hasKey === false ? (
                     <>
                       {' · needs a key in '}
