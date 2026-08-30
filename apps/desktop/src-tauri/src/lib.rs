@@ -7,6 +7,7 @@
 //! already paid for, and a record of what was on screen.
 
 mod anthropic;
+mod media;
 mod secrets;
 mod store;
 
@@ -31,6 +32,9 @@ pub fn run() {
             store::save_prompts,
             store::library_get,
             store::library_set,
+            media::media_tools,
+            media::media_probe,
+            media::media_frames,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

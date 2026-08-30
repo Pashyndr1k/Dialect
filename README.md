@@ -42,7 +42,7 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Batch | resumable queue, persistent cache, budget across restarts |
 | Survives a restart | answers already paid for, and what was on screen |
 | Job routing | `bestFor` matching, exposed via `dialect targets --job` |
-| Extraction | reference image to IR, behind a provider-agnostic gateway |
+| Extraction | image, and video via frames, behind a provider-agnostic gateway |
 | Provider gateway | content-addressed cache, budget cap, spend reporting |
 | Adapters | Anthropic (`claude-opus-5`, structured outputs); a mock for tests |
 | Key storage | OS credential store via the Rust host, with a settings panel |
@@ -112,6 +112,25 @@ apps/desktop        the Tauri window: React in src/, the host in src-tauri/
   src-tauri/        secrets.rs owns the credential store, anthropic.rs proxies
                     the one call that needs it
 ```
+
+## Reading a clip
+
+A vision model cannot watch anything, so a clip becomes a handful of stills
+taken in order across its length. What no single frame shows — that the camera
+is pushing in, that a hand is rising — is inferred from how the frames differ,
+which is why they go in one question as an ordered set rather than as separate
+pictures.
+
+The host does that work: a web view cannot run a program, and a clip is far too
+large to hand across as base64 just to have it handed back. So a clip is chosen
+rather than dropped, and only its path travels.
+
+Duration and aspect ratio come from the container rather than the model —
+asking it to guess something already measured only invites a wrong answer that
+then has to be corrected.
+
+ffmpeg is found on PATH rather than bundled. Shipping a copy is a release
+concern; the button says what it needs and stays disabled without it.
 
 ## The key
 

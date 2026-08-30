@@ -18,6 +18,7 @@ import {
   assembleText,
   compile,
   extractFromImage,
+  extractFromVideo,
   Gateway,
   ExtractedScene,
   getProfile,
@@ -40,7 +41,11 @@ import {
   hostCache,
   loadLibrary,
   loadSession,
+  mediaTools,
+  pickVideo,
+  probeVideo,
   rememberRead,
+  videoFrames,
   thumbnail,
   type LibraryEntry,
   saveSession,
@@ -121,6 +126,11 @@ export function App() {
   const thumbs = useRef(new Map<string, string | null>());
   const [library, setLibrary] = useState<LibraryEntry[]>([]);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [canReadClips, setCanReadClips] = useState(false);
+
+  useEffect(() => {
+    void mediaTools().then((t) => setCanReadClips(t.ffmpeg && t.ffprobe));
+  }, []);
 
   useEffect(() => {
     void loadLibrary().then(setLibrary);
@@ -432,6 +442,67 @@ export function App() {
   };
 
   /**
+   * Read a clip: frames out of the host, one question to the model.
+   *
+   * The name is the path's last segment, which is what everything else keys on
+   * — the same name in the list, the library and the saved file.
+   */
+  const takeVideo = async (): Promise<void> => {
+    setExtractError(null);
+
+    let path: string | null;
+    try {
+      path = await pickVideo();
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    if (!path) return;
+
+    const name = path.split(/[\\/]/).pop() ?? path;
+    if (held.current.has(name) || batch.some((i) => i.id === name)) {
+      setExtractError(`${name} is already in the list.`);
+      setActiveRef(name);
+      return;
+    }
+
+    setBatch((prev) => [{ id: name, name, state: 'running' as const }, ...prev]);
+    setActiveRef(name);
+    setExtracting(name);
+
+    try {
+      const probe = await probeVideo(path);
+      const frames = await videoFrames(path, 5);
+
+      // The first frame stands in for the clip, since there is no file object
+      // to make an object URL from.
+      const thumb = `data:image/jpeg;base64,${frames[0]!.base64}`;
+      thumbs.current.set(name, thumb);
+
+      const { ir, key } = await extractFromVideo(
+        gateway,
+        frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 })),
+        { reference: name, durationS: probe.duration_s, aspectRatio: probe.aspect_ratio },
+      );
+
+      results.current.set(name, ir);
+      showIR(ir);
+      setPromptOf(name);
+      setBatch((prev) => prev.map((i) => (i.id === name ? { ...i, state: 'done' } : i)));
+      setLibrary(await rememberRead({ key, ref: name, readAt: new Date().toISOString(), thumb }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setExtractError(message);
+      setBatch((prev) =>
+        prev.map((i) => (i.id === name ? { ...i, state: 'failed', error: message } : i)),
+      );
+    } finally {
+      setExtracting(null);
+      refreshCache();
+    }
+  };
+
+  /**
    * Bring back a reference read earlier. The picture is the thumbnail that was
    * kept — the original file is long gone — and the prompt comes from the
    * answer already in the cache, so this costs nothing.
@@ -610,9 +681,21 @@ export function App() {
                   <button className="ghost" onClick={() => folderInput.current?.click()}>
                     Upload folder
                   </button>
+                  <button
+                    className="ghost"
+                    disabled={!canReadClips}
+                    title={
+                      canReadClips
+                        ? 'Read a video clip as one shot'
+                        : 'Needs ffmpeg on PATH to read a clip'
+                    }
+                    onClick={() => void takeVideo()}
+                  >
+                    Upload clip
+                  </button>
                 </div>
                 <p className="drop-n">
-                  PNG, JPEG, WebP or GIF
+                  PNG, JPEG, WebP or GIF{canReadClips ? ' · MP4, MOV, WebM' : ''}
                   {hasKey === false ? (
                     <>
                       {' · needs a key in '}

@@ -233,3 +233,63 @@ export async function showFolder(dir: string): Promise<void> {
   const { openPath } = await import('@tauri-apps/plugin-opener');
   await openPath(dir).catch(() => undefined);
 }
+
+// ---------------------------------------------------------------------------
+// Reading a clip
+// ---------------------------------------------------------------------------
+
+export interface MediaTools {
+  ffmpeg: boolean;
+  ffprobe: boolean;
+}
+
+export interface VideoProbe {
+  duration_s: number;
+  width: number;
+  height: number;
+  fps: number;
+  has_audio: boolean;
+  aspect_ratio: string;
+}
+
+export interface VideoFrame {
+  at: number;
+  base64: string;
+}
+
+/** Whether a clip can be read here at all, so the window can say so up front. */
+export async function mediaTools(): Promise<MediaTools> {
+  if (!hasHost()) return { ffmpeg: false, ffprobe: false };
+  try {
+    return await invoke<MediaTools>('media_tools', {});
+  } catch {
+    return { ffmpeg: false, ffprobe: false };
+  }
+}
+
+/**
+ * A clip comes in by path, not by drop.
+ *
+ * A dropped file reaches the page as bytes with no name on disk, and handing a
+ * few hundred megabytes across to the host as base64 just to have ffmpeg read
+ * it would be absurd. So the file is chosen, and only the path travels.
+ */
+export async function pickVideo(): Promise<string | null> {
+  if (!hasHost()) {
+    throw new Error('Reading a clip needs the desktop app: a browser cannot reach ffmpeg.');
+  }
+
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const path = await open({
+    multiple: false,
+    title: 'Choose a clip',
+    filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'] }],
+  });
+  return typeof path === 'string' ? path : null;
+}
+
+export const probeVideo = (path: string): Promise<VideoProbe> =>
+  invoke<VideoProbe>('media_probe', { path });
+
+export const videoFrames = (path: string, count = 5): Promise<VideoFrame[]> =>
+  invoke<VideoFrame[]>('media_frames', { path, count });
