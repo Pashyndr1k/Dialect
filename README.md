@@ -138,6 +138,50 @@ size from the same angle, a camera that never stops doing the same thing. They
 read what the prompts actually say rather than what the shots store, so a move
 inherited from the world is counted like one that was typed.
 
+## One button
+
+A reference is a reference. Which of the three ways it gets read is decided from
+its extension, in one list shared by the file dialog, the folder scan and the
+reader — three copies of a list of extensions is three chances for `.m4v` to
+work in one place and not another.
+
+That decision forced a smaller one. ffmpeg needs a path, and a file dropped on a
+web view has bytes and no path, so a clip has to be chosen rather than dropped.
+Once one kind arrives as a path they all do, or a single button could not accept
+all three — so the host reads stills off disk too, and a picked folder is listed
+by the host rather than by the page.
+
+Dropping still works, and works for clips now: small enough, and the host writes
+the file down where ffmpeg can reach it, which is worth one round trip. Large
+enough and it says to use the button, before spending the time to encode it.
+
+A folder scan does not descend. A folder of references is a folder of
+references, and walking into a subfolder called `old` and reading forty more is
+a bill nobody asked for. It sorts the way a person numbered things, so `shot_2`
+comes before `shot_10`.
+
+## Writing from an idea
+
+The opposite job to reading a reference, and it needs the opposite instruction.
+Reading says: describe what is there, and where the picture does not tell you,
+say so. Writing says: decide. Someone who types "a cowboy in a saloon" is asking
+for the two hundred words they did not want to write, and a description hedged
+with "perhaps a coat, or a jacket" is not a description — something downstream
+picks one anyway, and worse.
+
+What does not change is the discipline. Everything invented still has to be
+something a camera could record, a shot still gets one action, optics are still
+a visible effect rather than a lens number. The rules engine holds the result to
+the same standard as a document read off a photograph.
+
+With a template chosen the job narrows and improves: instead of inventing a
+whole document, the model answers that template's questions, and the template
+decides the rest. The hints in the template are already written as instructions
+— "One action. A second one belongs in the next shot." — so they are handed
+over as the schema's field descriptions. The model never sees the template's IR:
+a template is a decision about the look, and letting a model rewrite it would
+defeat the point of choosing one.
+
 ## Reading a clip
 
 A vision model cannot watch anything, so a clip becomes a handful of stills

@@ -226,6 +226,8 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   border: 1px solid var(--accent); border-radius: 5px; padding: 7px 16px;
 }
 .solid:hover { filter: brightness(1.12); }
+/* A disabled solid button kept its colour and looked pressable. */
+.solid:disabled { opacity: .45; cursor: default; filter: none; }
 .link {
   font: inherit; color: var(--accent); background: none; border: 0; padding: 0;
   cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
@@ -457,3 +459,16 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 
 .seq-open { margin-top: 14px; }
 .seq-open h3 { margin: 0 0 8px; }
+
+/* --- the idea box: what you want, in words --- */
+.idea { margin-bottom: 12px; }
+.idea-t {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; line-height: 1.5;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 8px 10px; resize: vertical;
+}
+.idea-t::placeholder { color: var(--ink-3); }
+.idea-t:focus { border-color: var(--accent); outline: none; }
+.idea-b { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.idea-s { flex-shrink: 0; }
+.idea-b .solid { margin-bottom: 0; }

@@ -23,6 +23,15 @@ import {
   extractFromAudio,
   extractFromImage,
   extractFromVideo,
+  expandIdea,
+  fillTemplate,
+  ideaLabel,
+  kindOf,
+  modalityOfFamily,
+  kindOfMediaType,
+  mediaTypeOf,
+  nameOf,
+  type ReferenceKind,
   Gateway,
   ExtractedScene,
   getProfile,
@@ -38,6 +47,7 @@ import { createQueue, runQueue } from '@dialect/core';
 import { PromptActions, References, type BatchItem } from './Batch.tsx';
 import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
+import { Idea } from './Idea.tsx';
 import { Shots } from './Shots.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
@@ -48,10 +58,15 @@ import {
   hostCache,
   loadLibrary,
   loadSession,
+  hasDesktop,
   measureAudio,
   mediaTools,
-  pickAudio,
-  pickVideo,
+  parkFile,
+  pickFolder,
+  pickReferences,
+  readFile,
+  scanFolder,
+  thumbOf,
   probeVideo,
   rememberRead,
   videoFrames,
@@ -66,13 +81,27 @@ import {
 } from './store.ts';
 import { profiles, registry } from './registry.ts';
 import { Settings } from './Settings.tsx';
+import { templateLibrary, templatesForModality } from './templates.ts';
 import videoExample from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
 import imageExample from './example.image.json';
 import audioExample from './example.audio.json';
 
 const LEVEL_ORDER: Record<Finding['level'], number> = { block: 0, warn: 1, autofix: 2 };
 
-const READABLE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+/**
+ * A reference, however it arrived.
+ *
+ * A file chosen through the dialog has a path, which is what ffmpeg needs. A
+ * file dropped on the page has bytes and no path — fine for a still, which the
+ * web view can encode itself, and for a clip only after the host has written it
+ * down somewhere ffmpeg can reach.
+ */
+interface Source {
+  kind: ReferenceKind;
+  name: string;
+  path?: string;
+  file?: File;
+}
 
 /** The opening document follows the target, so the two never disagree. */
 const exampleFor = (family: string): unknown =>
@@ -111,6 +140,12 @@ function parseIR(text: string): { ir: PromptIR } | { error: string } {
  */
 const SURE_ENOUGH = 0.25;
 
+/**
+ * Above this a dropped clip is not worth moving through the bridge as text.
+ * The host refuses the same size; this only saves the wait before the refusal.
+ */
+const DROP_LIMIT_BYTES = 96 * 1024 * 1024;
+
 export function App() {
   const [irText, setIrText] = useState(() => JSON.stringify(imageExample, null, 2));
   const [target, setTarget] = useState('nano-banana-2');
@@ -125,6 +160,11 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
+
+  /** What the user typed instead of, or as well as, bringing a reference. */
+  const [idea, setIdea] = useState('');
+  const [templateId, setTemplateId] = useState('');
+  const [writing, setWriting] = useState(false);
 
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [activeRef, setActiveRef] = useState<string | null>(null);
@@ -163,16 +203,27 @@ export function App() {
   // An object URL holds the file open until it is revoked, so each one is
   // released as soon as another reference takes its place.
   useEffect(() => {
-    const file = activeRef ? held.current.get(activeRef) : undefined;
-    if (!file) {
-      // No file, but perhaps a thumbnail kept from when there was one.
-      setPreview(activeRef ? (thumbs.current.get(activeRef) ?? null) : null);
-      return;
+    const source = activeRef ? held.current.get(activeRef) : undefined;
+
+    if (source?.file) {
+      const url = URL.createObjectURL(source.file);
+      setPreview(url);
+      return () => URL.revokeObjectURL(url);
     }
 
-    const url = URL.createObjectURL(file);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
+    // Whatever was kept from an earlier look, shown at once so the pane does
+    // not blink while the host draws a new one.
+    setPreview(activeRef ? (thumbs.current.get(activeRef) ?? null) : null);
+    if (!source?.path || thumbs.current.has(source.name)) return;
+
+    let live = true;
+    void thumbOf(source.path).then((thumb) => {
+      thumbs.current.set(source.name, thumb ?? null);
+      if (live && thumb) setPreview(thumb);
+    });
+    return () => {
+      live = false;
+    };
   }, [activeRef, batch]);
 
   const refreshCache = (): void => {
@@ -182,8 +233,8 @@ export function App() {
   const [running, setRunning] = useState(false);
   // Files and their extracted IRs live outside React state: neither is
   // serialisable, and neither belongs in a render.
-  /** The dropped files themselves, kept so a preview has bytes to show. */
-  const held = useRef(new Map<string, File>());
+  /** The references themselves, kept so a preview has something to show. */
+  const held = useRef(new Map<string, Source>());
   const results = useRef(new Map<string, PromptIR>());
   const abort = useRef<AbortController | null>(null);
 
@@ -252,26 +303,91 @@ export function App() {
     void saveSession(session);
   }, [batch, target, spent, irText]);
 
-  const readOne = async (file: File): Promise<PromptIR> => {
-    const { ir: extracted, key, cached } = await extractFromImage(
-      gateway,
-      { mediaType: file.type, base64: await toBase64(file) },
-      { reference: file.name },
-    );
+  /**
+   * Read one reference, whichever of the three it is.
+   *
+   * The kind decides how it is read and nothing else: what happens around the
+   * reading — filing it in the library under a name and a picture, clearing a
+   * stale error when the answer came free — is the same either way.
+   */
+  const readOne = async (source: Source): Promise<PromptIR> => {
+    const { ir, key, thumb, cached } = await readByKind(source);
 
     // Filed under a name and a picture, so what was paid for can be found
     // again. A cached read still refreshes the date — it was used today.
-    const thumb = await thumbnail(file);
-    const entry: LibraryEntry = {
-      key,
-      ref: file.name,
-      readAt: new Date().toISOString(),
-      ...(thumb ? { thumb } : {}),
-    };
-    setLibrary(await rememberRead(entry));
+    if (thumb) thumbs.current.set(source.name, thumb);
+    setLibrary(
+      await rememberRead({
+        key,
+        ref: source.name,
+        readAt: new Date().toISOString(),
+        ...(thumb ? { thumb } : {}),
+      }),
+    );
     if (cached) setExtractError(null);
 
-    return extracted;
+    return ir;
+  };
+
+  const readByKind = async (
+    source: Source,
+  ): Promise<{ ir: PromptIR; key: string; cached: boolean; thumb?: string }> => {
+    if (source.kind === 'video') {
+      const path = source.path!;
+      const probe = await probeVideo(path);
+      const frames = await videoFrames(path, 5);
+
+      const { ir, key, cached } = await extractFromVideo(
+        gateway,
+        frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 })),
+        { reference: source.name, durationS: probe.duration_s, aspectRatio: probe.aspect_ratio },
+      );
+      // The first frame stands in for the clip.
+      return { ir, key, cached, thumb: `data:image/jpeg;base64,${frames[0]!.base64}` };
+    }
+
+    if (source.kind === 'audio') {
+      const m = await measureAudio(source.path!);
+
+      const { ir, key, cached } = await extractFromAudio(
+        gateway,
+        m.pictures.map((picture) => ({ mediaType: 'image/jpeg', base64: picture.base64 })),
+        {
+          reference: source.name,
+          durationS: m.probe.duration_s,
+          ...(m.tempo && m.tempo.confidence > SURE_ENOUGH ? { bpm: m.tempo.bpm } : {}),
+          ...(m.key && m.key.confidence > SURE_ENOUGH ? { musicalKey: m.key.name } : {}),
+          ...(m.lufs !== null ? { lufs: m.lufs } : {}),
+          ...(m.lra !== null ? { lra: m.lra } : {}),
+          ...(m.probe.title ? { title: m.probe.title } : {}),
+          ...(m.probe.artist ? { artist: m.probe.artist } : {}),
+          ...(m.probe.genre ? { taggedGenre: m.probe.genre } : {}),
+        },
+      );
+
+      const first = m.pictures[0];
+      return {
+        ir,
+        key,
+        cached,
+        ...(first ? { thumb: `data:image/jpeg;base64,${first.base64}` } : {}),
+      };
+    }
+
+    const base64 = source.file
+      ? await toBase64(source.file)
+      : (await readFile(source.path!)).base64;
+
+    const { ir, key, cached } = await extractFromImage(
+      gateway,
+      { mediaType: source.file?.type || mediaTypeOf(source.name), base64 },
+      { reference: source.name },
+    );
+
+    const thumb = source.file
+      ? await thumbnail(source.file)
+      : await thumbOf(source.path!);
+    return { ir, key, cached, ...(thumb ? { thumb } : {}) };
   };
 
   const showIR = (next: PromptIR): void => {
@@ -291,53 +407,52 @@ export function App() {
    * staged and wait for a decision, because a dozen is a spend worth seeing
    * before it happens.
    */
-  const takeFiles = async (incoming: File[]): Promise<void> => {
+  const takeSources = async (incoming: Source[], skipped = 0): Promise<void> => {
     setExtractError(null);
 
-    const usable = incoming.filter((f) => READABLE.has(f.type));
-    const rejected = incoming.length - usable.length;
-
-    if (usable.length === 0) {
-      setExtractError(
-        `Nothing readable there. Drop PNG, JPEG, WebP or GIF${rejected > 0 ? ` — ${rejected} file(s) were something else` : ''}.`,
-      );
+    if (incoming.length === 0) {
+      if (skipped > 0) {
+        setExtractError(
+          `Nothing readable there — ${skipped} file(s) were something this cannot read.`,
+        );
+      }
       return;
     }
 
-    // Names are the identity, so dropping the same file twice does not read it
+    // Names are the identity, so bringing the same file twice does not read it
     // twice or split the list.
-    const fresh = usable.filter((f) => !held.current.has(f.name));
+    const fresh = incoming.filter((source) => !held.current.has(source.name));
     if (fresh.length === 0) {
       setExtractError(
-        usable.length === 1
-          ? `${usable[0]!.name} is already in the list.`
+        incoming.length === 1
+          ? `${incoming[0]!.name} is already in the list.`
           : 'Those are all in the list already.',
       );
-      setActiveRef(usable[0]!.name);
+      setActiveRef(incoming[0]!.name);
       return;
     }
-    if (rejected > 0) setExtractError(`Skipped ${rejected} file(s) that were not images.`);
+    if (skipped > 0) setExtractError(`Skipped ${skipped} file(s) this cannot read.`);
 
-    for (const file of fresh) held.current.set(file.name, file);
+    for (const source of fresh) held.current.set(source.name, source);
     const mark = (id: string, patch: Partial<BatchItem>): void =>
       setBatch((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
     if (fresh.length === 1) {
-      const file = fresh[0]!;
-      setBatch((prev) => [{ id: file.name, name: file.name, state: 'running' }, ...prev]);
-      setActiveRef(file.name);
-      setExtracting(file.name);
+      const source = fresh[0]!;
+      setBatch((prev) => [{ id: source.name, name: source.name, state: 'running' }, ...prev]);
+      setActiveRef(source.name);
+      setExtracting(source.name);
 
       try {
-        const ir = await readOne(file);
-        results.current.set(file.name, ir);
+        const ir = await readOne(source);
+        results.current.set(source.name, ir);
         showIR(ir);
-        setPromptOf(file.name);
-        mark(file.name, { state: 'done' });
+        setPromptOf(source.name);
+        mark(source.name, { state: 'done' });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setExtractError(message);
-        mark(file.name, { state: 'failed', error: message });
+        mark(source.name, { state: 'failed', error: message });
       } finally {
         setExtracting(null);
         refreshCache();
@@ -352,6 +467,148 @@ export function App() {
     // Show the first straight away, so the set can be looked through before
     // anyone decides to pay for it.
     setActiveRef(fresh[0]!.name);
+  };
+
+  /**
+   * Files dropped on the page.
+   *
+   * A still is already here as bytes and needs nothing further. A clip or a
+   * track has to reach ffmpeg, which cannot read a web view, so the host writes
+   * it down first — worth the round trip for something small, and refused above
+   * a size where choosing the file is faster anyway.
+   */
+  const takeFiles = async (incoming: File[]): Promise<void> => {
+    const sources: Source[] = [];
+    const tooBig: string[] = [];
+    let skipped = 0;
+    let needsApp = 0;
+
+    for (const file of incoming) {
+      const kind = kindOfMediaType(file.type) ?? kindOf(file.name);
+      if (!kind) {
+        skipped += 1;
+        continue;
+      }
+      if (kind === 'image') {
+        sources.push({ kind, name: file.name, file });
+        continue;
+      }
+
+      if (!hasDesktop()) {
+        needsApp += 1;
+        continue;
+      }
+      // Checked before encoding rather than after: turning ninety megabytes
+      // into base64 to be told it is too big is a wait for nothing.
+      if (file.size > DROP_LIMIT_BYTES) {
+        tooBig.push(file.name);
+        continue;
+      }
+
+      try {
+        const path = await parkFile(file.name, await toBase64(file));
+        sources.push({ kind, name: file.name, path });
+      } catch (err) {
+        setExtractError(err instanceof Error ? err.message : String(err));
+        return;
+      }
+    }
+
+    await takeSources(sources, skipped);
+
+    if (tooBig.length > 0) {
+      setExtractError(
+        `${tooBig.join(', ')} — too large to drop. Choose it with Upload reference instead.`,
+      );
+    } else if (needsApp > 0 && sources.length === 0) {
+      setExtractError('Clips and tracks need the desktop app: a browser cannot reach ffmpeg.');
+    }
+  };
+
+  /** Files chosen through the dialog: every kind, by path. */
+  const chooseReferences = async (): Promise<void> => {
+    if (!hasDesktop()) {
+      fileInput.current?.click();
+      return;
+    }
+
+    try {
+      const paths = await pickReferences();
+      await takeSources(...sourcesFrom(paths));
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const chooseFolder = async (): Promise<void> => {
+    if (!hasDesktop()) {
+      folderInput.current?.click();
+      return;
+    }
+
+    try {
+      const dir = await pickFolder();
+      if (!dir) return;
+
+      const found = await scanFolder(dir);
+      const [sources, skipped] = sourcesFrom(found.map((f) => f.path));
+      if (sources.length === 0 && skipped === 0) {
+        setExtractError('That folder is empty.');
+        return;
+      }
+      await takeSources(sources, skipped);
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  /**
+   * Write a document from a few words.
+   *
+   * With no template the model invents the whole thing; with one it answers
+   * that template's questions and the template decides the rest. Either way the
+   * result lands in the document on the right, exactly where a reference would
+   * have put it — there is only one kind of document, and nothing downstream
+   * cares which way it arrived.
+   */
+  const writeFromIdea = async (): Promise<void> => {
+    if (!idea.trim() || writing) return;
+
+    setExtractError(null);
+    setWriting(true);
+    const label = ideaLabel(idea);
+
+    try {
+      const { ir } = templateId
+        ? await fillTemplate(gateway, idea, templateLibrary, templateId)
+        : await expandIdea(gateway, idea, { modality: modalityOfFamily(profile.family) });
+
+      results.current.set(label, ir);
+      showIR(ir);
+      // Not held as a reference: there is no file to preview and nothing to
+      // re-read, so it belongs in the prompt header and nowhere else.
+      setActiveRef(null);
+      setPromptOf(label);
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setWriting(false);
+      refreshCache();
+    }
+  };
+
+  /** Paths to sources, dropping anything this app has no way to read. */
+  const sourcesFrom = (paths: string[]): [Source[], number] => {
+    const sources: Source[] = [];
+    let skipped = 0;
+
+    for (const path of paths) {
+      const name = nameOf(path);
+      const kind = kindOf(name);
+      if (kind) sources.push({ kind, name, path });
+      else skipped += 1;
+    }
+    return [sources, skipped];
   };
 
   const runBatch = async (): Promise<void> => {
@@ -380,9 +637,9 @@ export function App() {
           );
         },
         work: async (item) => {
-          const file = held.current.get(item.id);
-          if (!file) throw new Error('that file is no longer here');
-          results.current.set(item.id, await readOne(file));
+          const source = held.current.get(item.id);
+          if (!source) throw new Error('that file is no longer here');
+          results.current.set(item.id, await readOne(source));
           return item.id;
         },
       });
@@ -475,121 +732,6 @@ export function App() {
    * The name is the path's last segment, which is what everything else keys on
    * — the same name in the list, the library and the saved file.
    */
-  /**
-   * A file the host reads: chosen rather than dropped, because ffmpeg needs a
-   * path and a dropped file has none.
-   *
-   * Everything around the reading is the same whether it is a clip or a track —
-   * stage it, run it, keep what came back, say so if it failed — so only the
-   * reading itself is passed in.
-   */
-  const readFromPath = async (
-    pick: () => Promise<string | null>,
-    read: (path: string, name: string) => Promise<{ ir: PromptIR; key: string; thumb?: string }>,
-  ): Promise<void> => {
-    setExtractError(null);
-
-    let path: string | null;
-    try {
-      path = await pick();
-    } catch (err) {
-      setExtractError(err instanceof Error ? err.message : String(err));
-      return;
-    }
-    if (!path) return;
-
-    const name = path.split(/[\\/]/).pop() ?? path;
-    if (held.current.has(name) || batch.some((i) => i.id === name)) {
-      setExtractError(`${name} is already in the list.`);
-      setActiveRef(name);
-      return;
-    }
-
-    setBatch((prev) => [{ id: name, name, state: 'running' as const }, ...prev]);
-    setActiveRef(name);
-    setExtracting(name);
-
-    try {
-      const { ir, key, thumb } = await read(path, name);
-      if (thumb) thumbs.current.set(name, thumb);
-
-      results.current.set(name, ir);
-      showIR(ir);
-      setPromptOf(name);
-      setBatch((prev) => prev.map((i) => (i.id === name ? { ...i, state: 'done' } : i)));
-      setLibrary(
-        await rememberRead({
-          key,
-          ref: name,
-          readAt: new Date().toISOString(),
-          ...(thumb ? { thumb } : {}),
-        }),
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setExtractError(message);
-      setBatch((prev) =>
-        prev.map((i) => (i.id === name ? { ...i, state: 'failed', error: message } : i)),
-      );
-    } finally {
-      setExtracting(null);
-      refreshCache();
-    }
-  };
-
-  const takeVideo = (): Promise<void> =>
-    readFromPath(pickVideo, async (path, name) => {
-      const probe = await probeVideo(path);
-      const frames = await videoFrames(path, 5);
-
-      const { ir, key } = await extractFromVideo(
-        gateway,
-        frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 })),
-        { reference: name, durationS: probe.duration_s, aspectRatio: probe.aspect_ratio },
-      );
-
-      // The first frame stands in for the clip, since there is no file object
-      // to make an object URL from.
-      return { ir, key, thumb: `data:image/jpeg;base64,${frames[0]!.base64}` };
-    });
-
-  /**
-   * A track is measured before it is read, and only what was measured
-   * *confidently* is stated as fact.
-   *
-   * Ambient with no pulse still produces a number from an autocorrelation, and
-   * telling a model a piece is 143 BPM when it has no tempo at all is worse
-   * than saying nothing — which is the whole reason the measurement carries how
-   * sure it is.
-   */
-  const takeAudio = (): Promise<void> =>
-    readFromPath(pickAudio, async (path, name) => {
-      const m = await measureAudio(path);
-
-      const { ir, key } = await extractFromAudio(
-        gateway,
-        m.pictures.map((p) => ({ mediaType: 'image/jpeg', base64: p.base64 })),
-        {
-          reference: name,
-          durationS: m.probe.duration_s,
-          ...(m.tempo && m.tempo.confidence > SURE_ENOUGH ? { bpm: m.tempo.bpm } : {}),
-          ...(m.key && m.key.confidence > SURE_ENOUGH ? { musicalKey: m.key.name } : {}),
-          ...(m.lufs !== null ? { lufs: m.lufs } : {}),
-          ...(m.lra !== null ? { lra: m.lra } : {}),
-          ...(m.probe.title ? { title: m.probe.title } : {}),
-          ...(m.probe.artist ? { artist: m.probe.artist } : {}),
-          ...(m.probe.genre ? { taggedGenre: m.probe.genre } : {}),
-        },
-      );
-
-      const first = m.pictures[0];
-      return {
-        ir,
-        key,
-        ...(first ? { thumb: `data:image/jpeg;base64,${first.base64}` } : {}),
-      };
-    });
-
   /**
    * Bring back a reference read earlier. The picture is the thumbnail that was
    * kept — the original file is long gone — and the prompt comes from the
@@ -704,6 +846,18 @@ export function App() {
     }
   };
 
+  /**
+   * Only the templates that make sense for what is being made. A template that
+   * cannot apply to the chosen target is not a choice, it is a mistake waiting.
+   */
+  const templates = useMemo(() => templatesForModality(modalityOfFamily(profile.family)), [profile.family]);
+
+  useEffect(() => {
+    // Switching from a video target to an image one leaves a video template
+    // selected and unusable, so it is dropped rather than left to fail.
+    if (templateId && !templates.some((t) => t.id === templateId)) setTemplateId('');
+  }, [templates, templateId]);
+
   const isOn = (s: Segment): boolean => !disabled.has(s.label);
 
   const toggle = (label: string): void => {
@@ -786,11 +940,22 @@ export function App() {
             </button>
           </div>
 
+          <Idea
+            idea={idea}
+            templateId={templateId}
+            templates={templates}
+            busy={writing}
+            disabled={hasKey === false}
+            onIdea={setIdea}
+            onTemplate={setTemplateId}
+            onWrite={() => void writeFromIdea()}
+          />
+
           <div className={`drop${dragging ? ' over' : ''}`}>
             <input
               ref={fileInput}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
+              accept="image/*,video/*,audio/*"
               multiple
               hidden
               onChange={(e) => {
@@ -817,39 +982,21 @@ export function App() {
               <>
                 <p className="drop-t">Drop references here — one, or a folder of them</p>
                 <div className="drop-b">
-                  <button className="solid" onClick={() => fileInput.current?.click()}>
+                  <button
+                    className="solid"
+                    title="Stills, clips or tracks — whichever it is, it is read as that"
+                    onClick={() => void chooseReferences()}
+                  >
                     Upload reference
                   </button>
-                  <button className="ghost" onClick={() => folderInput.current?.click()}>
+                  <button className="ghost" onClick={() => void chooseFolder()}>
                     Upload folder
-                  </button>
-                  <button
-                    className="ghost"
-                    disabled={!canReadMedia}
-                    title={
-                      canReadMedia
-                        ? 'Read a video clip as one shot'
-                        : 'Needs ffmpeg on PATH to read a clip'
-                    }
-                    onClick={() => void takeVideo()}
-                  >
-                    Upload clip
-                  </button>
-                  <button
-                    className="ghost"
-                    disabled={!canReadMedia}
-                    title={
-                      canReadMedia
-                        ? 'Measure a track and read the picture of its sound'
-                        : 'Needs ffmpeg on PATH to read a track'
-                    }
-                    onClick={() => void takeAudio()}
-                  >
-                    Upload track
                   </button>
                 </div>
                 <p className="drop-n">
-                  PNG, JPEG, WebP or GIF{canReadMedia ? ' · MP4, MOV, WebM · MP3, WAV, FLAC' : ''}
+                  {canReadMedia
+                    ? 'Stills, clips or tracks — each is read as what it is'
+                    : 'Stills · clips and tracks need ffmpeg on PATH'}
                   {hasKey === false ? (
                     <>
                       {' · needs a key in '}

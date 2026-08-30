@@ -8,6 +8,7 @@
 
 mod anthropic;
 mod audio;
+mod files;
 mod media;
 mod secrets;
 mod store;
@@ -38,6 +39,10 @@ pub fn run() {
             media::media_frames,
             audio::audio_probe,
             audio::audio_measure,
+            files::file_read,
+            files::file_thumb,
+            files::file_park,
+            files::folder_scan,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

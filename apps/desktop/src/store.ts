@@ -11,7 +11,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { PromptIR, ResultCache } from '@dialect/core';
+import { ALL_EXTENSIONS, EXTENSIONS, type PromptIR, type ResultCache } from '@dialect/core';
 import type { BatchItem } from './Batch.tsx';
 
 const hasHost = (): boolean =>
@@ -49,6 +49,9 @@ export class HostCache implements ResultCache {
     }
   }
 }
+
+/** Whether the window is running inside the app rather than a plain browser. */
+export const hasDesktop = (): boolean => hasHost();
 
 export interface CacheStats {
   entries: number;
@@ -268,24 +271,74 @@ export async function mediaTools(): Promise<MediaTools> {
 }
 
 /**
- * A clip comes in by path, not by drop.
+ * References come in by path, not by drop.
  *
  * A dropped file reaches the page as bytes with no name on disk, and handing a
- * few hundred megabytes across to the host as base64 just to have ffmpeg read
- * it would be absurd. So the file is chosen, and only the path travels.
+ * few hundred megabytes across as base64 just to have ffmpeg read it would be
+ * absurd. So files are chosen, and only paths travel — for every kind, because
+ * one button cannot take three kinds if one of them arrives differently.
  */
-export async function pickVideo(): Promise<string | null> {
+export async function pickReferences(): Promise<string[]> {
   if (!hasHost()) {
-    throw new Error('Reading a clip needs the desktop app: a browser cannot reach ffmpeg.');
+    throw new Error('Choosing files needs the desktop app.');
   }
 
   const { open } = await import('@tauri-apps/plugin-dialog');
-  const path = await open({
-    multiple: false,
-    title: 'Choose a clip',
-    filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'] }],
+  const picked = await open({
+    multiple: true,
+    title: 'Choose references',
+    filters: [
+      { name: 'References', extensions: [...ALL_EXTENSIONS] },
+      { name: 'Images', extensions: [...EXTENSIONS.image] },
+      { name: 'Video', extensions: [...EXTENSIONS.video] },
+      { name: 'Audio', extensions: [...EXTENSIONS.audio] },
+    ],
   });
-  return typeof path === 'string' ? path : null;
+
+  if (typeof picked === 'string') return [picked];
+  return Array.isArray(picked) ? picked.filter((p): p is string => typeof p === 'string') : [];
+}
+
+/** A folder of references, listed by the host so every kind arrives by path. */
+export async function pickFolder(): Promise<string | null> {
+  if (!hasHost()) {
+    throw new Error('Choosing a folder needs the desktop app.');
+  }
+
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const dir = await open({ directory: true, title: 'Choose a folder of references' });
+  return typeof dir === 'string' ? dir : null;
+}
+
+export interface Found {
+  name: string;
+  path: string;
+  bytes: number;
+}
+
+/** Write a dropped file down where ffmpeg can reach it, and say where. */
+export const parkFile = (name: string, base64: string): Promise<string> =>
+  invoke<string>('file_park', { name, base64 });
+
+export const scanFolder = (dir: string): Promise<Found[]> =>
+  invoke<Found[]>('folder_scan', { dir });
+
+/** Bytes off disk, for a still the host picked rather than the page received. */
+export const readFile = (path: string): Promise<{ base64: string; bytes: number }> =>
+  invoke<{ base64: string; bytes: number }>('file_read', { path });
+
+/**
+ * Something to recognise a reference by, whatever kind it is: the still, the
+ * clip's first frame, or the track's spectrogram.
+ */
+export async function thumbOf(path: string): Promise<string | undefined> {
+  if (!hasHost()) return undefined;
+  try {
+    return `data:image/jpeg;base64,${await invoke<string>('file_thumb', { path })}`;
+  } catch {
+    // A reference with no picture is still a reference.
+    return undefined;
+  }
 }
 
 export const probeVideo = (path: string): Promise<VideoProbe> =>
@@ -315,24 +368,6 @@ export interface Measured {
   lra: number | null;
   /** A spectrogram and a waveform, in that order. */
   pictures: Array<{ kind: string; base64: string }>;
-}
-
-/**
- * A track comes in by path, for the same reason a clip does: the host has to
- * run ffmpeg over it, and a file dropped on the page has no path on disk.
- */
-export async function pickAudio(): Promise<string | null> {
-  if (!hasHost()) {
-    throw new Error('Reading a track needs the desktop app: a browser cannot reach ffmpeg.');
-  }
-
-  const { open } = await import('@tauri-apps/plugin-dialog');
-  const path = await open({
-    multiple: false,
-    title: 'Choose a track',
-    filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'opus'] }],
-  });
-  return typeof path === 'string' ? path : null;
 }
 
 export const measureAudio = (path: string): Promise<Measured> =>

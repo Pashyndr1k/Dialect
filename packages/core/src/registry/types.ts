@@ -12,6 +12,13 @@ import type { FieldSpec } from '../renderers/resolve.ts';
 
 export type ProfileFamily = Modality | 'pipeline';
 
+/**
+ * What a target actually makes. A pipeline is a way of making a picture, so
+ * anything that has to choose a modality treats it as one rather than refusing.
+ */
+export const modalityOfFamily = (family: ProfileFamily): Modality =>
+  family === 'pipeline' ? 'image' : family;
+
 /** The overall form of a dialect. Renderers are written per form, not per model. */
 export type Syntax =
   /** Labelled fields in a mandatory order, e.g. Kling. */
