@@ -20,9 +20,17 @@ export interface SelectOptions {
 
 /**
  * The rules that apply to one target: everything marked `alwaysOn`, plus
- * whatever the profile opts into. An id the build does not know is an error
- * rather than a silent skip — a typo in a profile must not quietly disable a
- * check the author believed was running.
+ * whatever the profile opts into.
+ *
+ * An id this build does not have is skipped rather than thrown over. That was
+ * the other way round, on the argument that a typo must not quietly disable a
+ * check — and the argument was right, but this was the wrong place for it. Once
+ * a card set can arrive from a channel, a card naming a rule from a newer build
+ * is ordinary rather than a mistake, and losing the whole card over one missing
+ * check is worse than losing the check.
+ *
+ * The strictness moved to where a card is loaded, which can say which card and
+ * which rule and leave the one underneath it standing.
  */
 export function selectRules(
   profile: ModelProfile,
@@ -38,8 +46,7 @@ export function selectRules(
   }
   for (const id of profile.rules ?? []) {
     const rule = byId.get(id);
-    if (!rule) throw new UnknownRuleError(profile.id, id, [...byId.keys()]);
-    if (!disabled.has(id)) chosen.set(id, rule);
+    if (rule && !disabled.has(id)) chosen.set(id, rule);
   }
   return [...chosen.values()];
 }

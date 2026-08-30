@@ -34,3 +34,4 @@ export const RULES_BY_ID: ReadonlyMap<string, Rule> = new Map(ALL_RULES.map((r) 
 
 export * from './types.ts';
 export * from './engine.ts';
+export * from './declared/index.ts';

@@ -330,6 +330,29 @@ command line is checked against the host's verifier in the test suite. A
 disagreement about what Ed25519 over those bytes means would otherwise turn up
 on someone's machine when an update refuses to install.
 
+## Rules a set can ship
+
+Phase 7 made the cards replaceable and signed and left one hole: a card is data
+but a rule is code, so an update could change every model's formula and could
+not add a single check. That is backwards, because the rules are the part most
+likely to age — a booster word that worked last month reads as noise this month.
+
+So a rule can be written down. Not all of them: `one-action-one-move` knows what
+a second action looks like in a way a config file does not, and pretending
+otherwise would produce a worse programming language than the one underneath.
+What is written down is the shape almost every *new* rule turns out to have —
+words that stopped working, a pattern that started failing, a count a model will
+not hold, a field that means nothing without another.
+
+Each compiles to exactly the same `Rule` the engine already runs. There is no
+second engine, one `Finding`, one place a level means what it means.
+
+A card naming a rule this build does not have used to throw at compile time. It
+is rejected at load instead, where the card underneath it still stands — once a
+set can arrive from a channel, a card mentioning a newer build's rule is
+ordinary rather than a mistake, and losing the whole card over one missing check
+is worse than losing the check.
+
 ## Cards you write yourself
 
 Three layers: what the build shipped, what a signed set brought, what you wrote.

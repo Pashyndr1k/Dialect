@@ -50,6 +50,12 @@ export interface LoadedRegistry {
  */
 export interface LayerOptions {
   renderers?: readonly string[];
+  /**
+   * Rule ids this build can run. A card naming one it cannot is rejected here,
+   * where the card underneath it still stands and the reason can be said out
+   * loud — rather than at compile time, where it would take the card with it.
+   */
+  rules?: readonly string[];
 }
 
 function unusable(profile: ModelProfile, options: LayerOptions): string | undefined {
@@ -59,6 +65,14 @@ function unusable(profile: ModelProfile, options: LayerOptions): string | undefi
   }
   if (profile.renderer === 'field-list' && !profile.fields?.length) {
     return 'it renders as a field list but names no fields';
+  }
+
+  const rules = options.rules;
+  if (rules) {
+    const missing = (profile.rules ?? []).filter((id) => !rules.includes(id));
+    if (missing.length > 0) {
+      return `it asks for ${missing.join(', ')}, which this build does not have as a rule`;
+    }
   }
   return undefined;
 }
