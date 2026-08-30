@@ -377,7 +377,7 @@ async function cmdProbe(): Promise<number> {
   stdout.write(
     dry
       ? 'Dry run: building every request, sending none.\n\n'
-      : `Live run, capped at $${budgetUsd.toFixed(2)} per step. This spends real money.\n\n`,
+      : `Live run, capped at $${budgetUsd.toFixed(2)} in total. This spends real money.\n\n`,
   );
 
   const outcomes = await runProbe({

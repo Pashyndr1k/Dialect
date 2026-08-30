@@ -285,14 +285,17 @@ export async function runProbe(options: ProbeOptions): Promise<StepOutcome[]> {
   await mkdir(options.out, { recursive: true });
 
   const outcomes: StepOutcome[] = [];
+  let spent = 0;
 
   for (const step of steps) {
-    // A fresh gateway per step: one step's spend must not silently cap another,
-    // and a dry step must not carry a real provider into the next.
+    // A fresh gateway per step, carrying the running total in. A cap that
+    // applied to each step on its own would let eight steps spend eight times
+    // what anyone thought they had agreed to.
     const dryProvider = options.dry ? new DryProvider() : undefined;
     const gateway = new Gateway(dryProvider ?? options.provider, {
       budgetUsd: options.budgetUsd,
     });
+    gateway.restoreSpend(spent);
 
     log(`── ${step.name}\n   ${step.proves}\n`);
     let failure: string | undefined;
@@ -307,6 +310,8 @@ export async function runProbe(options: ProbeOptions): Promise<StepOutcome[]> {
       }
     } catch (err) {
       failure = err instanceof Error ? err.message : String(err);
+      // Whatever it managed to spend before falling over still counts.
+      spent = Math.max(spent, gateway.spentUsd);
     }
 
     if (dryProvider) {
@@ -337,10 +342,18 @@ export async function runProbe(options: ProbeOptions): Promise<StepOutcome[]> {
       continue;
     }
 
-    log(`   ok · $${gateway.spentUsd.toFixed(4)} · ${step.name}.json\n\n`);
-    outcomes.push({ name: step.name, ok: true, detail: `$${gateway.spentUsd.toFixed(4)}` });
+    const cost = gateway.spentUsd - spent;
+    spent = gateway.spentUsd;
+
+    log(`   ok · $${cost.toFixed(4)} · running $${spent.toFixed(4)} · ${step.name}.json
+
+`);
+    outcomes.push({ name: step.name, ok: true, detail: `$${cost.toFixed(4)}` });
   }
 
+  if (!options.dry) log(`total $${spent.toFixed(4)} of $${options.budgetUsd.toFixed(2)}
+
+`);
   return outcomes;
 }
 
