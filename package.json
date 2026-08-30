@@ -1,7 +1,7 @@
 {
   "name": "dialect",
   "private": true,
-  "version": "0.21",
+  "version": "0.22",
   "description": "Compiles ideas and references into prompts written in each generative model's own dialect",
   "workspaces": [
     "packages/*",

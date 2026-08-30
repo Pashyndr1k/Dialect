@@ -178,12 +178,16 @@ and composing would only pay to restate it.
 ## What shapes it
 
 A model card and a template of your own are the same kind of choice — both
-decide the form the finished prompt takes — so they are one list, grouped by
-what they make, and taking one puts the other down.
+decide the form the finished prompt takes — so they share one slot under the
+input, and taking one puts the other down. Two lists rather than one, switched
+between: mixing them made the half you were not using scroll past every time.
+Each is grouped by what it makes.
 
 A learned template records the model it came from, because it came from a prompt
 that worked on that model. Picking the template picks the dialect with it, and
-there is nothing left to choose.
+there is nothing left to choose. Where a template names none, whatever is
+already selected stays if it makes the right kind of thing, and otherwise it
+lands on the model that kind would have opened on.
 
 ## Writing from an idea
 

@@ -512,7 +512,14 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 }
 .ref.video { border-left-color: var(--hot); }
 .ref.audio { border-left-color: var(--ink-3); }
-.ref-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+.ref-n {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: 11px; color: inherit;
+  background: none; border: 0; padding: 0; cursor: pointer; max-width: 130px;
+}
+.ref-n:hover { color: var(--accent); }
+.ref.on { outline: 1px solid var(--accent); }
+.ref.on .ref-n { color: var(--accent); }
 .ref-r {
   font: inherit; font-size: 10.5px; padding: 0 2px; border: 0; border-radius: 3px;
   background: transparent; color: var(--ink-3); cursor: pointer;
@@ -541,6 +548,20 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   color: var(--ink-3); white-space: nowrap;
 }
 .shape .ghost { margin-bottom: 0; flex-shrink: 0; }
+
+/* --- prebuilt or custom: only one is ever in force --- */
+.seg {
+  display: inline-flex; flex-shrink: 0; border: 1px solid var(--rule);
+  border-radius: 5px; overflow: hidden;
+}
+.seg-b {
+  font: inherit; font-size: 10.5px; letter-spacing: .02em; padding: 3px 8px;
+  background: var(--bg); border: 0; border-right: 1px solid var(--rule);
+  color: var(--ink-3); cursor: pointer;
+}
+.seg-b:last-child { border-right: 0; }
+.seg-b:hover { color: var(--ink); }
+.seg-b.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 
 .spend { margin-bottom: 12px; }
 .spend .drop-n { margin-bottom: 4px; }

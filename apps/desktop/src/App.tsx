@@ -64,7 +64,7 @@ import { PromptActions, References, type BatchItem } from './Batch.tsx';
 import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
 import { Input } from './Input.tsx';
-import { Shape } from './Shape.tsx';
+import { Shape, type ShapeMode } from './Shape.tsx';
 import { Templates } from './Templates.tsx';
 import { Shots } from './Shots.tsx';
 import { HostProvider } from './provider.ts';
@@ -182,6 +182,18 @@ const MAX_ATTACHED = 4;
 const PER_READ_USD = 0.02;
 const PER_WRITE_USD = 0.01;
 
+/**
+ * Where a template that names no model lands.
+ *
+ * Alphabetical order picked Gemini for video, which is nobody's idea of the
+ * default; these are the three the app would open on.
+ */
+const DEFAULT_MODEL: Record<string, string> = {
+  image: 'nano-banana-2',
+  video: 'kling-3-omni',
+  audio: 'suno',
+};
+
 export function App() {
   const [irText, setIrText] = useState(() => JSON.stringify(imageExample, null, 2));
   const [target, setTarget] = useState('nano-banana-2');
@@ -201,6 +213,7 @@ export function App() {
   /** References attached to what is being written, not yet read. */
   const [attached, setAttached] = useState<Source[]>([]);
   const [templateId, setTemplateId] = useState('');
+  const [shapeMode, setShapeMode] = useState<ShapeMode>('prebuilt');
   const [writing, setWriting] = useState(false);
   const asked = useRef({ note: '', templateId: '' });
 
@@ -662,11 +675,28 @@ export function App() {
 
     setAttached((prev) => {
       const exclusive = incoming.find((s) => s.kind !== 'image');
-      if (exclusive) return [exclusive];
+      const next = exclusive
+        ? [exclusive]
+        : [
+            ...prev.filter((s) => s.kind === 'image'),
+            ...incoming.filter((s) => !prev.some((k) => k.name === s.name)),
+          ].slice(0, MAX_ATTACHED);
 
-      const kept = prev.filter((s) => s.kind === 'image');
-      const fresh = incoming.filter((s) => !kept.some((k) => k.name === s.name));
-      return [...kept, ...fresh].slice(0, MAX_ATTACHED);
+      // Held so the preview has something to show: an attached reference is
+      // worth looking at before it is worth paying to read.
+      for (const source of next) held.current.set(source.name, source);
+      return next;
+    });
+
+    setActiveRef(incoming[0]!.name);
+  };
+
+  const detach = (name: string): void => {
+    held.current.delete(name);
+    setAttached((prev) => {
+      const next = prev.filter((a) => a.name !== name);
+      if (activeRef === name) setActiveRef(next[0]?.name ?? null);
+      return next;
     });
   };
 
@@ -1278,6 +1308,7 @@ export function App() {
               name: a.name,
               kind: a.kind,
               role: a.role,
+              showing: activeRef === a.name,
               ...(readings.current.get(a.name)?.lines[0]
                 ? { read: readings.current.get(a.name)!.lines[0]! }
                 : {}),
@@ -1293,19 +1324,27 @@ export function App() {
             onRole={(name, role) =>
               setAttached((prev) => prev.map((a) => (a.name === name ? { ...a, role } : a)))
             }
+            onShow={setActiveRef}
             onGo={() => void makePrompt()}
             onRecord={() => void startSpeaking()}
             onStopRecording={() => void stopSpeaking()}
             onAttach={() => void chooseReferences()}
-            onDetach={(name) => setAttached((prev) => prev.filter((a) => a.name !== name))}
+            onDetach={detach}
             onFolder={() => void chooseFolder()}
           />
 
           <Shape
+            mode={shapeMode}
             target={target}
             templateId={templateId}
             profiles={profiles}
             templates={templates}
+            onMode={(next) => {
+              setShapeMode(next);
+              // Only one of the two is ever in force, so moving the switch to
+              // the models puts down whatever template was holding it.
+              if (next === 'prebuilt') setTemplateId('');
+            }}
             onModel={(id) => {
               chooseModel(id);
               // A model and a template are the same choice made two ways, so
@@ -1314,6 +1353,8 @@ export function App() {
             }}
             onTemplate={(id) => {
               setTemplateId(id);
+              if (!id) return;
+
               const picked = templates.find((t) => t.id === id);
               // The template came from a prompt that worked on some model, so
               // that model comes with it. Failing that, whatever is already
@@ -1323,7 +1364,9 @@ export function App() {
                 picked?.target ??
                 (profile.family === picked?.modality
                   ? target
-                  : profiles.find((p) => p.family === picked?.modality)?.id);
+                  : picked
+                    ? DEFAULT_MODEL[picked.modality]
+                    : undefined);
               if (model) chooseModel(model);
             }}
             onEdit={() => setTemplatesOpen(true)}

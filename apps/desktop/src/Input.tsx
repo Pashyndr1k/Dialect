@@ -18,6 +18,8 @@ export interface Attachment {
   role: SourceRole;
   /** What it turned out to say, once it has been read. */
   read?: string;
+  /** Whether this is the one shown in the preview. */
+  showing?: boolean;
 }
 
 function Mic({ recording }: { recording: boolean }) {
@@ -50,6 +52,7 @@ export function Input({
   cost,
   onIdea,
   onRole,
+  onShow,
   onGo,
   onRecord,
   onStopRecording,
@@ -70,6 +73,7 @@ export function Input({
   cost: number;
   onIdea: (next: string) => void;
   onRole: (name: string, role: SourceRole) => void;
+  onShow: (name: string) => void;
   onGo: () => void;
   onRecord: () => void;
   onStopRecording: () => void;
@@ -107,8 +111,14 @@ export function Input({
       {attached.length > 0 ? (
         <ul className="refs">
           {attached.map((a) => (
-            <li key={a.name} className={`ref ${a.kind}`} title={a.read ?? a.name}>
-              <span className="ref-n">{a.name}</span>
+            <li
+              key={a.name}
+              className={`ref ${a.kind}${a.showing ? ' on' : ''}`}
+              title={a.read ?? a.name}
+            >
+              <button className="ref-n" onClick={() => onShow(a.name)}>
+                {a.name}
+              </button>
               <select
                 className="ref-r"
                 value={a.role}
@@ -137,8 +147,8 @@ export function Input({
         <button className="ghost" onClick={onAttach}>
           Reference
         </button>
-        <button className="ghost" onClick={onFolder}>
-          Folder
+        <button className="ghost" title="Read a whole folder, one prompt each" onClick={onFolder}>
+          Batch
         </button>
 
         <button className="solid go" disabled={!ready} onClick={onGo}>
