@@ -21,6 +21,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
+  applyVariant,
   composeBundle,
   expandIdea,
   extractFromAudio,
@@ -30,7 +31,9 @@ import {
   Gateway,
   learnTemplate,
   sceneLines,
+  vary,
   type Bundle,
+  type BundleItem,
   type ImagePart,
   type Provider,
   type ProviderResult,
@@ -165,6 +168,49 @@ export interface Step {
   run(gateway: Gateway, media: ReturnType<typeof mediaFrom>): Promise<unknown>;
 }
 
+/**
+ * A character kept earlier, and a look kept earlier.
+ *
+ * Written out rather than read from a picture, because that is exactly what a
+ * kept source is: lines that were paid for once and are text from then on. No
+ * image goes into this call at all.
+ *
+ * The look is a snowy street on purpose. The composer is told that a style
+ * source lends its grade and its light and nothing else — so if snow turns up
+ * in the picture, the sentence it is told is not working, and that is the most
+ * useful thing this run could find out.
+ */
+const KEPT_SUBJECT: BundleItem = {
+  id: 'the-cowboy',
+  kind: 'image',
+  role: 'subject',
+  lines: [
+    'Subject: an aged cowboy leaning on a saloon bar',
+    'Who 1: the cowboy — a weathered man in his late sixties, deeply lined face, silver-grey ' +
+      'stubble, sun-darkened leathery skin, a dust-covered brown duster coat with frayed cuffs, ' +
+      'a worn brown leather hat dented from years of road use',
+    'Action: rests both forearms on the counter',
+  ],
+};
+
+const KEPT_LOOK: BundleItem = {
+  id: 'winter-street',
+  kind: 'image',
+  role: 'style',
+  lines: [
+    'Subject: a snowy street at dusk, nobody in it',
+    'Place: a terraced street under heavy snowfall',
+    'Place detail: sodium lamps, tyre tracks through deep snow, a buried kerb',
+    'Key light: sodium street lamps through falling snow',
+    'Contrast: high, deep crushed blacks',
+    'Colour temperature: warm lamps against blue snow',
+    'Optics: halation blooming around every light',
+    'Grade: cold shadows, warm highlights',
+    'Grain: heavy',
+    'Medium: 35mm film still, pushed two stops',
+  ],
+};
+
 const EXAMPLE_PROMPT = `Full-body character concept for a dark fantasy RPG. A
 grizzled dwarven smith, broad and low-slung, beard braided with iron rings, soot
 ground into the creases of his hands. Hand-painted texture, thick confident
@@ -234,6 +280,53 @@ export async function stepsFor(): Promise<Step[]> {
           ],
         };
         return (await composeBundle(gateway, bundle)).ir;
+      },
+    },
+    {
+      name: 'compose-kept',
+      proves:
+        'that a style source lends its light and not its snow — the claim the whole ' +
+        'role system rests on, and the one no test can check',
+      run: async (gateway) => {
+        const bundle: Bundle = {
+          modality: 'image',
+          items: [
+            { id: 'words', kind: 'words', role: 'auto', lines: ['at night, and it is raining'] },
+            KEPT_SUBJECT,
+            KEPT_LOOK,
+          ],
+        };
+        return (await composeBundle(gateway, bundle)).ir;
+      },
+    },
+    {
+      name: 'vary',
+      proves: 'VARY_SYSTEM — that eight versions differ from each other and hold the axis',
+      run: async (gateway) => {
+        // Built from the kept sources rather than read, so this step buys only
+        // the varying and nothing else.
+        const base = {
+          ...(await composeBundle(gateway, {
+            modality: 'image',
+            items: [KEPT_SUBJECT],
+          })).ir,
+        };
+
+        const { variants } = await vary(gateway, base, { axis: 'subject', count: 8 });
+        return {
+          base: { headline: base.subject?.headline, medium: base.style?.medium },
+          variants,
+          applied: variants.map((v) => {
+            const next = applyVariant(base, 'subject', v);
+            return {
+              label: next.title,
+              headline: next.subject?.headline,
+              // Off the axis, and therefore expected to be identical in all eight.
+              medium: next.style?.medium,
+              location: next.environment?.location,
+            };
+          }),
+        };
       },
     },
     {
