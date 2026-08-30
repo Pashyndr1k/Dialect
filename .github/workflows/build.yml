@@ -1,0 +1,145 @@
+name: Build installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  # Three installers take twenty minutes of runner time. A failing test costs
+  # thirty seconds to find out about, so it goes first and everything else
+  # waits on it.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # ffmpeg is on the ubuntu image. The tests that need it skip rather than
+      # fail where it is absent, so this is belt and braces.
+      - run: cargo test --lib
+        working-directory: apps/desktop/src-tauri
+
+  # Draft first, publish last.
+  #
+  # An uploader that finds the tag's release already published can skip its
+  # assets while still reporting success — which is how a release ships without
+  # half its installers and nobody notices. So the release is put into DRAFT
+  # before the matrix, every platform uploads into that same draft by id, and
+  # one job at the end flips it live: the whole set appears at once or not at
+  # all.
+  release:
+    needs: [check]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.draft.outputs.result }}
+    steps:
+      - uses: actions/github-script@v8
+        id: draft
+        with:
+          result-encoding: string
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const { owner, repo } = context.repo;
+            const all = await github.paginate(github.rest.repos.listReleases, { owner, repo, per_page: 100 });
+            const matches = all.filter((r) => r.tag_name === tag);
+
+            if (!matches.length) {
+              const made = await github.rest.repos.createRelease({
+                owner, repo, tag_name: tag, name: tag.replace(/^v/, ''), draft: true,
+                body: 'Installers are uploading.',
+              });
+              return String(made.data.id);
+            }
+
+            // Keep whichever holds the most assets, draft it so the builders
+            // can upload into it, and delete stray duplicates of the same tag.
+            matches.sort((a, b) => b.assets.length - a.assets.length);
+            const keep = matches[0];
+            await github.rest.repos.updateRelease({ owner, repo, release_id: keep.id, tag_name: tag, draft: true });
+            for (const extra of matches.slice(1)) {
+              await github.rest.repos.deleteRelease({ owner, repo, release_id: extra.id });
+            }
+            return String(keep.id);
+
+  build:
+    needs: [check, release]
+    # A manual run skips the release job and still builds, so three platforms
+    # can be checked without cutting a tag to find out whether they compile.
+    if: ${{ !cancelled() && needs.check.result == 'success' && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
+    strategy:
+      # One platform failing must not cancel the others: a Windows installer is
+      # worth having even on a day macOS will not build.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+          # macos-15-intel is the x64 label; macos-14 is Apple Silicon. Built
+          # natively on each rather than as one universal binary — nothing here
+          # needs to be a single file, and a native build is one less thing that
+          # can fail in a way nobody can reproduce.
+          - os: macos-15-intel
+            name: macos-x64
+          - os: macos-14
+            name: macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+          key: ${{ matrix.name }}
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          # Into the draft the release job made. Left to find the release
+          # itself, this is where the skipping happens.
+          releaseId: ${{ needs.release.outputs.id }}
+          # The action knows where its own bundles landed; a hand-written glob
+          # would be a guess about a platform this has never been built on.
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: dialect-${{ matrix.name }}
+
+  # Live only once every platform has finished uploading.
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const id = Number('${{ needs.release.outputs.id }}');
+            const { owner, repo } = context.repo;
+            const { data: rel } = await github.rest.repos.getRelease({ owner, repo, release_id: id });
+
+            console.log('Assets:', rel.assets.map((a) => a.name).join(', ') || '(none)');
+            // A draft with nothing in it is better than a published release
+            // with nothing in it: the first can be retried, the second has to
+            // be explained.
+            if (!rel.assets.length) throw new Error('Nothing was uploaded; leaving the draft alone.');
+
+            await github.rest.repos.updateRelease({ owner, repo, release_id: id, draft: false, make_latest: 'true' });

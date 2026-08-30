@@ -366,6 +366,23 @@ of is refused at load rather than at render — finding that out when someone
 presses the button, having already paid to read a reference, is finding out too
 late.
 
+## Releases
+
+Tag `vX.Y.Z` and push it. A workflow runs the tests once, drafts the release,
+builds a Windows installer and two macOS disk images — Intel and Apple Silicon
+natively rather than as one universal binary — and publishes the draft only
+once every platform has uploaded into it.
+
+That order is the whole of it. An uploader that finds the tag's release already
+published can skip its assets while still reporting success, which is how a
+release ships missing half its installers and nobody notices. Drafting first
+means the set appears at once or not at all, and a draft with nothing in it is
+better than a published release with nothing in it: the first can be retried,
+the second has to be explained.
+
+Re-pointing the tag is how a build is retried; pushing the same commit again
+does nothing.
+
 ## The key
 
 Extraction needs an Anthropic key. It is typed into the app's own settings panel

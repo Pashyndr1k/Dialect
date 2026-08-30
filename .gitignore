@@ -2,5 +2,16 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
-probe-dry/
+
+# Rust build output. Gigabytes, and reproducible from source.
+target/
+
+# What a live probe run writes: real answers from a real model, kept for
+# reading and not for keeping.
 probe/
+probe-dry/
+probe-fix/
+probe-vary/
+
+# A publisher's private key, if one is ever generated here by mistake.
+*.pem
