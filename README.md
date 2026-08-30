@@ -175,6 +175,22 @@ the field wins, and where two share a job the earlier leads.
 One reference, nothing typed, no template: the reading already is the answer,
 and composing would only pay to restate it.
 
+## Keeping a source
+
+The plan called for two things — entity cards, so a character survives from one
+prompt to the next, and a style DNA, so a look does. The bundle made them the
+same object: a cast member and a look are both a named source with a job, and
+the only difference is which job.
+
+What makes that worth building rather than merely tidy is the two-pass split. A
+reading is bought once and is text afterwards, so a character read out of one
+photograph can appear in fifty prompts without the photograph being looked at
+again. Keeping the lines keeps the whole of what was paid for, and attaching a
+kept source costs nothing — the button's price says so.
+
+They are files, like the templates, because a description is exactly the kind of
+thing someone wants to open and fix a word in.
+
 ## What shapes it
 
 A model card and a template of your own are the same kind of choice — both

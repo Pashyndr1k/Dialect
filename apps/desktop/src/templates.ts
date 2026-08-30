@@ -50,7 +50,9 @@ let inMemory: Template[] = [];
 export async function listTemplates(): Promise<Template[]> {
   if (!hasHost()) return inMemory;
 
-  const stored = await invoke<Array<{ id: string; text: string }>>('templates_list', {});
+  const stored = await invoke<Array<{ id: string; text: string }>>('authored_list', {
+    what: 'templates',
+  });
   return stored.flatMap((file) => {
     try {
       return [parseTemplate(file.text, `${file.id}.yaml`)];
@@ -67,7 +69,7 @@ export async function saveTemplate(id: string, text: string): Promise<void> {
     inMemory = [...inMemory.filter((t) => t.id !== id), parseTemplate(text, `${id}.yaml`)];
     return;
   }
-  await invoke<string>('template_save', { id, text });
+  await invoke<string>('authored_save', { what: 'templates', id, text });
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
@@ -75,12 +77,12 @@ export async function deleteTemplate(id: string): Promise<void> {
     inMemory = inMemory.filter((t) => t.id !== id);
     return;
   }
-  await invoke<void>('template_delete', { id });
+  await invoke<void>('authored_delete', { what: 'templates', id });
 }
 
 export async function openTemplatesFolder(): Promise<void> {
   if (!hasHost()) return;
-  const dir = await invoke<string>('templates_folder', {});
+  const dir = await invoke<string>('authored_folder', { what: 'templates' });
   const { openPath } = await import('@tauri-apps/plugin-opener');
   await openPath(dir).catch(() => undefined);
 }

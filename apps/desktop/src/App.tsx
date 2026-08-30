@@ -24,8 +24,11 @@ import {
   extractFromAudio,
   extractFromImages,
   extractFromVideo,
+  emptyIR,
   sceneLines,
   shotLines,
+  sourceId,
+  type SavedSource,
   songLines,
   wordLines,
   type Bundle,
@@ -65,6 +68,8 @@ import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
 import { Input } from './Input.tsx';
 import { Shape, type ShapeMode } from './Shape.tsx';
+import { Sources } from './Sources.tsx';
+import { deleteSource, listSources, openSourcesFolder, saveSource } from './sources.ts';
 import { estimate } from './prices.ts';
 import { Templates } from './Templates.tsx';
 import { Shots } from './Shots.tsx';
@@ -131,6 +136,15 @@ interface Source {
   file?: File;
   /** What this one is here for. `auto` lets the composer work it out. */
   role: SourceRole;
+  /**
+   * What it says, when that is already known.
+   *
+   * A source kept earlier carries its reading with it, so attaching it costs
+   * nothing — no file to open, no model to ask. It is the same shape as one
+   * that has just been read, because after the reading they are the same thing.
+   */
+  lines?: string[];
+  thumb?: string;
 }
 
 /** What a reference turned out to say, kept so a second press costs nothing. */
@@ -225,6 +239,13 @@ export function App() {
 
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [cardsOpen, setCardsOpen] = useState(false);
+  const [keptOpen, setKeptOpen] = useState(false);
+  const [kept, setKept] = useState<SavedSource[]>([]);
+
+  const refreshKept = (): void => {
+    void listSources().then(setKept, () => setKept([]));
+  };
+  useEffect(refreshKept, []);
 
   /**
    * The cards actually in force: what shipped, plus an installed set, plus any
@@ -470,8 +491,20 @@ export function App() {
    * sentence cheap.
    */
   const readSource = async (source: Source): Promise<Reading> => {
-    const kept = readings.current.get(source.name);
-    if (kept) return kept;
+    const already = readings.current.get(source.name);
+    if (already) return already;
+
+    // A source that arrived with its reading is finished before it starts.
+    if (source.lines) {
+      const free: Reading = {
+        lines: source.lines,
+        ir: emptyIR('image'),
+        key: `kept:${source.name}`,
+        ...(source.thumb ? { thumb: source.thumb } : {}),
+      };
+      readings.current.set(source.name, free);
+      return free;
+    }
 
     const reference = source.name;
     let reading: Reading;
@@ -542,7 +575,9 @@ export function App() {
     const { note, templateId: template } = asked.current;
     const read = await Promise.all(sources.map(async (s) => ({ source: s, reading: await readSource(s) })));
 
-    if (!template && sources.length === 1 && !note) {
+    // The pass-through only applies to something read here: a kept source
+    // carries lines and no document, so it has to be composed into one.
+    if (!template && sources.length === 1 && !note && !sources[0]!.lines) {
       const only = read[0]!;
       return { ir: only.reading.ir, key: only.reading.key };
     }
@@ -772,7 +807,9 @@ export function App() {
    * composing it, said without a sentence explaining it.
    */
   const cost = (() => {
-    const unread = attached.filter((a) => !readings.current.has(a.name)).length;
+    // A kept source arrives with its reading, so it is never unread — counting
+    // it would put five cents on the button for a call that will not happen.
+    const unread = attached.filter((a) => !a.lines && !readings.current.has(a.name)).length;
     const composes =
       templateId !== '' || attached.length > 1 || (attached.length > 0 && idea.trim() !== '');
     return estimate(unread, composes || attached.length === 0);
@@ -964,6 +1001,52 @@ export function App() {
     } catch (err) {
       setTemplateError(err instanceof Error ? err.message : String(err));
     }
+  };
+
+  /**
+   * Keep what a reference turned out to say.
+   *
+   * The lines, not the file: the file was only ever the way to get them, and a
+   * character kept as text can be in fifty prompts without being looked at
+   * again.
+   */
+  const keep = async (name: string): Promise<void> => {
+    const source = attached.find((a) => a.name === name);
+    const reading = readings.current.get(name);
+    if (!source || !reading) return;
+
+    const id = sourceId(name.replace(/\.[^.]+$/, ''), kept.map((k) => k.id));
+    const thumb = reading.thumb ?? thumbs.current.get(name) ?? undefined;
+
+    try {
+      await saveSource({
+        id,
+        name: name.replace(/\.[^.]+$/, ''),
+        kind: source.kind,
+        role: source.role,
+        lines: reading.lines,
+        from: name,
+        savedAt: new Date().toISOString().slice(0, 10),
+        ...(thumb ? { thumb } : {}),
+      });
+      refreshKept();
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  /** Attach something kept. Nothing is read and nothing is spent. */
+  const attachKept = (source: SavedSource): void => {
+    attach([
+      {
+        kind: source.kind === 'words' ? 'image' : source.kind,
+        name: source.id,
+        role: source.role,
+        lines: source.lines,
+        ...(source.thumb ? { thumb: source.thumb } : {}),
+      },
+    ]);
+    setKeptOpen(false);
   };
 
   /** Paths to sources, dropping anything this app has no way to read. */
@@ -1285,6 +1368,29 @@ export function App() {
 
       {settingsOpen ? <Settings onClose={() => setSettingsOpen(false)} /> : null}
 
+      {keptOpen ? (
+        <Sources
+          sources={kept}
+          attached={attached.map((a) => a.name)}
+          onAttach={attachKept}
+          onRole={(id, role) =>
+            void (async () => {
+              const source = kept.find((k) => k.id === id);
+              if (!source) return;
+              await saveSource({ ...source, role });
+              refreshKept();
+            })()
+          }
+          onDelete={(id) =>
+            void deleteSource(id).then(refreshKept, (e: unknown) =>
+              setExtractError(e instanceof Error ? e.message : String(e)),
+            )
+          }
+          onOpenFolder={() => void openSourcesFolder()}
+          onClose={() => setKeptOpen(false)}
+        />
+      ) : null}
+
       {cardsOpen ? (
         <Cards
           rejected={loaded.rejected}
@@ -1358,8 +1464,10 @@ export function App() {
               kind: a.kind,
               role: a.role,
               showing: activeRef === a.name,
+              read: readings.current.has(a.name),
+              kept: kept.some((k) => k.id === a.name),
               ...(readings.current.get(a.name)?.lines[0]
-                ? { read: readings.current.get(a.name)!.lines[0]! }
+                ? { says: readings.current.get(a.name)!.lines[0]! }
                 : {}),
             }))}
             working={writing ? 'Working…' : extracting ? `Reading ${extracting}…` : null}
@@ -1379,6 +1487,8 @@ export function App() {
             onStopRecording={() => void stopSpeaking()}
             onAttach={() => void chooseReferences()}
             onDetach={detach}
+            onKeep={(name) => void keep(name)}
+            onKept={() => setKeptOpen(true)}
             onFolder={() => void chooseFolder()}
           />
 

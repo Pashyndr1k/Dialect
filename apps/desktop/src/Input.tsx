@@ -16,10 +16,14 @@ export interface Attachment {
   name: string;
   kind: 'image' | 'video' | 'audio';
   role: SourceRole;
-  /** What it turned out to say, once it has been read. */
-  read?: string;
+  /** The first line of what it says, for the tooltip. */
+  says?: string;
   /** Whether this is the one shown in the preview. */
   showing?: boolean;
+  /** True once it has been read, so it is worth keeping. */
+  read?: boolean;
+  /** True when it came from the kept list and costs nothing. */
+  kept?: boolean;
 }
 
 function Mic({ recording }: { recording: boolean }) {
@@ -58,6 +62,8 @@ export function Input({
   onStopRecording,
   onAttach,
   onDetach,
+  onKeep,
+  onKept,
   onFolder,
 }: {
   idea: string;
@@ -79,6 +85,8 @@ export function Input({
   onStopRecording: () => void;
   onAttach: () => void;
   onDetach: (name: string) => void;
+  onKeep: (name: string) => void;
+  onKept: () => void;
   onFolder: () => void;
 }) {
   const ready = (idea.trim().length > 0 || attached.length > 0) && !working && !noKey;
@@ -114,7 +122,7 @@ export function Input({
             <li
               key={a.name}
               className={`ref ${a.kind}${a.showing ? ' on' : ''}`}
-              title={a.read ?? a.name}
+              title={a.says ?? a.name}
             >
               <button className="ref-n" onClick={() => onShow(a.name)}>
                 {a.name}
@@ -131,6 +139,15 @@ export function Input({
                   </option>
                 ))}
               </select>
+              {a.read && !a.kept ? (
+                <button
+                  className="ref-k"
+                  title="Keep this, so using it again costs nothing"
+                  onClick={() => onKeep(a.name)}
+                >
+                  keep
+                </button>
+              ) : null}
               <button
                 className="ref-x"
                 aria-label={`Remove ${a.name}`}
@@ -149,6 +166,9 @@ export function Input({
         </button>
         <button className="ghost" title="Read a whole folder, one prompt each" onClick={onFolder}>
           Batch
+        </button>
+        <button className="ghost" title="Characters and looks you kept" onClick={onKept}>
+          Kept
         </button>
 
         <button className="solid go" disabled={!ready} onClick={onGo}>

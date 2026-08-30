@@ -595,3 +595,24 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 .tpl-raw summary { font-size: 12px; color: var(--ink-3); cursor: pointer; }
 .tpl-raw summary:hover { color: var(--accent); }
 .sheet-box h3 { margin: 18px 0 8px; font-size: 13px; font-weight: 650; }
+
+/* --- things kept, so they cost nothing the second time --- */
+.ref-k {
+  background: none; border: 0; color: var(--ink-3); cursor: pointer;
+  font: inherit; font-size: 10px; letter-spacing: .04em; padding: 0 3px;
+}
+.ref-k:hover { color: var(--accent); }
+
+.kept { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.kept li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border: 1px solid var(--rule); border-radius: 5px; background: var(--bg);
+}
+.kept img, .kept-none {
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: 4px;
+  object-fit: cover; background: var(--surface-2);
+}
+.kept-mid { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.kept-mid .tpl-h { flex-basis: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kept-meta { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.kept .ghost { margin-bottom: 0; flex-shrink: 0; }
