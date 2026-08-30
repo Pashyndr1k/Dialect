@@ -17,6 +17,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   assembleText,
   compile,
+  compileSequence,
+  sequenceFromIR,
+  sequenceToDocument,
   extractFromImage,
   extractFromVideo,
   Gateway,
@@ -27,11 +30,14 @@ import {
   type Finding,
   type PromptIR,
   type Segment,
+  type Sequence,
+  type SequenceShot,
 } from '@dialect/core';
 import { createQueue, runQueue } from '@dialect/core';
 import { PromptActions, References, type BatchItem } from './Batch.tsx';
 import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
+import { Shots } from './Shots.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
 import {
@@ -126,6 +132,15 @@ export function App() {
   const thumbs = useRef(new Map<string, string | null>());
   const [library, setLibrary] = useState<LibraryEntry[]>([]);
   const [restoring, setRestoring] = useState<string | null>(null);
+
+  /**
+   * A sequence is stored as its shots alone, never as a snapshot of the world.
+   *
+   * The world *is* the document above, so editing the document changes every
+   * shot at once — which is the whole reason the world is kept in one place.
+   */
+  const [shots, setShots] = useState<SequenceShot[] | null>(null);
+  const [openShot, setOpenShot] = useState<string | null>(null);
   const [canReadClips, setCanReadClips] = useState(false);
 
   useEffect(() => {
@@ -254,6 +269,10 @@ export function App() {
     setIrText(JSON.stringify(next, null, 2));
     setDisabled(new Set());
     setSelected(null);
+    // Shots are differences from a world. A new document is a new world, and
+    // the old differences mean nothing against it.
+    setShots(null);
+    setOpenShot(null);
   };
 
   /**
@@ -561,6 +580,60 @@ export function App() {
       return { failure: (err as Error).message } as const;
     }
   }, [parsed, profile]);
+
+  /** Built fresh from the live document, so an edit above reaches every shot. */
+  const sequence = useMemo<Sequence | null>(() => {
+    if (!shots || 'error' in parsed) return null;
+    return { ...sequenceFromIR(parsed.ir), shots };
+  }, [shots, parsed]);
+
+  const compiledSeq = useMemo(
+    () => (sequence ? compileSequence(sequence, profile) : null),
+    [sequence, profile],
+  );
+
+  const slug = (): string =>
+    (parsed && !('error' in parsed) && parsed.ir.title ? parsed.ir.title : 'sequence')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40) || 'sequence';
+
+  const copySequence = async (): Promise<void> => {
+    if (!sequence || !compiledSeq) return;
+    await navigator.clipboard.writeText(sequenceToDocument(sequence, profile, compiledSeq));
+    setSavedTo(null);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  const saveSequence = async (): Promise<void> => {
+    if (!sequence || !compiledSeq) return;
+    setExtractError(null);
+
+    const base = `${slug()}_${profile.id}`;
+    // One file per shot, because they are pasted one at a time — plus the whole
+    // thing in order, and the world, so it can be picked up again later.
+    const files: OutFile[] = [
+      { name: `${base}.txt`, contents: sequenceToDocument(sequence, profile, compiledSeq) },
+      ...compiledSeq.shots.map((shot) => ({
+        name: `${base}_${shot.id}.txt`,
+        contents: toDocument(shot.render, profile, { title: `${slug()} ${shot.id}` }),
+      })),
+      { name: `${base}.ir.json`, contents: `${JSON.stringify(sequence, null, 2)}
+` },
+    ];
+
+    try {
+      const dir = await savePromptsTo(files);
+      if (dir) {
+        setSavedTo(dir);
+        void showFolder(dir);
+      }
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   const isOn = (s: Segment): boolean => !disabled.has(s.label);
 
@@ -877,6 +950,41 @@ export function App() {
               <p className="err">This is not valid JSON: {parsed.error}</p>
             ) : null}
           </div>
+
+          {sequence && compiledSeq ? (
+            <Shots
+              sequence={sequence}
+              compiled={compiledSeq}
+              selected={openShot}
+              saved={savedTo}
+              onSelect={setOpenShot}
+              onChange={(next) => setShots(next.shots)}
+              onClear={() => {
+                setShots(null);
+                setOpenShot(null);
+              }}
+              onCopyAll={() => void copySequence()}
+              onSaveAll={() => void saveSequence()}
+            />
+          ) : !('error' in parsed) && parsed.ir.modality !== 'audio' ? (
+            <div className="block seq-start">
+              <button
+                className="ghost"
+                onClick={() => {
+                  const seeded = sequenceFromIR(parsed.ir);
+                  setShots(seeded.shots);
+                  setOpenShot(seeded.shots[0]?.id ?? null);
+                }}
+              >
+                Make a sequence
+              </button>
+              <p className="quiet">
+                Several shots that share this document — one man, one room, four cuts. What is
+                written above is stated once and repeated in every shot, which is what stops it
+                drifting.
+              </p>
+            </div>
+          ) : null}
         </section>
       </main>
     </div>

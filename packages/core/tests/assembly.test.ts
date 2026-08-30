@@ -19,6 +19,19 @@ const ir = JSON.parse(
  * guess at them.
  */
 describe('assembling a prompt from a subset of segments', () => {
+  it('leaves out a field that resolved to nothing', () => {
+    const { render } = compile(ir, getProfile(registry, 'kling-3-omni'));
+    const blanked = {
+      ...render,
+      segments: render.segments.map((s) => (s.label === 'Lighting' ? { ...s, text: '  ' } : s)),
+    };
+
+    // Not "Lighting:" followed by nothing — a labelled gap is an instruction to
+    // fill it, which is worse than never raising the subject.
+    expect(assembleText(blanked)).not.toContain('Lighting:');
+    expect(render.segments.some((s) => s.label === 'Lighting')).toBe(true);
+  });
+
   it('round-trips to the same text when everything is enabled', () => {
     const { render } = compile(ir, getProfile(registry, 'kling-3-omni'));
     expect(assembleText(render)).toBe(render.text);

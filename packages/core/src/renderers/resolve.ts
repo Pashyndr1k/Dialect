@@ -132,5 +132,11 @@ export function partsFor(ir: PromptIR, spec: FieldSpec, profile: ModelProfile): 
 
 export function resolveField(ir: PromptIR, spec: FieldSpec, profile: ModelProfile): string {
   const text = partsFor(ir, spec, profile).join(spec.join ?? ', ');
-  return text || (spec.fallback ?? '');
+  if (text) return text;
+
+  // A fallback is a guess at something the document never said. A start frame
+  // is not a document that failed to say it — the picture says it, better than
+  // any stand-in phrase, and "minimal context" written next to a frame full of
+  // context can only contradict it.
+  return ir.frames?.start ? '' : (spec.fallback ?? '');
 }

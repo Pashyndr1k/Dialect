@@ -16,21 +16,18 @@ import { z } from 'zod';
 import type { Gateway } from '../providers/gateway.ts';
 import type { ImagePart, ProviderUsage } from '../providers/types.ts';
 import type { PromptIR } from '../ir/types.ts';
-import { IR_VERSION } from '../ir/types.ts';
+import { CAMERA_MOVES, IR_VERSION } from '../ir/types.ts';
 import { ExtractedScene } from './schema.ts';
 import { sceneToIR } from './image.ts';
 
 /** Bumped whenever this schema or the prompt below changes. */
 export const SHOT_VERSION = '1';
 
-const MOVES = [
-  'static', 'push-in', 'pull-back', 'pan', 'tilt', 'tracking',
-  'orbit', 'crane', 'zoom', 'dolly-zoom', 'whip-pan', 'handheld',
-] as const;
-
 export const ExtractedShot = ExtractedScene.extend({
   cameraMove: z
-    .enum(MOVES)
+    // The same list the IR takes, so the schema cannot drift from what a
+    // renderer knows how to write down.
+    .enum(CAMERA_MOVES)
     .describe('the one move the camera makes across these frames, or static if it holds'),
   cameraSpeed: z.enum(['slow', 'medium', 'fast']),
   subjectMotion: z

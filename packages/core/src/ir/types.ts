@@ -48,13 +48,24 @@ export interface Entity {
 // Framing and motion
 // ---------------------------------------------------------------------------
 
-export type ShotSize =
-  | 'extreme-wide' | 'wide' | 'medium-wide' | 'medium'
-  | 'medium-close' | 'close-up' | 'extreme-close-up' | 'two-shot' | 'over-shoulder';
+/**
+ * Widest to tightest, then the two that describe who is in frame rather than
+ * how close. The order is the order a size picker should offer them in.
+ */
+export const SHOT_SIZES = [
+  'extreme-wide', 'wide', 'medium-wide', 'medium',
+  'medium-close', 'close-up', 'extreme-close-up', 'two-shot', 'over-shoulder',
+] as const;
 
-export type CameraMove =
-  | 'static' | 'push-in' | 'pull-back' | 'pan' | 'tilt' | 'tracking'
-  | 'orbit' | 'crane' | 'zoom' | 'dolly-zoom' | 'whip-pan' | 'handheld';
+export type ShotSize = (typeof SHOT_SIZES)[number];
+
+/** `static` first, because it is the right answer more often than it is chosen. */
+export const CAMERA_MOVES = [
+  'static', 'push-in', 'pull-back', 'pan', 'tilt', 'tracking',
+  'orbit', 'crane', 'zoom', 'dolly-zoom', 'whip-pan', 'handheld',
+] as const;
+
+export type CameraMove = (typeof CAMERA_MOVES)[number];
 
 export interface Shot {
   size?: ShotSize;
@@ -190,7 +201,11 @@ export interface Frames {
   end?: string;
 }
 
-export type Seam = 'frozen-handoff' | 'action-bridge' | 'match-cut' | 'portal' | 'hard-cut';
+export const SEAMS = [
+  'frozen-handoff', 'action-bridge', 'match-cut', 'portal', 'hard-cut',
+] as const;
+
+export type Seam = (typeof SEAMS)[number];
 
 export interface Continuity {
   seamIn?: Seam;

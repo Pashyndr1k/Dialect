@@ -63,7 +63,10 @@ export function assembleText(
   enabled: (segment: Segment) => boolean = () => true,
 ): string {
   const a = result.assembly;
-  const kept = result.segments.filter(enabled);
+  // A field that resolved to nothing is left out entirely. `Lighting:` with an
+  // empty line after it is not a neutral omission — it is a labelled gap, and a
+  // model asked to fill one will.
+  const kept = result.segments.filter((s) => s.text.trim() !== '' && enabled(s));
 
   const prefix = a.prefixLabel ? kept.find((s) => s.label === a.prefixLabel) : undefined;
   const body = kept

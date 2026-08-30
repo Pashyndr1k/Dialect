@@ -113,6 +113,31 @@ apps/desktop        the Tauri window: React in src/, the host in src-tauri/
                     the one call that needs it
 ```
 
+## Sequences
+
+Four shots of one man in one room fail for a reason that has nothing to do with
+any single prompt: shot three quietly describes a different man. So the world —
+who, where, what it looks like — is stated once, and a shot holds only what
+makes it different. Kept once it cannot drift; kept four times it will.
+
+Expansion copies the world verbatim into each shot and hands the result to the
+ordinary compiler. There is no second code path, which is the only way the
+prompt for shot three can be trusted to be as good as a prompt written alone.
+
+A shot that continues from the previous frame is compiled differently, and less:
+the picture fixes the room and the light better than a sentence can, so
+restating them can only disagree with it, and a disagreement at the seam is
+exactly where the join becomes visible. Identity stays — the model has to track
+a person through motion, not merely render them once. A field someone changed on
+purpose stays too: a light going out is the one thing the frame cannot show,
+because it is what happens next.
+
+The joins get their own checks, none of which block: a character described two
+ways, a shot that changes place without cutting there, two shots at the same
+size from the same angle, a camera that never stops doing the same thing. They
+read what the prompts actually say rather than what the shots store, so a move
+inherited from the world is counted like one that was typed.
+
 ## Reading a clip
 
 A vision model cannot watch anything, so a clip becomes a handful of stills
