@@ -77,7 +77,9 @@ export function sceneToIR(
       ...(nonEmpty(scene.era) ? { era: scene.era } : {}),
     },
     shot: {
-      size: scene.shotSize,
+      // Absent rather than empty. A reading always names a size, but a template
+      // learned from an example that never framed anything does not.
+      ...(nonEmpty(scene.shotSize) ? { size: scene.shotSize } : {}),
       ...(nonEmpty(scene.angle) ? { angle: scene.angle } : {}),
       ...(nonEmpty(scene.aspectRatio) ? { aspectRatio: scene.aspectRatio } : {}),
     },
@@ -94,7 +96,7 @@ export function sceneToIR(
       dominant: scene.palette,
       ...(nonEmpty(scene.grade) ? { grade: scene.grade } : {}),
     },
-    texture: { grain: scene.grain },
+    texture: nonEmpty(scene.grain) ? { grain: scene.grain } : {},
     style: {
       ...(nonEmpty(scene.medium) ? { medium: scene.medium } : {}),
       ...(nonEmpty(scene.genre) ? { genre: scene.genre } : {}),

@@ -48,4 +48,8 @@ export const notedInstruction = (base: string, note: string): string =>
   `exists and their words as what they want. Where the two touch, follow their ` +
   `words and describe the result as though it were already in front of you — do ` +
   `not describe the change, and do not mention that anything was asked for. ` +
-  `Everything they did not touch stays exactly as the reference has it.`;
+  `Everything they did not touch stays exactly as the reference has it.\n\n` +
+  `Put each change in the field that carries it. If their words move it to ` +
+  `night, the time-of-day field says night; if they age it, the era field says ` +
+  `so. Naming it only in the headline leaves the field a renderer actually ` +
+  `reads still holding what the reference said.`;

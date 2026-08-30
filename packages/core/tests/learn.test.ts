@@ -201,6 +201,52 @@ describe('the template it produces', () => {
   });
 });
 
+describe('fields a template may leave open', () => {
+  it('drops a grain the example never mentioned, rather than refusing the answer', () => {
+    // The first live run of this prompt died here: a reading's enum has no way
+    // to say "the example does not mention grain".
+    const template = learnedToTemplate({ ...LEARNED_IMAGE, grain: '' }, {
+      kind: 'text2img',
+      cast: 1,
+    });
+
+    // The texture block survives, empty; the grain that was never stated does not.
+    expect((template.ir as Record<string, Record<string, unknown>>)['texture']?.['grain'])
+      .toBeUndefined();
+  });
+
+  it('keeps a grain the example did state', () => {
+    const template = learnedToTemplate(LEARNED_IMAGE, { kind: 'text2img', cast: 1 });
+    const ir = template.ir as Record<string, Record<string, unknown>>;
+
+    expect(ir['texture']?.['grain']).toBe('fine-uniform');
+  });
+
+  it('drops a placeholder where the IR takes one of a fixed set', () => {
+    // `{{framing}}` in a shot size would be written into every prompt the
+    // template ever made, which is worse than having no framing at all.
+    const template = learnedToTemplate({ ...LEARNED_IMAGE, shotSize: '{{framing}}' }, {
+      kind: 'text2img',
+      cast: 1,
+    });
+
+    expect((template.ir as Record<string, Record<string, unknown>>)['shot']?.['size']).toBeUndefined();
+    expect(JSON.stringify(template.ir)).not.toContain('{{framing}}');
+  });
+
+  it('gives a clip the honest move when the example does not say', () => {
+    const template = learnedToTemplate(
+      { ...LEARNED_VIDEO, cameraMove: '', cameraSpeed: '' },
+      { kind: 'text2vid', cast: 1 },
+    );
+
+    expect((template.ir as Record<string, unknown>)['cameraMove']).toEqual({
+      move: 'static',
+      speed: 'slow',
+    });
+  });
+});
+
 describe('what each kind is shaped like', () => {
   it('gives an image-to-image template a source and an edit mode', () => {
     const template = learnedToTemplate(LEARNED_IMAGE, { kind: 'img2img', cast: 1 });

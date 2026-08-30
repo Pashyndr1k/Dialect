@@ -24,9 +24,20 @@ import { ExtractedScene } from '../extract/schema.ts';
 import { sceneToIR } from '../extract/image.ts';
 import { ExtractedShot, shotToIR } from '../extract/video.ts';
 import type { IRFragment, Template, Variable } from './types.ts';
+import { CAMERA_MOVES, SHOT_SIZES } from '../ir/types.ts';
 
-/** Bumped whenever a schema or a prompt in this file changes. */
-export const LEARN_VERSION = '1';
+const GRAINS = ['none', 'fine-uniform', 'heavy'] as const;
+const SPEEDS = ['slow', 'medium', 'fast'] as const;
+
+/**
+ * Bumped whenever a schema or a prompt in this file changes.
+ *
+ * The schema itself is not in the cache key — only this is — so a shape change
+ * that leaves the number alone would hand back an answer bought for the old one.
+ * 2: the enum fields opened up, after the first live run failed on a grain the
+ * model had no legal way to leave blank.
+ */
+export const LEARN_VERSION = '2';
 
 /**
  * What the template makes, and what it starts from.
@@ -80,8 +91,33 @@ const learned = {
     .describe('every {{hole}} you left, in the order someone should be asked for them'),
 };
 
-export const LearnedImageTemplate = ExtractedScene.extend(learned);
-export const LearnedVideoTemplate = ExtractedShot.extend(learned);
+/**
+ * A template is not a reading, and forcing it through a reading's schema broke.
+ *
+ * A reading is of something that exists, so `grain` can be one of three named
+ * values. A template is a description with holes in it: a field may hold
+ * `{{a_placeholder}}`, or nothing at all where the example never mentioned it.
+ * An enum can express neither, so the first live run of this prompt failed on a
+ * grain the model had no legal way to leave blank.
+ *
+ * These fields are therefore strings here and are put back into their proper
+ * shape on the way into the template, where anything unrecognised becomes
+ * absent rather than a failure.
+ */
+const openEnums = {
+  grain: z
+    .string()
+    .describe('none, fine-uniform or heavy — or empty if the example does not say'),
+  shotSize: z.string().describe('the framing, or a {{placeholder}}, or empty'),
+};
+
+export const LearnedImageTemplate = ExtractedScene.extend({ ...learned, ...openEnums });
+export const LearnedVideoTemplate = ExtractedShot.extend({
+  ...learned,
+  ...openEnums,
+  cameraMove: z.string().describe('the one move, or empty if the example does not say'),
+  cameraSpeed: z.string().describe('slow, medium or fast — or empty'),
+});
 
 export type LearnedImageTemplate = z.infer<typeof LearnedImageTemplate>;
 export type LearnedVideoTemplate = z.infer<typeof LearnedVideoTemplate>;
@@ -187,6 +223,33 @@ function fragmentOf(ir: PromptIR): IRFragment {
   return rest as unknown as IRFragment;
 }
 
+/**
+ * The open fields, back into the shapes the IR takes.
+ *
+ * A value the reading schema would have refused is dropped rather than carried:
+ * a template whose grain is `{{grain}}` would put that string into every prompt
+ * it ever made, which is worse than having no grain at all.
+ */
+function closedUp(answer: LearnedImageTemplate | LearnedVideoTemplate): unknown {
+  const pick = <T extends string>(value: string, allowed: readonly T[]): T | '' =>
+    (allowed as readonly string[]).includes(value) ? (value as T) : '';
+
+  const video = answer as LearnedVideoTemplate;
+
+  return {
+    ...answer,
+    grain: pick(answer.grain, GRAINS),
+    shotSize: pick(answer.shotSize, SHOT_SIZES),
+    ...(video.cameraMove === undefined
+      ? {}
+      : {
+          // A shot has to have some move; unreadable becomes the honest one.
+          cameraMove: pick(video.cameraMove, CAMERA_MOVES) || 'static',
+          cameraSpeed: pick(video.cameraSpeed, SPEEDS) || 'slow',
+        }),
+  };
+}
+
 function variablesOf(declared: LearnedImageTemplate['variables']): Variable[] {
   return declared.slice(0, MAX_VARIABLES).map((v) => ({
     name: v.name,
@@ -208,8 +271,8 @@ export function learnedToTemplate(
 
   const ir =
     modality === 'video'
-      ? shotToIR(answer as LearnedVideoTemplate, { reference: 'example' })
-      : sceneToIR(answer, { reference: 'example', modality: 'image' });
+      ? shotToIR(closedUp(answer) as never, { reference: 'example' })
+      : sceneToIR(closedUp(answer) as never, { reference: 'example', modality: 'image' });
 
   const fragment = fragmentOf(ir);
 
