@@ -8,7 +8,7 @@
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { argv, env as processEnv, exit, stderr, stdout } from 'node:process';
+import { argv, env as processEnv, exit, platform, stderr, stdout } from 'node:process';
 
 import {
   compile,
@@ -68,6 +68,22 @@ function flag(name: string): string | undefined {
 }
 
 const LEVEL_MARK: Record<string, string> = { autofix: '·', warn: '!', block: '✕' };
+
+/**
+ * How to run this with a key, in the shell the reader is actually in.
+ *
+ * A bash line handed to someone in PowerShell is not advice, it is a second
+ * error message: PowerShell has no inline environment prefix, so the whole
+ * line reads as a command name that does not exist.
+ */
+const RUN_LINE =
+  platform === 'win32'
+    ? [
+        "  $env:ANTHROPIC_API_KEY = 'sk-ant-...'",
+        '  node --experimental-strip-types apps/cli/src/main.ts probe --out probe --budget 1.00',
+        '  Remove-Item Env:ANTHROPIC_API_KEY',
+      ].join('\n')
+    : '  ANTHROPIC_API_KEY=sk-ant-... node --experimental-strip-types apps/cli/src/main.ts probe --out probe --budget 1.00';
 
 async function cmdTargets(): Promise<number> {
   const registry = await loadBuiltinRegistry();
@@ -378,8 +394,8 @@ async function cmdProbe(): Promise<number> {
     stderr.write(
       'No key in this shell. The desktop app keeps its key in the OS credential store,\n' +
         'which another process cannot read — that is the point of putting it there.\n\n' +
-        'For one command, in your own terminal:\n\n' +
-        '  ANTHROPIC_API_KEY=sk-ant-... node --experimental-strip-types apps/cli/src/main.ts probe --out probe --budget 1.00\n\n' +
+        'In your own terminal:\n\n' +
+        `${RUN_LINE}\n\n` +
         'Nothing was spent.\n',
     );
     return 2;
