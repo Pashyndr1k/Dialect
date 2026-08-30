@@ -15,7 +15,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 /// The gateway's keys are sha256 hex. Anything else is not ours to write, and
@@ -250,6 +250,38 @@ mod tests {
     }
 
     #[test]
+    fn only_writes_plain_file_names() {
+        for good in ["a.txt", "ref-001_nano-banana-2.txt", "shot 3.ir.json"] {
+            assert!(checked_name(good).is_ok(), "{good} should have been allowed");
+        }
+        // The web view builds these from a naming pattern, which is exactly
+        // where a stray separator or a parent reference would come from.
+        for bad in ["", "..", "../out.txt", "a/b.txt", "a\\b.txt", "C:evil.txt"] {
+            assert!(checked_name(bad).is_err(), "{bad} should have been refused");
+        }
+    }
+
+    #[test]
+    fn writes_a_whole_batch_into_a_folder_it_makes() {
+        let dir = scratch("save").join("prompts");
+
+        let files = vec![
+            OutFile { name: "one.txt".into(), contents: "first prompt".into() },
+            OutFile { name: "one.ir.json".into(), contents: "{}".into() },
+        ];
+        assert_eq!(write_all(&dir, &files).unwrap(), 2);
+
+        assert_eq!(fs::read_to_string(dir.join("one.txt")).unwrap(), "first prompt");
+        assert!(dir.join("one.ir.json").exists());
+
+        // One bad name refuses the write rather than half-writing the batch.
+        let bad = vec![OutFile { name: "../escape.txt".into(), contents: "x".into() }];
+        assert!(write_all(&dir, &bad).is_err());
+
+        fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+    }
+
+    #[test]
     fn counts_and_clears_what_it_holds() {
         let dir = scratch("stats");
         write_entry(&dir, KEY, "{\"a\":1}").unwrap();
@@ -265,4 +297,48 @@ mod tests {
 
         fs::remove_dir_all(&dir).unwrap();
     }
+}
+
+// ---------------------------------------------------------------------------
+// Saving prompts
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct OutFile {
+    name: String,
+    contents: String,
+}
+
+/// Refuses anything that is not a plain file name. The web view chooses these
+/// from a naming pattern, and a pattern is exactly where a stray `..` or a
+/// second directory separator would come from.
+fn checked_name(name: &str) -> Result<&str, String> {
+    let bad = name.is_empty()
+        || name.contains("..")
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains(':');
+    if bad {
+        Err(format!("Not a file name: {name}"))
+    } else {
+        Ok(name)
+    }
+}
+
+pub fn write_all(dir: &Path, files: &[OutFile]) -> Result<u64, String> {
+    fs::create_dir_all(dir).map_err(|e| format!("Could not use that folder: {e}"))?;
+
+    let mut written = 0;
+    for file in files {
+        let path = dir.join(checked_name(&file.name)?);
+        fs::write(&path, &file.contents)
+            .map_err(|e| format!("Could not write {}: {e}", file.name))?;
+        written += 1;
+    }
+    Ok(written)
+}
+
+#[tauri::command]
+pub fn save_prompts(dir: String, files: Vec<OutFile>) -> Result<u64, String> {
+    write_all(Path::new(&dir), &files)
 }

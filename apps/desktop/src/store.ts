@@ -118,3 +118,36 @@ export async function clearSession(): Promise<void> {
   memorySession = undefined;
   if (hasHost()) await invoke<void>('session_clear', {}).catch(() => undefined);
 }
+
+// ---------------------------------------------------------------------------
+// Saving prompts
+// ---------------------------------------------------------------------------
+
+export interface OutFile {
+  name: string;
+  contents: string;
+}
+
+/**
+ * Ask where, write there, and offer to show it.
+ *
+ * Returns the folder, or null if the dialog was dismissed — the caller says
+ * nothing in that case, because cancelling is not a failure.
+ */
+export async function savePromptsTo(files: OutFile[]): Promise<string | null> {
+  if (!hasHost()) {
+    throw new Error('Saving needs the desktop app: a browser cannot choose a folder to write to.');
+  }
+
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const dir = await open({ directory: true, title: 'Where should the prompts go?' });
+  if (typeof dir !== 'string') return null;
+
+  await invoke<number>('save_prompts', { dir, files });
+  return dir;
+}
+
+export async function showFolder(dir: string): Promise<void> {
+  const { openPath } = await import('@tauri-apps/plugin-opener');
+  await openPath(dir).catch(() => undefined);
+}

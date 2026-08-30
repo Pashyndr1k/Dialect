@@ -210,7 +210,17 @@ screen. Where a field came from a reference, the panel says which one.
 Drop one reference and it is read straight away. Drop several — or a whole
 folder — and they are staged instead, with what the run will cost, because a
 dozen is a spend worth seeing before it happens. Rows report their own state as
-the queue works through them, and a finished one opens into the editor.
+the queue works through them.
+
+A finished batch is worked with three ways: open any row into the editor, copy
+one row's prompt from the row itself, or save the lot to a folder you pick. The
+IR is written beside each prompt, so an edit can be picked up later without
+paying to read the reference again.
+
+What the session has cost, and what the cache is holding, sit on one line under
+the drop zone — next to each other, because they are the same subject. Forgetting
+the cache is the only thing that makes a reference cost money twice, so it says
+so.
 
 Findings appear underneath, sorted with anything blocking first, each naming
 the rule that raised it and what to do about it.

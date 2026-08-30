@@ -65,10 +65,11 @@ select {
   font: inherit; color: var(--ink); background: var(--surface-2);
   border: 1px solid var(--rule); border-radius: 5px; padding: 5px 8px;
 }
-.note {
-  margin: 0; color: var(--ink-3); font-size: 12.5px;
-  flex: 1 1 260px; min-width: 0;
+.drop-n.money {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  justify-content: center;
 }
+.drop-n .dot { color: var(--rule); }
 
 .panes {
   flex: 1; min-height: 0; display: grid;
@@ -324,3 +325,14 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 
 .sheet-sep { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rule); }
 .sheet-sub { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--ink); }
+
+.row-copy {
+  font: inherit; font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); background: none; border: 0; padding: 0; cursor: pointer;
+}
+.row-copy:hover { color: var(--accent); }
+.batch-saved {
+  margin: 0; padding: 8px 12px; font-size: 12px; color: var(--accent);
+  background: var(--accent-soft); border-bottom: 1px solid var(--rule-soft);
+  overflow-wrap: anywhere;
+}

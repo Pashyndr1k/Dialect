@@ -5,6 +5,7 @@ import {
   extractFromImage,
   Gateway,
   getProfile,
+  toDocument,
   type Finding,
   type PromptIR,
   type Segment,
@@ -14,7 +15,18 @@ import { Batch, type BatchItem } from './Batch.tsx';
 import { Fields } from './Fields.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
-import { HostCache, loadSession, saveSession, SESSION_VERSION, type Session } from './store.ts';
+import {
+  cacheStats,
+  clearCache,
+  HostCache,
+  loadSession,
+  saveSession,
+  savePromptsTo,
+  SESSION_VERSION,
+  showFolder,
+  type OutFile,
+  type Session,
+} from './store.ts';
 import { profiles, registry } from './registry.ts';
 import { Settings } from './Settings.tsx';
 import videoExample from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
@@ -71,6 +83,13 @@ export function App() {
 
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [batchOpen, setBatchOpen] = useState<string | null>(null);
+  const [savedTo, setSavedTo] = useState<string | null>(null);
+  const [cache, setCache] = useState<{ entries: number; bytes: number } | null>(null);
+
+  const refreshCache = (): void => {
+    void cacheStats().then(setCache);
+  };
+  useEffect(refreshCache, []);
   const [running, setRunning] = useState(false);
   // Files and their extracted IRs live outside React state: neither is
   // serialisable, and neither belongs in a render.
@@ -190,6 +209,7 @@ export function App() {
         setExtractError(err instanceof Error ? err.message : String(err));
       } finally {
         setExtracting(null);
+        refreshCache();
       }
       return;
     }
@@ -249,6 +269,7 @@ export function App() {
     } finally {
       abort.current = null;
       setRunning(false);
+      refreshCache();
     }
   };
 
@@ -259,11 +280,67 @@ export function App() {
     setBatchOpen(id);
   };
 
+  /** The finished references, compiled against whatever target is showing. */
+  const finished = (): Array<{ id: string; base: string; ir: PromptIR; document: string }> =>
+    batch
+      .filter((item) => item.state === 'done')
+      .flatMap((item) => {
+        const ir = results.current.get(item.id);
+        if (!ir) return [];
+        const rendered = compile(ir, profile);
+        return [
+          {
+            id: item.id,
+            base: item.name.replace(/\.[^.]+$/, ''),
+            ir,
+            document: toDocument(rendered.render, profile, { title: ir.title }),
+          },
+        ];
+      });
+
+  const copyAll = async (): Promise<void> => {
+    const all = finished();
+    if (all.length === 0) return;
+    await navigator.clipboard.writeText(all.map((f) => f.document).join('\n\n'));
+    setSavedTo(null);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  const copyOne = async (id: string): Promise<void> => {
+    const one = finished().find((f) => f.id === id);
+    if (one) await navigator.clipboard.writeText(one.document);
+  };
+
+  const saveAll = async (): Promise<void> => {
+    setExtractError(null);
+    const all = finished();
+    if (all.length === 0) return;
+
+    // The IR goes beside each prompt, so an edit can be picked up later
+    // without paying to read the reference again.
+    const files: OutFile[] = all.flatMap((f) => [
+      { name: `${f.base}_${profile.id}.txt`, contents: f.document },
+      { name: `${f.base}_${profile.id}.ir.json`, contents: `${JSON.stringify(f.ir, null, 2)}\n` },
+    ]);
+
+    try {
+      const dir = await savePromptsTo(files);
+      if (dir) {
+        setSavedTo(dir);
+        void showFolder(dir);
+      }
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   const clearBatch = (): void => {
     staged.current.clear();
     results.current.clear();
     setBatch([]);
     setBatchOpen(null);
+    setSavedTo(null);
   };
 
   const parsed = useMemo(() => parseIR(irText), [irText]);
@@ -312,6 +389,7 @@ export function App() {
         <label className="field">
           <span className="field-k">Target</span>
           <select
+            title={profile.routingNote?.trim().replace(/\s+/g, ' ')}
             value={target}
             onChange={(e) => {
               const next = getProfile(registry, e.target.value);
@@ -331,7 +409,6 @@ export function App() {
             ))}
           </select>
         </label>
-        {profile.routingNote ? <p className="note">{profile.routingNote}</p> : null}
         <button className="ghost bar-end" onClick={() => setSettingsOpen(true)}>
           Settings
         </button>
@@ -415,7 +492,29 @@ export function App() {
               </>
             )}
 
-            {spent > 0 ? <p className="drop-n">${spent.toFixed(4)} spent this session</p> : null}
+            <p className="drop-n money">
+              <span>${spent.toFixed(4)} spent this session</span>
+              {cache && cache.entries > 0 ? (
+                <>
+                  <span className="dot">·</span>
+                  <span title="Reading any of these again is free">
+                    {cache.entries} kept, {(cache.bytes / 1024).toFixed(0)} kB
+                  </span>
+                  <button
+                    className="link"
+                    title="Reading those references again would cost money"
+                    onClick={() =>
+                      void clearCache().then(() => {
+                        refreshCache();
+                        setSpent(0);
+                      })
+                    }
+                  >
+                    forget them
+                  </button>
+                </>
+              ) : null}
+            </p>
           </div>
 
           {extractError ? <p className="err">{extractError}</p> : null}
@@ -430,6 +529,10 @@ export function App() {
               onStop={() => abort.current?.abort()}
               onSelect={openFromBatch}
               onClear={clearBatch}
+              onCopyOne={(id) => void copyOne(id)}
+              onCopyAll={() => void copyAll()}
+              onSaveAll={() => void saveAll()}
+              saved={savedTo}
             />
           ) : null}
           <textarea

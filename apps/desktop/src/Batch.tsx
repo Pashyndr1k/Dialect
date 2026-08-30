@@ -36,6 +36,10 @@ export function Batch({
   onStop,
   onSelect,
   onClear,
+  onCopyOne,
+  onCopyAll,
+  onSaveAll,
+  saved,
 }: {
   items: BatchItem[];
   selected: string | null;
@@ -45,6 +49,10 @@ export function Batch({
   onStop: () => void;
   onSelect: (id: string) => void;
   onClear: () => void;
+  onCopyOne: (id: string) => void;
+  onCopyAll: () => void;
+  onSaveAll: () => void;
+  saved: string | null;
 }) {
   const staged = items.filter((i) => i.state === 'staged' || i.state === 'queued').length;
   const done = items.filter((i) => i.state === 'done').length;
@@ -71,9 +79,19 @@ export function Batch({
           ) : (
             <>
               {staged > 0 ? (
-                <button className="solid" onClick={onRun}>
+                <button className={done > 0 ? 'ghost' : 'solid'} onClick={onRun}>
                   Read {staged} · about ${(staged * PER_REFERENCE_USD).toFixed(2)}
                 </button>
+              ) : null}
+              {done > 0 ? (
+                <>
+                  <button className="solid" onClick={onSaveAll}>
+                    Save {done} to a folder
+                  </button>
+                  <button className="ghost" onClick={onCopyAll}>
+                    Copy all
+                  </button>
+                </>
               ) : null}
               <button className="ghost" onClick={onClear}>
                 Clear
@@ -82,6 +100,8 @@ export function Batch({
           )}
         </div>
       </div>
+
+      {saved ? <p className="batch-saved">Written to {saved}</p> : null}
 
       <ul className="rows-b">
         {items.map((item) => (
@@ -98,6 +118,11 @@ export function Batch({
               {LABEL[item.state]}
               {item.cached ? ' · cached' : ''}
             </span>
+            {item.state === 'done' ? (
+              <button className="row-copy" title="Copy this prompt" onClick={() => onCopyOne(item.id)}>
+                copy
+              </button>
+            ) : null}
             {item.error ? <span className="row-err">{item.error}</span> : null}
           </li>
         ))}
