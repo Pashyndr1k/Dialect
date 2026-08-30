@@ -78,6 +78,12 @@ export interface ModelProfile {
    */
   fields?: FieldSpec[];
   /**
+   * How those fields become one prompt. Kling wants a labelled field per line;
+   * a music model wants one comma-separated line and no labels at all.
+   * Defaults to labelled fields separated by a blank line.
+   */
+  assembly?: { separator?: string; labelled?: boolean };
+  /**
    * The order a `shot-description` model expects, recorded for the reader.
    * That form is prose, so the renderer composes it rather than filling slots.
    */

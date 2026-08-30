@@ -1,0 +1,42 @@
+id: sora-2
+label: Sora 2
+vendor: openai
+family: video
+syntax: shot-description
+renderer: shot-description
+header: Sora 2 prompt
+
+bestFor:
+  - cinematic_shot
+  - narrative
+routingNote: >-
+  The wider field alongside Seedance. Same shot-description discipline: one
+  action, one camera move, named light.
+
+fieldOrder: [shot, subject, action, environment, camera, lighting, style, sound]
+
+limits:
+  durationS: 20
+
+supports:
+  negativePrompt: false
+  nativeAudio: true
+  startEndFrame: true
+  emitsGearNumbers: false
+
+defaults:
+  sound.music: false
+  sound.subtitles: false
+
+rules:
+  - one-action-one-move
+  - max-tracked-entities
+  - max-look-words
+  - emotions-are-physical
+  - only-visible-and-audible
+  - exit-frame-means-gone
+  - skin-realism-block
+
+source:
+  name: The Prompting Handbook v1.2 (Magnific)
+  dated: "2026-07-01"

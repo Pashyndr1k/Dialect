@@ -1,0 +1,44 @@
+id: elevenlabs
+label: ElevenLabs
+vendor: elevenlabs
+family: audio
+syntax: field-list
+renderer: field-list
+header: ElevenLabs direction
+
+bestFor:
+  - voice
+  - narration
+  - dubbing
+routingNote: >-
+  Speech, not music. The words are the script and everything else is direction:
+  how it is said, not what it is about.
+
+fields:
+  - name: Text
+    # What is actually said. Spoken verbatim, so it is never a description.
+    from: ["dialogue[].line", audio.lyrics]
+    mode: first
+    join: " "
+    fallback: (nothing to say yet)
+
+  - name: Delivery
+    # Two or three qualities. One flat label reads dead.
+    from: ["dialogue[].delivery[]", mood.emotion, mood.energy]
+
+  - name: Voice
+    from: ["subject.entities[].description", subject.headline]
+    mode: first
+
+limits:
+  maxChars: 5000
+
+supports:
+  negativePrompt: false
+
+rules:
+  - emotions-are-physical
+
+source:
+  name: Dialect audio profiles
+  dated: "2026-08-29"

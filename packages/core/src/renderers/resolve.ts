@@ -55,9 +55,23 @@ function lens(ir: PromptIR, profile: ModelProfile): string | undefined {
   return /lens$/i.test(hint) ? hint : `${hint} lens`;
 }
 
+/** A number on its own says nothing; "78 BPM" does. */
+function tempo(ir: PromptIR): string | undefined {
+  const bpm = ir.audio?.bpm;
+  return typeof bpm === 'number' && bpm > 0 ? `${bpm} BPM` : undefined;
+}
+
+/** The section order a song is asked for, as a music model reads it. */
+function sections(ir: PromptIR): string | undefined {
+  const parts = ir.audio?.structure?.filter((s) => s.trim());
+  return parts?.length ? parts.join(' - ') : undefined;
+}
+
 export const COMPUTED: Record<string, Computed> = {
   '@cameraMove': cameraMove,
   '@lens': lens,
+  '@tempo': tempo,
+  '@sections': sections,
 };
 
 export class FieldSpecError extends Error {

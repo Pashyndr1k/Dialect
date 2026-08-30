@@ -33,7 +33,7 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Piece | State |
 | --- | --- |
 | Prompt IR schema | image / video / audio, one versioned shape |
-| Model registry | YAML cards: 2 video, 2 image |
+| Model registry | YAML cards: 5 video, 2 image, 3 audio |
 | Renderers | `field-list` (formula-driven), `shot-description`, `natural` |
 | Generate mode | all four targets |
 | Edit mode | `natural` targets — names the delta, pins the rest |

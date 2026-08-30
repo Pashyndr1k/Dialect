@@ -54,13 +54,15 @@ import { profiles, registry } from './registry.ts';
 import { Settings } from './Settings.tsx';
 import videoExample from '../../../packages/core/tests/golden/cowboy-saloon.ir.json';
 import imageExample from './example.image.json';
+import audioExample from './example.audio.json';
 
 const LEVEL_ORDER: Record<Finding['level'], number> = { block: 0, warn: 1, autofix: 2 };
 
 const READABLE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 /** The opening document follows the target, so the two never disagree. */
-const exampleFor = (family: string): unknown => (family === 'video' ? videoExample : imageExample);
+const exampleFor = (family: string): unknown =>
+  family === 'video' ? videoExample : family === 'audio' ? audioExample : imageExample;
 
 /**
  * One gateway for the window's lifetime, so its cache and its running total

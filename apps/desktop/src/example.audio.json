@@ -1,0 +1,16 @@
+{
+  "irVersion": "1.0",
+  "modality": "audio",
+  "mode": "generate",
+  "title": "Saloon closing time",
+  "audio": {
+    "genre": "dusty americana",
+    "bpm": 78,
+    "musicalKey": "A minor",
+    "instruments": ["brushed drums", "upright bass", "a lap steel a room away"],
+    "structure": ["intro", "verse", "chorus", "outro"],
+    "lyrics": "[Verse]\nThe doors still swing an hour after closing\n[Chorus]\nNobody left to tell it to",
+    "mix": "warm tape, gentle compression"
+  },
+  "mood": { "emotion": "world-weary" }
+}

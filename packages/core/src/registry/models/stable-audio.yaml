@@ -1,0 +1,42 @@
+id: stable-audio
+label: Stable Audio
+vendor: stability
+family: audio
+syntax: field-list
+renderer: field-list
+header: Stable Audio prompt
+
+bestFor:
+  - instrumental
+  - ambience
+  - sound_design
+routingNote: >-
+  Instrumental beds, ambience and sound design. One line of description, with
+  the length as a setting rather than a word in the prompt.
+
+# One line, no labels: this model takes a description, not a form.
+assembly:
+  separator: ", "
+  labelled: false
+
+fields:
+  - name: Prompt
+    from:
+      - audio.genre
+      - mood.emotion
+      - audio.instruments[]
+      - "@tempo"
+      - audio.musicalKey
+      - audio.mix
+      - environment.location
+    fallback: an unspecified instrumental bed
+
+limits:
+  durationS: 190
+
+supports:
+  negativePrompt: false
+
+source:
+  name: Dialect audio profiles
+  dated: "2026-08-29"

@@ -1,0 +1,44 @@
+id: suno
+label: Suno
+vendor: suno
+family: audio
+syntax: field-list
+renderer: field-list
+header: Suno prompt
+
+bestFor:
+  - song
+  - vocal_track
+  - full_arrangement
+routingNote: >-
+  A whole song in one pass: arrangement and vocals together. Style and lyrics
+  are separate boxes, and it reads them as separate things.
+
+# Two boxes, and they are not interchangeable: the style line is a description,
+# the lyrics box is a script. Anything in the lyrics box gets sung.
+fields:
+  - name: Style
+    from:
+      - audio.genre
+      - style.genre
+      - mood.emotion
+      - audio.instruments[]
+      - "@tempo"
+      - audio.musicalKey
+      - audio.mix
+      - style.notes[]
+    fallback: instrumental, no genre given
+
+  - name: Lyrics
+    from: [audio.lyrics]
+    fallback: "[Instrumental]"
+
+limits:
+  maxChars: 3000
+
+supports:
+  negativePrompt: false
+
+source:
+  name: Dialect audio profiles
+  dated: "2026-08-29"

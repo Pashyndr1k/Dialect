@@ -1,0 +1,47 @@
+id: gemini-omni-flash
+label: Gemini Omni Flash
+vendor: google
+family: video
+syntax: shot-description
+renderer: shot-description
+header: Gemini Omni Flash prompt
+
+bestFor:
+  - video_edit
+  - conversational_direction
+  - physics
+routingNote: >-
+  The one you can direct in conversation and correct over follow-up turns. It
+  re-derives a scene's physics when you change something in it, which is what
+  makes it strong for editing footage rather than making it.
+
+fieldOrder: [shot, subject, action, environment, camera, lighting, style, sound]
+
+limits:
+  durationS: 10
+  maxRes: "720p"
+
+supports:
+  negativePrompt: false
+  # It speaks in its own voice; it will not sync to audio you supply.
+  nativeAudio: true
+  lipSync: false
+  startEndFrame: true
+  emitsGearNumbers: false
+
+defaults:
+  sound.music: false
+  sound.subtitles: false
+
+rules:
+  - one-action-one-move
+  - max-tracked-entities
+  - max-look-words
+  - emotions-are-physical
+  - only-visible-and-audible
+  - exit-frame-means-gone
+  - skin-realism-block
+
+source:
+  name: The Prompting Handbook v1.2 (Magnific)
+  dated: "2026-07-01"

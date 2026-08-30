@@ -39,7 +39,12 @@ export function renderFieldList(ir: PromptIR, profile: ModelProfile): RenderResu
     segments.push({ label: spec.name, from: spec.from, text, source: 'ir' });
   }
 
-  const assembly = { separator: '\n\n', labelled: true };
+  // How the fields become one prompt is the card's business: Kling wants a
+  // labelled field per line, a music model wants one comma-separated line.
+  const assembly = {
+    separator: profile.assembly?.separator ?? '\n\n',
+    labelled: profile.assembly?.labelled ?? true,
+  };
   const text = assembleText({ segments, assembly });
 
   const params: Record<string, string> = {};

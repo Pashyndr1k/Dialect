@@ -1,0 +1,48 @@
+id: happy-horse-1.1
+label: Happy Horse 1.1
+vendor: alibaba
+family: video
+syntax: shot-description
+renderer: shot-description
+header: Happy Horse prompt
+
+bestFor:
+  - short_form
+  - talking_head
+  - portrait
+  - video_edit
+routingNote: >-
+  Short vertical pieces and talking heads, and the one to reach for when credits
+  are tight. Also does video-to-video and subject swaps on footage you already
+  have.
+
+fieldOrder: [shot, subject, action, environment, camera, lighting, style, sound]
+
+limits:
+  durationS: 15
+  references: 9
+  maxRes: "1080p"
+
+supports:
+  negativePrompt: false
+  nativeAudio: true
+  lipSync: true
+  startEndFrame: true
+  emitsGearNumbers: false
+
+defaults:
+  sound.music: false
+  sound.subtitles: false
+
+rules:
+  - one-action-one-move
+  - max-tracked-entities
+  - max-look-words
+  - emotions-are-physical
+  - only-visible-and-audible
+  - exit-frame-means-gone
+  - skin-realism-block
+
+source:
+  name: The Prompting Handbook v1.2 (Magnific)
+  dated: "2026-07-01"
