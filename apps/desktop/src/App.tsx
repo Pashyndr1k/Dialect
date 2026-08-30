@@ -24,11 +24,17 @@ import {
   extractFromAudio,
   extractFromImages,
   extractFromVideo,
+  applyVariant,
+  decksFor,
+  drawFrom,
   emptyIR,
   sceneLines,
   shotLines,
   sourceId,
   type SavedSource,
+  vary,
+  type DeckEntry,
+  type VaryAxis,
   songLines,
   wordLines,
   type Bundle,
@@ -69,8 +75,10 @@ import { Fields } from './Fields.tsx';
 import { Input } from './Input.tsx';
 import { Shape, type ShapeMode } from './Shape.tsx';
 import { Sources } from './Sources.tsx';
+import { Variations, type Variation } from './Variations.tsx';
+import { decks } from './decks.ts';
 import { deleteSource, listSources, openSourcesFolder, saveSource } from './sources.ts';
-import { estimate } from './prices.ts';
+import { estimate, PER_WRITE_USD } from './prices.ts';
 import { Templates } from './Templates.tsx';
 import { Shots } from './Shots.tsx';
 import { HostProvider } from './provider.ts';
@@ -240,6 +248,14 @@ export function App() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [cardsOpen, setCardsOpen] = useState(false);
   const [keptOpen, setKeptOpen] = useState(false);
+
+  const [varyAxis, setVaryAxis] = useState<VaryAxis>('subject');
+  const [varyCount, setVaryCount] = useState(8);
+  const [varyDeck, setVaryDeck] = useState('');
+  const [drawn, setDrawn] = useState<DeckEntry | null>(null);
+  const [variations, setVariations] = useState<Variation[]>([]);
+  const [openVariant, setOpenVariant] = useState<string | null>(null);
+  const [varying, setVarying] = useState(false);
   const [kept, setKept] = useState<SavedSource[]>([]);
 
   const refreshKept = (): void => {
@@ -814,6 +830,52 @@ export function App() {
       templateId !== '' || attached.length > 1 || (attached.length > 0 && idea.trim() !== '');
     return estimate(unread, composes || attached.length === 0);
   })();
+
+  /**
+   * Many versions of the document, along one axis.
+   *
+   * One call rather than one per version: separate calls have no idea what the
+   * others said, and produce variants that differ only in wording.
+   */
+  const makeVariations = async (): Promise<void> => {
+    if ('error' in parsed || varying) return;
+
+    setExtractError(null);
+    setVarying(true);
+
+    const deck = decks.find((d) => d.id === varyDeck);
+    const card = deck ? (drawFrom(deck) ?? null) : null;
+    setDrawn(card);
+
+    try {
+      const { variants } = await vary(gateway, parsed.ir, {
+        axis: varyAxis,
+        count: varyCount,
+        ...(card ? { nudge: card } : {}),
+      });
+
+      // Compiled here, so the list can say which of them a rule would block
+      // before anyone opens one.
+      setVariations(
+        variants.map((variant) => {
+          const ir = applyVariant(parsed.ir, varyAxis, variant);
+          return { label: ir.title ?? 'a version', compiled: compile(ir, profile) };
+        }),
+      );
+      setOpenVariant(null);
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setVarying(false);
+      refreshCache();
+    }
+  };
+
+  const variationFiles = (): OutFile[] =>
+    variations.map((v, i) => ({
+      name: `${slug()}_${String(i + 1).padStart(2, '0')}_${profile.id}.txt`,
+      contents: toDocument(v.compiled.render, profile, { title: v.label }),
+    }));
 
   /**
    * The one action: whatever the words and the references add up to.
@@ -1710,6 +1772,61 @@ export function App() {
               <p className="err">This is not valid JSON: {parsed.error}</p>
             ) : null}
           </div>
+
+          {!('error' in parsed) ? (
+            <Variations
+              axis={varyAxis}
+              count={varyCount}
+              deckId={varyDeck}
+              decks={decks}
+              drawn={drawn}
+              variations={variations}
+              selected={openVariant}
+              working={varying}
+              saved={savedTo}
+              cost={PER_WRITE_USD * 2}
+              onAxis={(next) => {
+                setVaryAxis(next);
+                // A deck belongs to an axis; one that no longer fits is dropped
+                // rather than left selected and unusable.
+                if (varyDeck && !decksFor(decks, next).some((d) => d.id === varyDeck)) {
+                  setVaryDeck('');
+                }
+              }}
+              onCount={setVaryCount}
+              onDeck={setVaryDeck}
+              onMake={() => void makeVariations()}
+              onSelect={setOpenVariant}
+              onUse={(label) => {
+                const found = variations.find((v) => v.label === label);
+                if (found) showIR(found.compiled.ir);
+              }}
+              onCopyAll={() =>
+                void navigator.clipboard
+                  .writeText(variationFiles().map((f) => f.contents).join('\n\n'))
+                  .then(() => {
+                    setCopied(true);
+                    window.setTimeout(() => setCopied(false), 1600);
+                  })
+              }
+              onSaveAll={() =>
+                void savePromptsTo(variationFiles()).then(
+                  (dir) => {
+                    if (dir) {
+                      setSavedTo(dir);
+                      void showFolder(dir);
+                    }
+                  },
+                  (e: unknown) => setExtractError(e instanceof Error ? e.message : String(e)),
+                )
+              }
+              onClear={() => {
+                setVariations([]);
+                setOpenVariant(null);
+                setDrawn(null);
+              }}
+            />
+          ) : null}
 
           {sequence && compiledSeq ? (
             <Shots
