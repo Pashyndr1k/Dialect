@@ -12,13 +12,26 @@ import type { ImagePart, ProviderUsage } from '../providers/types.ts';
 import type { Modality, PromptIR } from '../ir/types.ts';
 import { IR_VERSION } from '../ir/types.ts';
 import { EXTRACTION_VERSION, ExtractedScene } from './schema.ts';
-import { EXTRACTION_INSTRUCTION, EXTRACTION_SYSTEM } from './prompt.ts';
+import {
+  EXTRACTION_INSTRUCTION,
+  EXTRACTION_INSTRUCTION_MANY,
+  EXTRACTION_SYSTEM,
+  notedInstruction,
+} from './prompt.ts';
 
 export interface ExtractOptions {
   /** Label recorded in provenance, normally the file name. */
   reference: string;
   /** What the resulting IR is for. Defaults to a still. */
   modality?: Modality;
+  /**
+   * What the person said alongside the reference.
+   *
+   * Not a second reference and not a separate call: one reading, of a picture
+   * and a sentence together, because a document assembled from two answers
+   * agrees with neither.
+   */
+  note?: string;
 }
 
 export interface ExtractResult {
@@ -101,15 +114,29 @@ export function sceneToIR(
   return ir;
 }
 
-export async function extractFromImage(
+/**
+ * Several stills at once, read as one scene.
+ *
+ * A style reference and a character reference are two pictures of one intention,
+ * and the only way to get a document that honours both is to show them together
+ * — two readings merged afterwards would each be internally consistent and
+ * disagree with each other.
+ */
+export async function extractFromImages(
   gateway: Gateway,
-  image: ImagePart,
+  images: ImagePart[],
   options: ExtractOptions,
 ): Promise<ExtractResult> {
+  if (images.length === 0) {
+    throw new Error('No reference to read: nothing was attached.');
+  }
+
+  const base = images.length > 1 ? EXTRACTION_INSTRUCTION_MANY : EXTRACTION_INSTRUCTION;
+
   const result = await gateway.extract({
     system: EXTRACTION_SYSTEM,
-    instruction: EXTRACTION_INSTRUCTION,
-    images: [image],
+    instruction: options.note?.trim() ? notedInstruction(base, options.note) : base,
+    images,
     schema: ExtractedScene,
     schemaVersion: EXTRACTION_VERSION,
   });
@@ -122,3 +149,9 @@ export async function extractFromImage(
     key: result.key,
   };
 }
+
+export const extractFromImage = (
+  gateway: Gateway,
+  image: ImagePart,
+  options: ExtractOptions,
+): Promise<ExtractResult> => extractFromImages(gateway, [image], options);

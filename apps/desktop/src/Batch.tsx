@@ -80,9 +80,7 @@ export function References({
       </div>
 
       {items.length === 0 ? (
-        <p className="rows-empty">
-          Whatever you bring in above is listed here, and stays listed while the window is open.
-        </p>
+        <p className="rows-empty">Nothing read yet.</p>
       ) : null}
 
       <ul className="rows-b">

@@ -19,6 +19,10 @@ import type { PromptIR } from '../ir/types.ts';
 import { CAMERA_MOVES, IR_VERSION } from '../ir/types.ts';
 import { ExtractedScene } from './schema.ts';
 import { sceneToIR } from './image.ts';
+import { notedInstruction } from './prompt.ts';
+
+const withNote = (base: string, note?: string): string =>
+  note?.trim() ? notedInstruction(base, note) : base;
 
 /** Bumped whenever this schema or the prompt below changes. */
 export const SHOT_VERSION = '1';
@@ -69,6 +73,8 @@ export const SHOT_INSTRUCTION =
 export interface ShotOptions {
   /** Label recorded in provenance, normally the file name. */
   reference: string;
+  /** What the person said alongside the clip. See `ExtractOptions.note`. */
+  note?: string;
   /** From the container, so the model is not asked to guess it. */
   durationS?: number;
   aspectRatio?: string;
@@ -123,10 +129,12 @@ export async function extractFromVideo(
     // The duration goes in the question rather than the schema: it is known,
     // and asking a model to guess something already measured invites a wrong
     // answer that then has to be corrected.
-    instruction:
+    instruction: withNote(
       options.durationS === undefined
         ? SHOT_INSTRUCTION
         : `${SHOT_INSTRUCTION} The clip runs ${options.durationS.toFixed(1)} seconds.`,
+      options.note,
+    ),
     images: frames,
     schema: ExtractedShot,
     schemaVersion: SHOT_VERSION,

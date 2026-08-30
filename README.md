@@ -138,64 +138,43 @@ size from the same angle, a camera that never stops doing the same thing. They
 read what the prompts actually say rather than what the shots store, so a move
 inherited from the world is counted like one that was typed.
 
-## Four ways in
+## One block
 
-A sentence, a voice, a file, a folder of them. One block, one choice, and then
-only what that choice needs — never controls for a thing nobody is doing.
+What you want, and what you brought. They are not two channels: a sentence
+narrows a reference and a reference grounds a sentence, and either alone is a
+fair answer — so there is one box, one row of attachments, and one button that
+does whatever the two of them add up to.
 
-Nothing is dropped on the page any more. ffmpeg needs a path and a web view
-cannot give it one, so every reference is chosen; the host reads bytes off disk,
-draws the thumbnail, and lists what a folder holds.
+They go to the model as **one question**. A document assembled from two answers
+— one that read the picture, one that read the words — agrees with neither. So
+the reference goes in as what exists, the words as what is wanted, and the
+answer comes back as a description of the result rather than as a note about a
+change.
 
-Which of the three ways a reference gets read is decided from its extension, in
-one list shared by the file dialog, the folder scan and the reader. Three copies
-of a list of extensions is three chances for `.m4v` to work in one place and not
-another.
+A chosen reference is attached, not read. Nothing is spent until the button is
+pressed, because what a reference costs depends on what gets typed next to it.
+Stills accumulate — a style reference and a character reference are two pictures
+of one intention — while a clip or a track is exclusive, since there is no
+sensible reading of a song and a photograph at once.
 
-Speaking is not its own destination: the words land in the same box typing
-fills, to be corrected before anything is spent on them. Recording happens in
-the window because only it has a microphone; transcribing happens on the host,
-because that is either a program on PATH or a request carrying a key. A whisper
-on PATH is preferred — free, private, no key — and a transcription API is the
-fallback. Where neither is there the button says which one to add rather than
-doing nothing quietly.
+Speaking is not a third thing. It is a way of filling the box, so it is an icon
+beside the box, and the words land there to be corrected before anything is
+spent on them. Recording happens in the window because only it has a microphone;
+transcribing happens on the host, because that is either a program on PATH or a
+request carrying a key. A whisper on PATH is preferred — free, private, no key —
+with a transcription API as the fallback.
 
-A folder scan does not descend. A folder of references is a folder of
-references, and walking into a subfolder called `old` and reading forty more is
-a bill nobody asked for. It sorts the way a person numbered things, so `shot_2`
-comes before `shot_10`.
+Nothing is dropped on the page. ffmpeg needs a path and a web view cannot give
+it one, so every reference is chosen; the host reads bytes off disk, draws the
+thumbnail, and lists what a folder holds. Which of the three ways a reference
+gets read is decided from its extension, in one list shared by the file dialog,
+the folder scan and the reader.
 
-## Templates from a prompt that works
+A folder is the same question asked of many references: whatever is in the box,
+and whichever template is chosen, applies to every one of them. Twenty character
+sheets are twenty readings of one intention.
 
-Someone has a prompt they trust and wants fifty more like it, each about a
-different character. The job is not to improve their prompt — it works, that is
-why it is here. The job is to find its seams.
-
-Everything describing *this particular subject* becomes a hole. Everything
-describing *how the thing is made* — the rendering, the framing, the light, the
-material language, the things to avoid — stays word for word. That fixed half is
-why the prompt works, and paraphrasing it is how a template stops working.
-
-At most five holes, and fewer is better: someone with a few words about their
-next character is not filling in a questionnaire. One hole for who they are
-beats seven for eyes, hair, jaw, build, boots, cloak, scars.
-
-Each variable keeps the value the example itself used, which is what makes the
-split checkable. The template is applied to its own defaults and rendered
-straight back: if that does not read like what was pasted in, the seam was drawn
-in the wrong place, and it can be seen before fifty prompts are built on top of
-it.
-
-A kind — text2img, img2img, text2vid, img2vid — sets the structural slots rather
-than asking for them, so a template that says it starts from an image has a
-start frame in it. A cast of one or two says how many people it carries, and two
-must stay distinguishable.
-
-They are saved as files beside the built-in ones, read by the same parser. A
-custom template cannot mean something a shipped one could not, and a word in one
-can be fixed in any editor.
-
-## Writing from an idea
+A folder scan does not descend.## Writing from an idea
 
 The opposite job to reading a reference, and it needs the opposite instruction.
 Reading says: describe what is there, and where the picture does not tell you,

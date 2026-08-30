@@ -278,7 +278,7 @@ export async function mediaTools(): Promise<MediaTools> {
  * absurd. So files are chosen, and only paths travel — for every kind, because
  * one button cannot take three kinds if one of them arrives differently.
  */
-export async function pickReferences(): Promise<string[]> {
+export async function pickReferences(imagesOnly = false): Promise<string[]> {
   if (!hasHost()) {
     throw new Error('Choosing files needs the desktop app.');
   }
@@ -287,12 +287,16 @@ export async function pickReferences(): Promise<string[]> {
   const picked = await open({
     multiple: true,
     title: 'Choose references',
-    filters: [
-      { name: 'References', extensions: [...ALL_EXTENSIONS] },
-      { name: 'Images', extensions: [...EXTENSIONS.image] },
-      { name: 'Video', extensions: [...EXTENSIONS.video] },
-      { name: 'Audio', extensions: [...EXTENSIONS.audio] },
-    ],
+    // Without ffmpeg a clip cannot be read at all, so it is not offered rather
+    // than accepted and refused later.
+    filters: imagesOnly
+      ? [{ name: 'Images', extensions: [...EXTENSIONS.image] }]
+      : [
+          { name: 'References', extensions: [...ALL_EXTENSIONS] },
+          { name: 'Images', extensions: [...EXTENSIONS.image] },
+          { name: 'Video', extensions: [...EXTENSIONS.video] },
+          { name: 'Audio', extensions: [...EXTENSIONS.audio] },
+        ],
   });
 
   if (typeof picked === 'string') return [picked];

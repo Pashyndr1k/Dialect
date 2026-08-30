@@ -21,7 +21,7 @@ import {
   sequenceFromIR,
   sequenceToDocument,
   extractFromAudio,
-  extractFromImage,
+  extractFromImages,
   extractFromVideo,
   expandIdea,
   fillTemplate,
@@ -55,7 +55,7 @@ import { createQueue, runQueue } from '@dialect/core';
 import { PromptActions, References, type BatchItem } from './Batch.tsx';
 import { Library } from './Library.tsx';
 import { Fields } from './Fields.tsx';
-import { Input, type InputMode } from './Input.tsx';
+import { Input } from './Input.tsx';
 import { Templates } from './Templates.tsx';
 import { Shots } from './Shots.tsx';
 import { HostProvider } from './provider.ts';
@@ -156,6 +156,9 @@ function parseIR(text: string): { ir: PromptIR } | { error: string } {
  */
 const SURE_ENOUGH = 0.25;
 
+/** More stills than this in one prompt stops adding anything and starts costing. */
+const MAX_ATTACHED = 4;
+
 export function App() {
   const [irText, setIrText] = useState(() => JSON.stringify(imageExample, null, 2));
   const [target, setTarget] = useState('nano-banana-2');
@@ -171,10 +174,12 @@ export function App() {
   const folderInput = useRef<HTMLInputElement>(null);
 
   /** What the user typed instead of, or as well as, bringing a reference. */
-  const [mode, setMode] = useState<InputMode>('describe');
   const [idea, setIdea] = useState('');
+  /** References attached to what is being written, not yet read. */
+  const [attached, setAttached] = useState<Source[]>([]);
   const [templateId, setTemplateId] = useState('');
   const [writing, setWriting] = useState(false);
+  const asked = useRef({ note: '', templateId: '' });
 
   const [canSpeak, setCanSpeak] = useState(false);
   const [speakNote, setSpeakNote] = useState('Checking what can transcribe…');
@@ -350,8 +355,9 @@ export function App() {
    * reading — filing it in the library under a name and a picture, clearing a
    * stale error when the answer came free — is the same either way.
    */
-  const readOne = async (source: Source): Promise<PromptIR> => {
-    const { ir, key, thumb, cached } = await readByKind(source);
+  const readOne = async (sources: Source[]): Promise<PromptIR> => {
+    const source = sources[0]!;
+    const { ir, key, thumb, cached } = await readByKind(sources);
 
     // Filed under a name and a picture, so what was paid for can be found
     // again. A cached read still refreshes the date — it was used today.
@@ -369,32 +375,59 @@ export function App() {
     return ir;
   };
 
+  /**
+   * One reading, of everything that was brought and everything that was said.
+   *
+   * A note and a template are not second passes over the answer: they go into
+   * the same question, because a document assembled from two answers agrees
+   * with neither of them. What the kind decides is only how the reference is
+   * turned into something a model can look at.
+   */
   const readByKind = async (
-    source: Source,
+    sources: Source[],
   ): Promise<{ ir: PromptIR; key: string; cached: boolean; thumb?: string }> => {
-    if (source.kind === 'video') {
-      const path = source.path!;
+    const first = sources[0];
+    if (!first) throw new Error('nothing to read');
+
+    const { note, templateId: template } = asked.current;
+    const reference =
+      sources.length === 1 ? first.name : `${first.name} +${sources.length - 1}`;
+
+    const through = async (
+      parts: Array<{ mediaType: string; base64: string }>,
+      plain: () => Promise<{ ir: PromptIR; key: string; cached: boolean }>,
+    ) =>
+      template
+        ? await fillTemplate(gateway, note, activeLibrary, template, parts)
+        : await plain();
+
+    if (first.kind === 'video') {
+      const path = first.path!;
       const probe = await probeVideo(path);
       const frames = await videoFrames(path, 5);
+      const parts = frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 }));
 
-      const { ir, key, cached } = await extractFromVideo(
-        gateway,
-        frames.map((f) => ({ mediaType: 'image/jpeg', base64: f.base64 })),
-        { reference: source.name, durationS: probe.duration_s, aspectRatio: probe.aspect_ratio },
+      const { ir, key, cached } = await through(parts, () =>
+        extractFromVideo(gateway, parts, {
+          reference,
+          durationS: probe.duration_s,
+          aspectRatio: probe.aspect_ratio,
+          ...(note ? { note } : {}),
+        }),
       );
       // The first frame stands in for the clip.
       return { ir, key, cached, thumb: `data:image/jpeg;base64,${frames[0]!.base64}` };
     }
 
-    if (source.kind === 'audio') {
-      const m = await measureAudio(source.path!);
+    if (first.kind === 'audio') {
+      const m = await measureAudio(first.path!);
+      const parts = m.pictures.map((p) => ({ mediaType: 'image/jpeg', base64: p.base64 }));
 
-      const { ir, key, cached } = await extractFromAudio(
-        gateway,
-        m.pictures.map((picture) => ({ mediaType: 'image/jpeg', base64: picture.base64 })),
-        {
-          reference: source.name,
+      const { ir, key, cached } = await through(parts, () =>
+        extractFromAudio(gateway, parts, {
+          reference,
           durationS: m.probe.duration_s,
+          ...(note ? { note } : {}),
           ...(m.tempo && m.tempo.confidence > SURE_ENOUGH ? { bpm: m.tempo.bpm } : {}),
           ...(m.key && m.key.confidence > SURE_ENOUGH ? { musicalKey: m.key.name } : {}),
           ...(m.lufs !== null ? { lufs: m.lufs } : {}),
@@ -402,31 +435,30 @@ export function App() {
           ...(m.probe.title ? { title: m.probe.title } : {}),
           ...(m.probe.artist ? { artist: m.probe.artist } : {}),
           ...(m.probe.genre ? { taggedGenre: m.probe.genre } : {}),
-        },
+        }),
       );
 
-      const first = m.pictures[0];
+      const picture = m.pictures[0];
       return {
         ir,
         key,
         cached,
-        ...(first ? { thumb: `data:image/jpeg;base64,${first.base64}` } : {}),
+        ...(picture ? { thumb: `data:image/jpeg;base64,${picture.base64}` } : {}),
       };
     }
 
-    const base64 = source.file
-      ? await toBase64(source.file)
-      : (await readFile(source.path!)).base64;
-
-    const { ir, key, cached } = await extractFromImage(
-      gateway,
-      { mediaType: source.file?.type || mediaTypeOf(source.name), base64 },
-      { reference: source.name },
+    const parts = await Promise.all(
+      sources.map(async (source) => ({
+        mediaType: source.file?.type || mediaTypeOf(source.name),
+        base64: source.file ? await toBase64(source.file) : (await readFile(source.path!)).base64,
+      })),
     );
 
-    const thumb = source.file
-      ? await thumbnail(source.file)
-      : await thumbOf(source.path!);
+    const { ir, key, cached } = await through(parts, () =>
+      extractFromImages(gateway, parts, { reference, ...(note ? { note } : {}) }),
+    );
+
+    const thumb = first.file ? await thumbnail(first.file) : await thumbOf(first.path!);
     return { ir, key, cached, ...(thumb ? { thumb } : {}) };
   };
 
@@ -484,7 +516,7 @@ export function App() {
       setExtracting(source.name);
 
       try {
-        const ir = await readOne(source);
+        const ir = await readOne([source]);
         results.current.set(source.name, ir);
         showIR(ir);
         setPromptOf(source.name);
@@ -526,11 +558,37 @@ export function App() {
       else needsApp += 1;
     }
 
-    await takeSources(sources, skipped);
+    attach(sources);
+    if (skipped > 0) setExtractError(`Skipped ${skipped} file(s) this cannot read.`);
 
     if (needsApp > 0 && sources.length === 0) {
       setExtractError('Clips and tracks need the desktop app: a browser cannot reach ffmpeg.');
     }
+  };
+
+  /**
+   * Chosen references are attached, not read.
+   *
+   * Nothing is spent until the button is pressed, because what a reference
+   * costs depends on what is typed next to it — and because a picture and a
+   * sentence go to the model together or not at all.
+   *
+   * Stills accumulate: a style reference and a character reference are two
+   * pictures of one intention. A clip or a track is exclusive, because there is
+   * no sensible reading of a song and a photograph at once.
+   */
+  const attach = (incoming: Source[]): void => {
+    if (incoming.length === 0) return;
+    setExtractError(null);
+
+    setAttached((prev) => {
+      const exclusive = incoming.find((s) => s.kind !== 'image');
+      if (exclusive) return [exclusive];
+
+      const kept = prev.filter((s) => s.kind === 'image');
+      const fresh = incoming.filter((s) => !kept.some((k) => k.name === s.name));
+      return [...kept, ...fresh].slice(0, MAX_ATTACHED);
+    });
   };
 
   /** Files chosen through the dialog: every kind, by path. */
@@ -541,8 +599,9 @@ export function App() {
     }
 
     try {
-      const paths = await pickReferences();
-      await takeSources(...sourcesFrom(paths));
+      const [sources, skipped] = sourcesFrom(await pickReferences(!canReadMedia));
+      attach(sources);
+      if (skipped > 0) setExtractError(`Skipped ${skipped} file(s) this cannot read.`);
     } catch (err) {
       setExtractError(err instanceof Error ? err.message : String(err));
     }
@@ -579,26 +638,63 @@ export function App() {
    * have put it — there is only one kind of document, and nothing downstream
    * cares which way it arrived.
    */
-  const writeFromIdea = async (): Promise<void> => {
-    if (!idea.trim() || writing) return;
+  /**
+   * The one action: whatever the words and the references add up to.
+   *
+   * With both, the reference is what exists and the words are what is wanted,
+   * and they go as one question. With only one of them, that one is the whole
+   * of it. A template, when chosen, decides everything neither of them said.
+   */
+  const makePrompt = async (): Promise<void> => {
+    if (writing || (!idea.trim() && attached.length === 0)) return;
 
     setExtractError(null);
     setWriting(true);
-    const label = ideaLabel(idea);
+    asked.current = { note: idea.trim(), templateId };
+
+    const label =
+      attached.length > 0
+        ? attached[0]!.name
+        : idea.trim()
+          ? ideaLabel(idea)
+          : (templates.find((t) => t.id === templateId)?.name ?? 'prompt');
 
     try {
+      if (attached.length > 0) {
+        // Held under its own name, so the list, the preview and the library all
+        // agree about what this prompt came from.
+        for (const source of attached) held.current.set(source.name, source);
+        setBatch((prev) => [
+          { id: label, name: label, state: 'running' as const },
+          ...prev.filter((i) => i.id !== label),
+        ]);
+        setActiveRef(label);
+
+        const ir = await readOne(attached);
+        results.current.set(label, ir);
+        showIR(ir);
+        setPromptOf(label);
+        setBatch((prev) => prev.map((i) => (i.id === label ? { ...i, state: 'done' } : i)));
+        setAttached([]);
+        return;
+      }
+
       const { ir } = templateId
         ? await fillTemplate(gateway, idea, activeLibrary, templateId)
         : await expandIdea(gateway, idea, { modality: modalityOfFamily(profile.family) });
 
       results.current.set(label, ir);
       showIR(ir);
-      // Not held as a reference: there is no file to preview and nothing to
-      // re-read, so it belongs in the prompt header and nowhere else.
+      // Nothing to preview and nothing to re-read: it belongs in the prompt
+      // header and nowhere else.
       setActiveRef(null);
       setPromptOf(label);
     } catch (err) {
-      setExtractError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setExtractError(message);
+      setBatch((prev) =>
+        prev.map((i) => (i.id === label ? { ...i, state: 'failed', error: message } : i)),
+      );
     } finally {
       setWriting(false);
       refreshCache();
@@ -739,6 +835,9 @@ export function App() {
   const runBatch = async (): Promise<void> => {
     setExtractError(null);
     setRunning(true);
+    // Whatever is in the box applies to every reference in the run: twenty
+    // character sheets are twenty readings of one intention.
+    asked.current = { note: idea.trim(), templateId };
 
     const controller = new AbortController();
     abort.current = controller;
@@ -764,7 +863,7 @@ export function App() {
         work: async (item) => {
           const source = held.current.get(item.id);
           if (!source) throw new Error('that file is no longer here');
-          results.current.set(item.id, await readOne(source));
+          results.current.set(item.id, await readOne([source]));
           return item.id;
         },
       });
@@ -902,6 +1001,7 @@ export function App() {
     setPromptOf(null);
     setSavedTo(null);
     setExtractError(null);
+    setAttached([]);
     showIR(exampleFor(profile.family) as PromptIR);
   };
 
@@ -1105,25 +1205,23 @@ export function App() {
           />
 
           <Input
-            mode={mode}
             idea={idea}
+            attached={attached.map((a) => ({ name: a.name, kind: a.kind }))}
             templateId={templateId}
             templates={templates}
-            writing={writing}
+            working={writing ? 'Working…' : extracting ? `Reading ${extracting}…` : null}
             recording={recording}
             hearing={hearing}
-            busy={extracting}
-            noKey={hasKey === false}
             canSpeak={canSpeak}
             speakNote={speakNote}
-            canReadMedia={canReadMedia}
-            onMode={setMode}
+            noKey={hasKey === false}
             onIdea={setIdea}
             onTemplate={setTemplateId}
-            onWrite={() => void writeFromIdea()}
+            onGo={() => void makePrompt()}
             onRecord={() => void startSpeaking()}
             onStopRecording={() => void stopSpeaking()}
-            onFile={() => void chooseReferences()}
+            onAttach={() => void chooseReferences()}
+            onDetach={(name) => setAttached((prev) => prev.filter((a) => a.name !== name))}
             onFolder={() => void chooseFolder()}
             onTemplates={() => setTemplatesOpen(true)}
           />
@@ -1335,11 +1433,7 @@ export function App() {
               >
                 Make a sequence
               </button>
-              <p className="quiet">
-                Several shots that share this document — one man, one room, four cuts. What is
-                written above is stated once and repeated in every shot, which is what stops it
-                drifting.
-              </p>
+              <p className="quiet">Several shots that share this document.</p>
             </div>
           ) : null}
         </section>

@@ -22,7 +22,7 @@
 
 import { z } from 'zod';
 import type { Gateway } from '../providers/gateway.ts';
-import type { ProviderUsage } from '../providers/types.ts';
+import type { ImagePart, ProviderUsage } from '../providers/types.ts';
 import type { Modality, PromptIR } from '../ir/types.ts';
 import { ExtractedScene } from './schema.ts';
 import { sceneToIR } from './image.ts';
@@ -121,6 +121,18 @@ person who wrote the template, and they are the point of using one.
 Decide rather than hedge, and keep whatever the idea already said. Where the
 idea is silent, choose something that suits it. Describe what a camera would
 record, and avoid words that only assert quality.`;
+
+export const TEMPLATE_WITH_REFERENCE_SYSTEM = `${TEMPLATE_SYSTEM}
+
+You are also shown a reference. Fill the fields from what is actually in it,
+described concretely enough to be rebuilt — not from what it reminds you of.
+
+Where their words touch something the reference shows, follow their words and
+write the result as though it were already in front of you. Everything they did
+not touch stays as the reference has it.
+
+The template's own fixed parts are not yours to reproduce: answer the fields and
+nothing else.`;
 
 export interface IdeaOptions {
   /** What is being made. Normally the target model's family. */
@@ -234,8 +246,11 @@ export async function fillTemplate(
   idea: string,
   library: Library,
   templateId: string,
+  images: ImagePart[] = [],
 ): Promise<TemplateIdeaResult> {
-  if (words(idea).length === 0) throw new EmptyIdeaError();
+  // With a reference in hand there is something to fill the template from, so
+  // words stop being the only source and stop being required.
+  if (words(idea).length === 0 && images.length === 0) throw new EmptyIdeaError();
 
   const template = library.templates.get(templateId);
   if (!template) {
@@ -266,10 +281,16 @@ export async function fillTemplate(
     ),
   );
 
+  const said = idea.trim();
   const result = await gateway.extract({
-    system: TEMPLATE_SYSTEM,
+    system: images.length > 0 ? TEMPLATE_WITH_REFERENCE_SYSTEM : TEMPLATE_SYSTEM,
+    ...(images.length > 0 ? { images } : {}),
     instruction: [
-      `The idea, in their words: "${idea.trim()}"`,
+      images.length > 0
+        ? said
+          ? `A reference, and what they said about it: "${said}"`
+          : 'A reference, and nothing said about it — take the fields from what is there.'
+        : `The idea, in their words: "${said}"`,
       `The template is "${template.name}"${template.description ? `: ${template.description.trim().replace(/\s+/g, ' ')}` : ''}`,
     ].join('\n'),
     schema,
@@ -284,7 +305,7 @@ export async function fillTemplate(
   const applied = applyTemplate(library, templateId, { values });
 
   return {
-    ir: { ...applied.ir, title: applied.ir.title ?? ideaLabel(idea) },
+    ir: { ...applied.ir, title: applied.ir.title ?? (said ? ideaLabel(said) : template.name) },
     values: applied.used,
     usage: result.usage,
     cached: result.cached,

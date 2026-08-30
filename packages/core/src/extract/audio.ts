@@ -21,6 +21,10 @@ import type { Gateway } from '../providers/gateway.ts';
 import type { ImagePart, ProviderUsage } from '../providers/types.ts';
 import type { PromptIR } from '../ir/types.ts';
 import { IR_VERSION } from '../ir/types.ts';
+import { notedInstruction } from './prompt.ts';
+
+const withNote = (base: string, note?: string): string =>
+  note?.trim() ? notedInstruction(base, note) : base;
 
 /** Bumped whenever this schema or the prompt below changes. */
 export const SONG_VERSION = '1';
@@ -73,6 +77,8 @@ you below. Do not restate them and do not contradict them.`;
 export interface SongMeasurements {
   /** Label recorded in provenance, normally the file name. */
   reference: string;
+  /** What the person said alongside the track. See `ExtractOptions.note`. */
+  note?: string;
   durationS?: number;
   bpm?: number;
   /** e.g. `A minor`. */
@@ -186,10 +192,13 @@ export async function extractFromAudio(
 
   const result = await gateway.extract({
     system: SONG_SYSTEM,
-    instruction: [
-      `${named} Describe this track so something like it could be written.`,
-      ...measurementLines(m),
-    ].join(' '),
+    instruction: withNote(
+      [
+        `${named} Describe this track so something like it could be written.`,
+        ...measurementLines(m),
+      ].join(' '),
+      m.note,
+    ),
     images: pictures,
     schema: ExtractedSong,
     schemaVersion: SONG_VERSION,

@@ -1,218 +1,158 @@
 import type { Template } from '@dialect/core';
 
 /**
- * Four ways in, one block.
+ * One block: what you want, and what you brought.
  *
- * They are four because they are four different things someone might have: a
- * sentence, a voice, a file, a folder of them. Not four buttons in a row — one
- * choice, and then only what that choice needs, so the panel is never showing
- * controls for a thing nobody is doing.
+ * They are not two channels. A sentence narrows a reference and a reference
+ * grounds a sentence, and either alone is a fair answer — so there is one box,
+ * one row of attachments, and one button that does whatever the two of them add
+ * up to.
  *
- * Speaking is not its own destination: it fills the same box describing does,
- * and the words land there to be corrected before they are spent on.
+ * Speaking is not a third thing. It is a way of filling the box, so it is an
+ * icon beside the box.
  */
 
-export const MODES = ['describe', 'speak', 'file', 'folder'] as const;
-export type InputMode = (typeof MODES)[number];
+/** Roughly what one call costs. Small, but not nothing, so it is shown. */
+export const PER_CALL_USD = 0.02;
 
-const MODE_LABEL: Record<InputMode, string> = {
-  describe: 'Describe',
-  speak: 'Speak',
-  file: 'Reference',
-  folder: 'Folder',
-};
+export interface Attachment {
+  name: string;
+  kind: 'image' | 'video' | 'audio';
+}
 
-const MODE_TITLE: Record<InputMode, string> = {
-  describe: 'Type a few words and let the app write the rest',
-  speak: 'Say it instead of typing it',
-  file: 'A still, a clip or a track — read as whatever it is',
-  folder: 'Every reference in one folder, read as a batch',
-};
-
-/** Roughly what one write costs. Small, but not nothing, so it is shown. */
-export const PER_IDEA_USD = 0.02;
+function Mic({ recording }: { recording: boolean }) {
+  return recording ? (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="4" y="4" width="8" height="8" rx="1.5" fill="currentColor" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none">
+      <rect x="6" y="2" width="4" height="7" rx="2" fill="currentColor" />
+      <path
+        d="M3.75 7.25v.5a4.25 4.25 0 0 0 8.5 0v-.5M8 12.25V14"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export function Input({
-  mode,
   idea,
+  attached,
   templateId,
   templates,
-  writing,
+  working,
   recording,
   hearing,
-  busy,
-  noKey,
   canSpeak,
   speakNote,
-  canReadMedia,
-  onMode,
+  noKey,
   onIdea,
   onTemplate,
-  onWrite,
+  onGo,
   onRecord,
   onStopRecording,
-  onFile,
+  onAttach,
+  onDetach,
   onFolder,
   onTemplates,
 }: {
-  mode: InputMode;
   idea: string;
+  attached: Attachment[];
   templateId: string;
   templates: Template[];
-  writing: boolean;
+  /** Reading, writing, or both — the label the button carries while it runs. */
+  working: string | null;
   recording: boolean;
   hearing: boolean;
-  /** A reference is being read, so the panel says so instead of taking more. */
-  busy: string | null;
-  noKey: boolean;
   canSpeak: boolean;
-  /** What is missing, when speaking is not available. */
   speakNote: string;
-  canReadMedia: boolean;
-  onMode: (next: InputMode) => void;
+  noKey: boolean;
   onIdea: (next: string) => void;
   onTemplate: (next: string) => void;
-  onWrite: () => void;
+  onGo: () => void;
   onRecord: () => void;
   onStopRecording: () => void;
-  onFile: () => void;
+  onAttach: () => void;
+  onDetach: (name: string) => void;
   onFolder: () => void;
   onTemplates: () => void;
 }) {
-  const chosen = templates.find((t) => t.id === templateId);
-  const ready = idea.trim().length > 0 && !writing && !noKey;
-  const words = mode === 'describe' || mode === 'speak';
+  const ready = (idea.trim().length > 0 || attached.length > 0) && !working && !noKey;
 
   return (
     <div className="in">
-      <div className="in-tabs" role="tablist">
-        {MODES.map((m) => (
-          <button
-            key={m}
-            role="tab"
-            aria-selected={mode === m}
-            className={`in-tab${mode === m ? ' on' : ''}`}
-            title={MODE_TITLE[m]}
-            onClick={() => onMode(m)}
-          >
-            {MODE_LABEL[m]}
-          </button>
-        ))}
+      <div className="in-say">
+        <textarea
+          className="idea-t"
+          rows={3}
+          spellCheck={false}
+          placeholder="What you want"
+          value={idea}
+          onChange={(e) => onIdea(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && ready) onGo();
+          }}
+        />
+        <button
+          className={`mic${recording ? ' on' : ''}`}
+          disabled={!canSpeak || hearing}
+          title={recording ? 'Stop and write it down' : canSpeak ? 'Dictate' : speakNote}
+          aria-label={recording ? 'Stop dictating' : 'Dictate'}
+          onClick={recording ? onStopRecording : onRecord}
+        >
+          {hearing ? <span className="mic-w" /> : <Mic recording={recording} />}
+        </button>
       </div>
 
-      <div className="in-body">
-        {busy ? <p className="drop-busy">Reading {busy}…</p> : null}
-
-        {mode === 'speak' ? (
-          <div className="in-rec">
-            {recording ? (
-              <button className="solid rec" onClick={onStopRecording}>
-                <span className="dotr" /> Stop and write it down
-              </button>
-            ) : (
+      {attached.length > 0 ? (
+        <ul className="refs">
+          {attached.map((a) => (
+            <li key={a.name} className={`ref ${a.kind}`}>
+              <span className="ref-n">{a.name}</span>
               <button
-                className="solid"
-                disabled={!canSpeak || hearing}
-                title={canSpeak ? 'Record what you say' : speakNote}
-                onClick={onRecord}
+                className="ref-x"
+                aria-label={`Remove ${a.name}`}
+                onClick={() => onDetach(a.name)}
               >
-                {hearing ? 'Listening back…' : 'Start speaking'}
+                {'×'}
               </button>
-            )}
-            <span className="quiet">
-              {recording
-                ? 'Recording. It stops and transcribes when you press the button.'
-                : hearing
-                  ? 'Turning it into words…'
-                  : canSpeak
-                    ? 'The words land in the box below, to correct before you spend on them.'
-                    : speakNote}
-            </span>
-          </div>
-        ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-        {words ? (
-          <>
-            <textarea
-              className="idea-t"
-              rows={3}
-              spellCheck={false}
-              placeholder="A few words about what you want — one is enough"
-              value={idea}
-              onChange={(e) => onIdea(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && ready) onWrite();
-              }}
-            />
+      <div className="in-row">
+        <button className="ghost" onClick={onAttach}>
+          Reference
+        </button>
+        <button className="ghost" onClick={onFolder}>
+          Folder
+        </button>
 
-            <div className="idea-b">
-              <select
-                className="idea-s"
-                value={templateId}
-                title={
-                  chosen?.description?.trim().replace(/\s+/g, ' ') ??
-                  'Write the whole document, with nothing deciding it in advance'
-                }
-                onChange={(e) => onTemplate(e.target.value)}
-              >
-                <option value="">No template</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+        <select
+          className="idea-s"
+          value={templateId}
+          title={templates.find((t) => t.id === templateId)?.description ?? 'No template'}
+          onChange={(e) => onTemplate(e.target.value)}
+        >
+          <option value="">No template</option>
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
 
-              <button
-                className="ghost"
-                title="Make a template from a prompt that already works"
-                onClick={onTemplates}
-              >
-                Templates
-              </button>
+        <button className="ghost" title="Make a template from a prompt you have" onClick={onTemplates}>
+          Edit
+        </button>
 
-              <button
-                className="solid"
-                disabled={!ready}
-                title={
-                  noKey
-                    ? 'Needs a key in Settings'
-                    : chosen
-                      ? `Fill in "${chosen.name}" from these words`
-                      : 'Write a whole document from these words'
-                }
-                onClick={onWrite}
-              >
-                {writing ? 'Writing…' : `Write prompt · about $${PER_IDEA_USD.toFixed(2)}`}
-              </button>
-            </div>
-          </>
-        ) : null}
-
-        {mode === 'file' ? (
-          <div className="in-pick">
-            <button className="solid" onClick={onFile}>
-              Choose a reference
-            </button>
-            <p className="quiet">
-              {canReadMedia
-                ? 'A still, a clip or a track. Each is read as what it is — several at once are staged rather than read straight away.'
-                : 'Stills only until ffmpeg is on PATH; clips and tracks need it.'}
-            </p>
-          </div>
-        ) : null}
-
-        {mode === 'folder' ? (
-          <div className="in-pick">
-            <button className="solid" onClick={onFolder}>
-              Choose a folder
-            </button>
-            <p className="quiet">
-              Everything directly inside it, in the order it was named. Subfolders are left alone,
-              and nothing is read until you say what it costs is acceptable.
-            </p>
-          </div>
-        ) : null}
+        <button className="solid go" disabled={!ready} onClick={onGo}>
+          {working ?? `Prompt · $${PER_CALL_USD.toFixed(2)}`}
+        </button>
       </div>
     </div>
   );
