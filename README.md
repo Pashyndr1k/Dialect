@@ -195,8 +195,21 @@ cannot surprise you:
 
 ## The window
 
-Two panes. The left holds the IR; the right holds the prompt it compiles to,
-live. Between them sit the chips: one per segment of the prompt.
+Two panes, and which side a thing belongs on is not a matter of taste.
+
+**Left is everything that goes in**: the references, the document, what the
+session has cost, what the cache is holding, and the button that starts a run.
+
+**Right is everything to do with the prompt**: which result is showing, the
+prompt itself, the blocks it is made of, the fields behind them, and what the
+rules had to say.
+
+A batch obeys the same line. What was dropped and what reading it will cost are
+input, so they sit under the drop zone. The results are prompts, so they sit
+above the prompt they let you choose between — pick a row and its prompt shows,
+exactly as a single reference does. The same five files never appear twice.
+
+Between the panes sit the chips: one per segment of the prompt.
 
 Each chip does two things. Its label opens the IR fields that segment was built
 from — a segment records the paths it came from, so the editor can offer those

@@ -1,3 +1,17 @@
+/**
+ * The window is two panes, and which side a thing belongs on is not a matter of
+ * taste:
+ *
+ *   Left  — everything that goes in. The references, the document, what the
+ *           session has cost, what the cache is holding.
+ *   Right — everything to do with the prompt. Which result is showing, the
+ *           prompt itself, the blocks it is made of, the fields behind them,
+ *           and what the rules had to say.
+ *
+ * A batch's results are results, so they live on the right, above the prompt
+ * they let you choose between.
+ */
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   assembleText,
@@ -11,7 +25,7 @@ import {
   type Segment,
 } from '@dialect/core';
 import { createQueue, runQueue } from '@dialect/core';
-import { Batch, type BatchItem } from './Batch.tsx';
+import { BatchControls, BatchResults, type BatchItem } from './Batch.tsx';
 import { Fields } from './Fields.tsx';
 import { HostProvider } from './provider.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
@@ -515,26 +529,18 @@ export function App() {
                 </>
               ) : null}
             </p>
+
+            <BatchControls
+              items={batch}
+              running={running}
+              onRun={() => void runBatch()}
+              onStop={() => abort.current?.abort()}
+              onClear={clearBatch}
+            />
           </div>
 
           {extractError ? <p className="err">{extractError}</p> : null}
 
-          {batch.length > 0 ? (
-            <Batch
-              items={batch}
-              selected={batchOpen}
-              running={running}
-              spent={spent}
-              onRun={() => void runBatch()}
-              onStop={() => abort.current?.abort()}
-              onSelect={openFromBatch}
-              onClear={clearBatch}
-              onCopyOne={(id) => void copyOne(id)}
-              onCopyAll={() => void copyAll()}
-              onSaveAll={() => void saveAll()}
-              saved={savedTo}
-            />
-          ) : null}
           <textarea
             className="ir"
             spellCheck={false}
@@ -546,11 +552,24 @@ export function App() {
 
         <section className="pane">
           <div className="pane-h">
-            <h2>Prompt</h2>
+            <h2>
+              Prompt
+              {batchOpen ? <span className="pane-of">{batchOpen}</span> : null}
+            </h2>
             <button className="ghost" onClick={() => void copy()} disabled={!promptText}>
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
+
+          <BatchResults
+            items={batch}
+            selected={batchOpen}
+            onSelect={openFromBatch}
+            onCopyOne={(id) => void copyOne(id)}
+            onCopyAll={() => void copyAll()}
+            onSaveAll={() => void saveAll()}
+            saved={savedTo}
+          />
 
           {compiled && 'failure' in compiled ? (
             <p className="err">{compiled.failure}</p>
