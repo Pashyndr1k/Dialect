@@ -165,7 +165,17 @@ jobs:
           tag="${GITHUB_REF#refs/tags/}"
           # Only the things a person would install. The bundle tree also holds
           # unpacked app directories and intermediate artefacts.
-          mapfile -t files < <(find apps/desktop/src-tauri/target/release/bundle -type f             \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' \))
+          #
+          # Read in a loop rather than with `mapfile`, which is bash 4 and
+          # therefore absent on macOS: Apple still ships 3.2. That is why both
+          # mac jobs failed here while Windows, on git bash, uploaded fine —
+          # the builds were finished and correct, and the shell could not hold
+          # the list of what they had made.
+          files=()
+          while IFS= read -r f; do files+=("$f"); done < <(
+            find apps/desktop/src-tauri/target/release/bundle -type f \
+              \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' \)
+          )
 
           if [ ${#files[@]} -eq 0 ]; then
             echo "Nothing to upload from this platform." >&2
