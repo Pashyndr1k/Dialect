@@ -1,0 +1,8 @@
+id: tiny-two
+label: Tiny Two
+family: video
+syntax: natural
+renderer: natural
+source:
+  name: fixture for the channel test
+  dated: "2026-08-30"

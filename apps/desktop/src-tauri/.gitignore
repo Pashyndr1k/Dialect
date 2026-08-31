@@ -6,6 +6,15 @@
 # will have schema files for capabilities auto-completion
 /gen/schemas
 
-# Live-test fixtures: a generated schema, someone's own reference image, and
-# whatever the last billed call returned. None of it belongs in the repository.
-/tests/fixtures/
+# Live-test fixtures. Two kinds, and only one of them is private.
+#
+# A reference image, a clip someone rendered, and whatever the last billed call
+# returned are theirs and are large; they stay out, and the tests that want them
+# skip where they are absent.
+#
+# The signed card set is neither. It is four tiny files generated as a fixture,
+# and it is the only thing standing between the two halves of the update channel
+# agreeing about Ed25519 and finding out they do not on somebody's machine. It
+# has to travel with the tests that check it.
+/tests/fixtures/*
+!/tests/fixtures/signed-set/
