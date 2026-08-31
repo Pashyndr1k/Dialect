@@ -137,18 +137,53 @@ jobs:
           key: ${{ matrix.name }}
       - run: npm ci
 
-      - uses: tauri-apps/tauri-action@v1
+      # Split into steps on purpose.
+      #
+      # This was one call to tauri-action, which failed on all three platforms
+      # including the one where `npx tauri build` demonstrably works. Job logs
+      # need repo admin and this repository's owner is not me, so a single
+      # opaque step that fails is a step I cannot learn anything from — whereas
+      # step *names* are public, and three named steps say which third broke.
+      #
+      # These are the commands that were run by hand before any of this was
+      # written, which is a better thing to depend on than an action whose
+      # inputs I inferred from a list.
+      - name: Build the installers
+        run: npx tauri build
+        working-directory: apps/desktop
+
+      - name: List what was built
+        shell: bash
+        run: find apps/desktop/src-tauri/target/release/bundle -type f | sed 's/^/  /'
+
+      - name: Upload into the draft
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          # Only the things a person would install. The bundle tree also holds
+          # unpacked app directories and intermediate artefacts.
+          mapfile -t files < <(find apps/desktop/src-tauri/target/release/bundle -type f             \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' \))
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Nothing to upload from this platform." >&2
+            exit 1
+          fi
+          echo "uploading:"
+          for f in "${files[@]}"; do echo "  $f"; done
+          gh release upload "$tag" "${files[@]}" --clobber
+
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          projectPath: apps/desktop
-          # Into the draft the release job made. Left to find the release
-          # itself, this is where the skipping happens.
-          releaseId: ${{ needs.release.outputs.id }}
-          # The action knows where its own bundles landed; a hand-written glob
-          # would be a guess about a platform this has never been built on.
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: dialect-${{ matrix.name }}
+          name: dialect-${{ matrix.name }}
+          if-no-files-found: ignore
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/**/*.msi
+            apps/desktop/src-tauri/target/release/bundle/**/*-setup.exe
+            apps/desktop/src-tauri/target/release/bundle/**/*.dmg
 
   # Live only once every platform has finished uploading.
   publish:
