@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   # Three installers take twenty minutes of runner time. A failing test costs
-  # thirty seconds to find out about, so it goes first and everything else
-  # waits on it.
+  # thirty seconds to find out about, so the tests go first and everything else
+  # waits on them.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -20,15 +20,30 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  # The host tests run on a platform this app actually ships to.
+  #
+  # They were on ubuntu at first, which fails: the crate pulls in Tauri, and
+  # Tauri on Linux wants a GTK and WebKit development stack. Installing all of
+  # that to compile a crate for a platform nobody runs is a strange way to find
+  # out whether a hash check works. Windows is a target, needs nothing, and is
+  # where every version of this has been built.
+  #
+  # In parallel with the TypeScript half rather than after it, because neither
+  # tells you anything about the other.
+  rust:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      # ffmpeg is on the ubuntu image. The tests that need it skip rather than
-      # fail where it is absent, so this is belt and braces.
+          key: windows-test
+      # ffmpeg is not on the runner; the tests that want it say so and skip.
       - run: cargo test --lib
         working-directory: apps/desktop/src-tauri
 
@@ -41,7 +56,7 @@ jobs:
   # one job at the end flips it live: the whole set appears at once or not at
   # all.
   release:
-    needs: [check]
+    needs: [check, rust]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     outputs:
@@ -76,10 +91,10 @@ jobs:
             return String(keep.id);
 
   build:
-    needs: [check, release]
+    needs: [check, rust, release]
     # A manual run skips the release job and still builds, so three platforms
     # can be checked without cutting a tag to find out whether they compile.
-    if: ${{ !cancelled() && needs.check.result == 'success' && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
+    if: ${{ !cancelled() && needs.check.result == 'success' && needs.rust.result == 'success' && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
     strategy:
       # One platform failing must not cancel the others: a Windows installer is
       # worth having even on a day macOS will not build.
