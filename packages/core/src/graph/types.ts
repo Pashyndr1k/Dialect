@@ -122,10 +122,21 @@ export interface NodeContext {
   signal?: AbortSignal;
 }
 
+/**
+ * What the host found in a file: pictures to look at, and the facts it measured
+ * rather than guessed.
+ *
+ * The facts matter as much as the pictures. A clip's duration and aspect come
+ * from a probe, and a track's tempo, key and loudness are counted — the reader
+ * is told them so it does not have to estimate from a spectrogram.
+ */
 export interface ResolvedSource {
   parts: ImagePart[];
-  /** Audio only: measured before it is described, so it is counted not guessed. */
-  measurements?: SongMeasurements;
+  /** Video: what the probe found. */
+  durationS?: number;
+  aspectRatio?: string;
+  /** Audio: everything measured. The reference name is filled in by the node. */
+  measurements?: Omit<SongMeasurements, 'reference'>;
 }
 
 export type SourceResolver = (source: GraphSource) => Promise<ResolvedSource>;

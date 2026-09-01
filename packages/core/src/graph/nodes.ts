@@ -21,6 +21,7 @@ import { extractFromVideo } from '../extract/video.ts';
 import { setPath } from '../ir/paths.ts';
 import { getProfile } from '../registry/load.ts';
 import { expandShot } from '../sequence/expand.ts';
+import { SEQUENCE_VERSION, type Sequence, type SequenceShot } from '../sequence/types.ts';
 import { learnTemplate, type CastSize, type TemplateKind } from '../templates/learn.ts';
 import { applyVariant, vary } from '../vary/vary.ts';
 import { SOURCE_ROLES, type Bundle, type SourceRole } from '../compose/types.ts';
@@ -175,36 +176,48 @@ const specs: NodeSpec[] = [
     title: 'Read',
     group: 'read',
     inputs: { source: { type: 'source' } },
-    outputs: { out: { type: 'lines' } },
+    outputs: {
+      out: { type: 'lines' },
+      // A reading already contains a document — the readers return one and it
+      // costs nothing extra. Handing it back is what lets a single reference
+      // reach a prompt without paying to compose a bundle of one, which is the
+      // path the app has always taken.
+      ir: { type: 'ir', label: 'document' },
+    },
     spends: true,
     defaults: { role: 'auto' },
     async run(inputs, params, ctx) {
       const { source } = one(inputs.source, 'source', 'source');
       const resolved = await ctx.resolve(source);
       const role = (str(params, 'role', 'auto') as SourceRole) ?? 'auto';
+      const reference = source.name;
 
-      const lines = await (async (): Promise<string[]> => {
+      const read = await (async (): Promise<{ lines: string[]; ir: PromptIR }> => {
         if (source.kind === 'image') {
-          const r = await extractFromImages(ctx.gateway, resolved.parts, {
-            reference: source.name,
-          });
-          return sceneLines(r.scene);
+          const r = await extractFromImages(ctx.gateway, resolved.parts, { reference });
+          return { lines: sceneLines(r.scene), ir: r.ir };
         }
         if (source.kind === 'video') {
           const r = await extractFromVideo(ctx.gateway, resolved.parts, {
-            reference: source.name,
+            reference,
+            ...(resolved.durationS === undefined ? {} : { durationS: resolved.durationS }),
+            ...(resolved.aspectRatio === undefined ? {} : { aspectRatio: resolved.aspectRatio }),
           });
-          return shotLines(r.shot);
+          return { lines: shotLines(r.shot), ir: r.ir };
         }
         if (!resolved.measurements) {
-          throw new GraphError(`"${source.name}" was not measured, so it cannot be described.`);
+          throw new GraphError(`"${reference}" was not measured, so it cannot be described.`);
         }
-        const r = await extractFromAudio(ctx.gateway, resolved.parts, resolved.measurements);
-        return songLines(r.song);
+        const r = await extractFromAudio(ctx.gateway, resolved.parts, {
+          ...resolved.measurements,
+          reference,
+        });
+        return { lines: songLines(r.song), ir: r.ir };
       })();
 
       return {
-        out: { type: 'lines', lines: { id: source.name, kind: source.kind, role, lines } },
+        out: { type: 'lines', lines: { id: reference, kind: source.kind, role, lines: read.lines } },
+        ir: { type: 'ir', ir: read.ir },
       };
     },
   },
@@ -246,6 +259,7 @@ const specs: NodeSpec[] = [
     async run(inputs, params, ctx) {
       const readings = many(inputs.lines, 'lines', 'lines');
       const words = inputs.words ? one(inputs.words, 'words', 'words') : undefined;
+      const templateId = str(params, 'templateId');
 
       const bundle: Bundle = {
         modality: str(params, 'modality', 'image') as Bundle['modality'],
@@ -260,7 +274,16 @@ const specs: NodeSpec[] = [
         ],
       };
 
-      const result = await composeBundle(ctx.gateway, bundle);
+      // With a template, the composer is asked only the template's own
+      // questions and never sees its document — so what the template already
+      // decided stays decided. That is a different call from filling a template
+      // from words alone, which is why both exist.
+      if (templateId && !ctx.library) {
+        throw new GraphError(`Compose was given the template "${templateId}" and no library.`);
+      }
+      const result = await composeBundle(ctx.gateway, bundle, {
+        ...(templateId && ctx.library ? { templateId, library: ctx.library } : {}),
+      });
       return { out: { type: 'ir', ir: result.ir } };
     },
   },
@@ -358,7 +381,11 @@ const specs: NodeSpec[] = [
 
       // The world is stated once so it cannot drift between shots; each shot is
       // only what it changes.
-      const sequence = { world: ir, shots } as Parameters<typeof expandShot>[0];
+      const sequence: Sequence = {
+        seqVersion: SEQUENCE_VERSION,
+        world: ir,
+        shots: shots as SequenceShot[],
+      };
       return {
         out: shots.map((_, i) => ({ type: 'ir' as const, ir: expandShot(sequence, i) })),
       };
