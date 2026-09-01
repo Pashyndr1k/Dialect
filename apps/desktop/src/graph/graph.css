@@ -509,5 +509,10 @@
   color: var(--ink-3);
 }
 .graph-menu {
-  grid-template-columns: repeat(2, minmax(9rem, 1fr));
+  grid-template-columns: repeat(3, minmax(9rem, 1fr));
+}
+.add-cost {
+  margin-left: auto;
+  font: 0.68rem var(--mono);
+  color: var(--hot);
 }

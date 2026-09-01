@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { GraphDoc, Library, LoadedRegistry } from '@dialect/core';
+import type { Library, LoadedRegistry } from '@dialect/core';
 
 import { App } from './App.tsx';
 import { Editor } from './graph/Editor.tsx';
@@ -21,32 +21,9 @@ import { Settings } from './Settings.tsx';
 import { BUILTIN } from './registry.ts';
 import { loadRegistry } from './channel.ts';
 import { builtinLibrary, libraryWith, listTemplates } from './templates.ts';
-import imageExample from './example.image.json';
+import { STARTER_GRAPH } from './graph/examples.ts';
 
 type View = 'canvas' | 'panels';
-
-/**
- * What the canvas opens on.
- *
- * An empty canvas is a bad first thing to be handed: it asks you to know the
- * vocabulary before you have seen any of it. This is the shortest graph that
- * does something real — a document, and a model to render it in — so the first
- * press of Run produces a prompt and costs nothing.
- */
-const STARTER: GraphDoc = {
-  version: 1,
-  name: 'A document, rendered',
-  nodes: [
-    {
-      id: 'document-1',
-      type: 'document',
-      at: { x: 40, y: 60 },
-      params: { json: JSON.stringify(imageExample, null, 2) },
-    },
-    { id: 'compile-1', type: 'compile', at: { x: 340, y: 60 }, params: { target: 'nano-banana-2' } },
-  ],
-  edges: [{ from: { node: 'document-1', port: 'out' }, to: { node: 'compile-1', port: 'ir' } }],
-};
 
 export function Shell(): React.ReactElement {
   const [view, setView] = useState<View>('canvas');
@@ -98,7 +75,7 @@ export function Shell(): React.ReactElement {
       </header>
 
       {library ? (
-        <Editor registry={registry} library={library} doc={STARTER} />
+        <Editor registry={registry} library={library} doc={STARTER_GRAPH} />
       ) : (
         <p className="shell-loading">Reading the cards and templates…</p>
       )}

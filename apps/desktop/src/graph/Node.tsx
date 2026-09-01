@@ -8,25 +8,18 @@
  */
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { PORT_LABEL, type NodeSpec, type PortSpec } from '@dialect/core';
+import { PORT_LABEL, type PortSpec } from '@dialect/core';
 
 import { controlsFor, summaryOf, type Control, type World } from './controls.ts';
+import { useBoard, type NodeFace } from './NodeData.tsx';
+import { NODES } from './host.ts';
 
-export type NodeState = 'idle' | 'running' | 'done' | 'cached' | 'failed';
-
-export interface BodyData extends Record<string, unknown> {
-  spec: NodeSpec;
-  params: Record<string, unknown>;
+/**
+ * What a widget needs. Assembled here from the board rather than carried on the
+ * node, so the node object stays still and keeps its measurement.
+ */
+interface Face extends NodeFace {
   world: World;
-  state: NodeState;
-  /** What this node produced last run, in a few words. */
-  note?: string;
-  error?: string;
-  /**
-   * Set params. A patch rather than one key, because choosing a kept reading
-   * sets what it is called, what kind it is, and its lines all at once.
-   * The editor owns the document; this only reports.
-   */
   onParams: (patch: Record<string, unknown>) => void;
   onPick: (key: string, what: 'file' | 'folder') => void;
 }
@@ -72,7 +65,7 @@ function Widget({
   data,
 }: {
   control: Control;
-  data: BodyData;
+  data: Face;
 }): React.ReactElement {
   const value = data.params[control.key];
 
@@ -163,8 +156,28 @@ function Widget({
   );
 }
 
-export function NodeBody({ data, selected }: NodeProps): React.ReactElement {
-  const d = data as BodyData;
+export function NodeBody({ id, data, selected }: NodeProps): React.ReactElement {
+  const board = useBoard();
+  // The type is carried on the node itself because it never changes, and
+  // because the ports have to be rendered on the very first paint: React Flow
+  // keeps a node hidden until it has found its handles, and a node that was
+  // ever drawn without them stays hidden for good. That is what an
+  // "empty frame while we catch up" fallback cost, twice.
+  const spec = NODES.get((data as { type?: string }).type ?? '');
+  const face = board.faces.get(id);
+
+  if (!spec) return <div className="node node-idle" />;
+
+  const d: Face = {
+    spec,
+    params: face?.params ?? {},
+    state: face?.state ?? 'idle',
+    ...(face?.note ? { note: face.note } : {}),
+    ...(face?.error ? { error: face.error } : {}),
+    world: board.world,
+    onParams: (patch) => board.setParams(id, patch),
+    onPick: (key, what) => board.pick(id, key, what),
+  };
   const inputs = Object.entries(d.spec.inputs);
   const outputs = Object.entries(d.spec.outputs);
   const controls = controlsFor(d.spec.type);
