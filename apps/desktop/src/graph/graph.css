@@ -1,0 +1,513 @@
+/* ===========================================================================
+   The canvas
+   ===========================================================================
+   Nodes are read at a distance, so three things have to survive being small:
+   which family a node is in (the head), whether it can spend (the amber dot),
+   and what happened to it last run (the left edge). State wins the edge because
+   it is the thing that changes, and a changing thing is what the eye should be
+   drawn to.
+
+   Everything a node cannot hold goes to the inspector, because a rendered
+   prompt is several hundred words and does not shrink.
+   =========================================================================== */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--ground);
+}
+.shell-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.shell-head h1 {
+  font: 600 0.95rem/1 var(--ui);
+  margin: 0;
+}
+.shell-head .version {
+  font: 400 0.75rem/1 var(--mono);
+  color: var(--ink-3);
+  margin-left: 0.35rem;
+}
+.shell .spacer,
+.run-bar .spacer {
+  flex: 1;
+}
+.shell-loading {
+  margin: auto;
+  color: var(--ink-3);
+  font: 0.9rem var(--ui);
+}
+.view-toggle {
+  position: fixed;
+  right: 0.8rem;
+  bottom: 0.8rem;
+  z-index: 40;
+}
+
+.graph {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.graph-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.graph-body .react-flow {
+  flex: 1;
+  min-width: 0;
+  background: var(--ground);
+}
+
+/* --- the run bar: the only place money is spoken about -------------------- */
+.run-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.run-bar .run {
+  font-weight: 600;
+}
+.run-bar .spend {
+  font: 0.8rem var(--mono);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.run-bar .will-spend {
+  font: 0.75rem var(--ui);
+  color: var(--hot);
+  background: var(--hot-soft);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+.graph-problem {
+  margin: 0;
+  padding: 0.45rem 0.9rem;
+  font: 0.85rem var(--ui);
+  color: var(--bad);
+  background: var(--bad-soft);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* --- add menu ------------------------------------------------------------- */
+.add {
+  position: relative;
+}
+.add-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 0.4rem;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px -18px rgb(0 0 0 / 0.5);
+}
+.add-menu > li > b {
+  display: block;
+  font: 600 0.65rem/1 var(--ui);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 0.25rem 0.3rem 0.35rem;
+}
+.add-menu ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.add-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  padding: 0.3rem;
+  font: 0.85rem var(--ui);
+  color: var(--ink);
+  cursor: pointer;
+}
+.add-menu button:hover {
+  background: var(--accent-soft);
+}
+
+/* --- a node --------------------------------------------------------------- */
+.node {
+  position: relative;
+  width: 15rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
+  border-radius: 8px;
+  font: 0.85rem var(--ui);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+.node-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.node-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--rule);
+}
+.node-head b {
+  font-weight: 600;
+}
+.node-spends {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--hot);
+  flex-shrink: 0;
+}
+.node-summary {
+  margin: 0;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.node-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0 0.6rem 0.5rem;
+}
+.node-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.node-field > span {
+  font: 600 0.65rem/1 var(--ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.node-field textarea,
+.node-field input,
+.node-field select,
+.node-pick {
+  width: 100%;
+  font: 0.8rem var(--ui);
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.25rem 0.35rem;
+}
+.node-field textarea {
+  resize: vertical;
+  font-family: var(--ui);
+}
+.node-pick {
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node-note,
+.node-error {
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  font: 0.72rem var(--mono);
+  border-top: 1px solid var(--rule);
+}
+.node-note {
+  color: var(--ink-3);
+}
+.node-error {
+  color: var(--bad);
+  background: var(--bad-soft);
+  font-family: var(--ui);
+}
+
+.node-in .node-head {
+  background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
+}
+.node-read .node-head {
+  background: color-mix(in srgb, var(--hot-soft) 45%, transparent);
+}
+.node-compose .node-head,
+.node-shape .node-head {
+  background: var(--surface-2);
+}
+.node-out .node-head {
+  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+}
+
+.node-running {
+  border-left-color: var(--hot);
+}
+.node-done {
+  border-left-color: var(--accent);
+}
+.node-cached {
+  border-left-color: var(--ink-3);
+}
+.node-failed {
+  border-left-color: var(--bad);
+}
+
+/* --- ports: the colour is the type, so a refusal is predictable ----------- */
+.react-flow__handle.port {
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+}
+.port-words {
+  background: #6a8caf;
+}
+.port-source {
+  background: #a8825c;
+}
+.port-lines {
+  background: var(--hot);
+}
+.port-ir {
+  background: var(--accent);
+}
+.port-prompt {
+  background: #7d6aaf;
+}
+.port-template {
+  background: #5c9a83;
+}
+.port-optional {
+  opacity: 0.55;
+}
+
+.port-label {
+  position: absolute;
+  font: 0.62rem/1 var(--ui);
+  color: var(--ink-3);
+  transform: translateY(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.port-label-in {
+  left: 0.55rem;
+}
+.port-label-out {
+  right: 0.55rem;
+}
+
+.react-flow__edge-path {
+  stroke-width: 1.75;
+}
+.wire-words .react-flow__edge-path {
+  stroke: #6a8caf;
+}
+.wire-source .react-flow__edge-path {
+  stroke: #a8825c;
+}
+.wire-lines .react-flow__edge-path {
+  stroke: var(--hot);
+}
+.wire-ir .react-flow__edge-path {
+  stroke: var(--accent);
+}
+.wire-prompt .react-flow__edge-path {
+  stroke: #7d6aaf;
+}
+.wire-template .react-flow__edge-path {
+  stroke: #5c9a83;
+}
+
+/* --- the inspector: where prose lives ------------------------------------- */
+.inspector {
+  width: 24rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--rule);
+  background: var(--surface);
+  overflow: hidden;
+}
+.ins-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  font: 0.9rem var(--ui);
+}
+.ins-head b {
+  font-weight: 600;
+}
+.ins-id {
+  font: 0.7rem var(--mono);
+  color: var(--ink-3);
+}
+.ins-usd {
+  margin-left: auto;
+  font: 0.75rem var(--mono);
+  color: var(--hot);
+  font-variant-numeric: tabular-nums;
+}
+.ins-empty {
+  margin: auto;
+  padding: 1rem;
+  color: var(--ink-3);
+  font: 0.85rem var(--ui);
+  text-align: center;
+}
+.ins-error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font: 0.8rem var(--ui);
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.ins-ports {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.4rem 0.75rem 0;
+}
+.ins-ports button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0.25rem 0.35rem;
+  font: 0.8rem var(--ui);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.ins-ports button span {
+  font: 0.62rem var(--mono);
+  color: var(--ink-3);
+}
+.ins-ports button.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.ins-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.6rem 0.75rem 1.5rem;
+}
+.ins-count {
+  margin: 0 0 0.5rem;
+  font: 0.7rem var(--mono);
+  color: var(--ink-3);
+}
+.ins-item + .ins-item {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+}
+.ins-item h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.35rem;
+  font: 600 0.82rem var(--ui);
+}
+.ins-item h5 {
+  margin: 0.6rem 0 0.25rem;
+  font: 600 0.68rem var(--ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ins-blocked {
+  font: 0.65rem var(--ui);
+  color: var(--bad);
+  background: var(--bad-soft);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+.ins-role {
+  font: 0.65rem var(--mono);
+  color: var(--ink-3);
+}
+.ins-text {
+  margin: 0;
+  font: 0.78rem/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  background: var(--ground);
+  border-radius: 5px;
+  padding: 0.5rem 0.6rem;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.ins-negative {
+  color: var(--ink-2);
+}
+.ins-words {
+  margin: 0;
+  font: 0.85rem/1.5 var(--ui);
+}
+.ins-path {
+  margin: 0;
+  font: 0.7rem var(--mono);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.ins-lines,
+.ins-findings {
+  margin: 0;
+  padding-left: 1rem;
+  font: 0.78rem/1.5 var(--ui);
+  color: var(--ink-2);
+}
+.ins-findings {
+  margin-top: 0.5rem;
+}
+.ins-findings b {
+  font: 600 0.65rem var(--ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.finding-block {
+  color: var(--bad);
+}
+.finding-warn {
+  color: var(--hot);
+}
+.finding-autofix {
+  color: var(--ink-3);
+}
+
+.add-empty {
+  display: block;
+  padding: 0.3rem;
+  font: 0.8rem var(--ui);
+  color: var(--ink-3);
+}
+.graph-menu {
+  grid-template-columns: repeat(2, minmax(9rem, 1fr));
+}

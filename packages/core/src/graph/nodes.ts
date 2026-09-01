@@ -141,6 +141,23 @@ const specs: NodeSpec[] = [
     inputs: {},
     outputs: { out: { type: 'ir' } },
     async run(_inputs, params) {
+      // Either a document already parsed, or the text of one. The text form is
+      // what someone pastes in, and it is the same thing they would paste into
+      // the field editor, so a bad one has to say where it went wrong rather
+      // than just refusing.
+      if (typeof params.json === 'string' && params.json.trim()) {
+        try {
+          const parsed: unknown = JSON.parse(params.json);
+          if (!parsed || typeof parsed !== 'object') {
+            throw new GraphError('That document is not an object.');
+          }
+          return { out: { type: 'ir', ir: parsed as PromptIR } };
+        } catch (error) {
+          if (error instanceof GraphError) throw error;
+          throw new GraphError(`That document will not parse: ${(error as Error).message}`);
+        }
+      }
+
       const ir = params.ir as PromptIR | undefined;
       if (!ir || typeof ir !== 'object') throw new GraphError('This document node is empty.');
       return { out: { type: 'ir', ir } };

@@ -57,7 +57,6 @@ import {
   mediaTypeOf,
   nameOf,
   type ReferenceKind,
-  Gateway,
   ExtractedScene,
   getProfile,
   sceneToIR,
@@ -81,13 +80,12 @@ import { deleteSource, listSources, openSourcesFolder, saveSource } from './sour
 import { estimate, PER_WRITE_USD } from './prices.ts';
 import { Templates } from './Templates.tsx';
 import { Shots } from './Shots.tsx';
-import { HostProvider } from './provider.ts';
+import { gateway } from './gateway.ts';
 import { ANTHROPIC_KEY, secretStatus } from './secrets.ts';
 import {
   cachedAnswer,
   cacheStats,
   clearCache,
-  hostCache,
   loadLibrary,
   loadSession,
   hasDesktop,
@@ -167,15 +165,9 @@ interface Reading {
 const exampleFor = (family: string): unknown =>
   family === 'video' ? videoExample : family === 'audio' ? audioExample : imageExample;
 
-/**
- * One gateway for the window's lifetime, so its cache and its running total
- * survive between drops. Re-reading the same reference costs nothing.
- */
-const gateway = new Gateway(new HostProvider(), {
-  cache: hostCache,
-  budgetUsd: 5,
-  onSpend: (_usage, total) => window.dispatchEvent(new CustomEvent('dialect:spend', { detail: total })),
-});
+// The gateway moved to its own module when the graph editor needed the same
+// one: two would be two budget counters, and a five dollar cap counted twice
+// is a ten dollar cap.
 
 async function toBase64(file: File): Promise<string> {
   const buffer = new Uint8Array(await file.arrayBuffer());
