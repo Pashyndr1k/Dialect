@@ -32,6 +32,50 @@ export interface GatewayResult<T> extends ProviderResult<T> {
    * own index — the key alone says nothing a person would recognise.
    */
   key: string;
+  /** When a reused answer was first bought. Absent on a fresh call. */
+  cachedAt?: string;
+}
+
+/**
+ * What a cache entry holds.
+ *
+ * The answer, and the two facts about it that only stop being obvious once the
+ * model can change underneath: who produced it and when. Both live in the entry
+ * rather than in its key, so an answer survives a change of model and can still
+ * say where it came from.
+ */
+interface Held {
+  /** Bumped if this shape ever changes. Absent means the original bare value. */
+  v?: 1;
+  model?: string;
+  at?: string;
+  value: unknown;
+}
+
+const wrap = (value: unknown, model: string): Held => ({
+  v: 1,
+  model,
+  at: new Date().toISOString(),
+  value,
+});
+
+/**
+ * Read an entry, in either shape.
+ *
+ * Entries written before answers carried their provenance are bare values. They
+ * are still perfectly good answers — they simply cannot say which model gave
+ * them — so they are used rather than thrown away.
+ */
+function unwrap(stored: unknown): { value: unknown; model?: string; at?: string } {
+  if (stored !== null && typeof stored === 'object' && (stored as Held).v === 1) {
+    const held = stored as Held;
+    return {
+      value: held.value,
+      ...(held.model ? { model: held.model } : {}),
+      ...(held.at ? { at: held.at } : {}),
+    };
+  }
+  return { value: stored };
 }
 
 export class Gateway {
@@ -68,10 +112,20 @@ export class Gateway {
     return this.#budgetUsd === undefined ? undefined : this.#budgetUsd - this.#spentUsd;
   }
 
+  /**
+   * The question, not who was asked.
+   *
+   * The model is deliberately absent. What is cached is the reading of a
+   * reference — what the picture shows — and that is a fact about the picture,
+   * so changing model must not mean paying to look at everything again. Which
+   * model produced an answer is recorded *in* the answer instead, so nothing is
+   * lost; it only moves out of the identity of the question.
+   *
+   * The adapter id stays: a mock's scripted answer must never reach a real run.
+   */
   async keyFor<T>(request: StructuredRequest<T>): Promise<string> {
     const parts = [
       this.#provider.id,
-      this.#provider.model,
       request.schemaVersion,
       request.system,
       request.instruction,
@@ -85,16 +139,21 @@ export class Gateway {
 
     const hit = await this.#cache.get(key);
     if (hit !== undefined) {
+      const held = unwrap(hit);
       // Re-validate: a cached answer written by an older build must not slip
       // past the current schema just because it is on disk.
-      const parsed = request.schema.safeParse(hit);
+      const parsed = request.schema.safeParse(held.value);
       if (parsed.success) {
         return {
           value: parsed.data,
           usage: ZERO_USAGE,
-          model: this.#provider.model,
+          // The model that actually produced this, which is not necessarily the
+          // one selected now. Saying otherwise would be a small lie told every
+          // time an old answer is reused.
+          model: held.model ?? this.#provider.model,
           cached: true,
           key,
+          ...(held.at ? { cachedAt: held.at } : {}),
         };
       }
     }
@@ -108,7 +167,7 @@ export class Gateway {
     this.#spentUsd += result.usage.costUsd;
     this.#onSpend?.(result.usage, this.#spentUsd);
 
-    await this.#cache.set(key, result.value);
+    await this.#cache.set(key, wrap(result.value, result.model));
     return { ...result, cached: false, key };
   }
 }

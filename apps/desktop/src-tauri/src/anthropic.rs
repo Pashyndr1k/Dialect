@@ -15,6 +15,7 @@ use serde_json::{json, Value};
 use crate::secrets;
 
 const ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
+const MODELS_ENDPOINT: &str = "https://api.anthropic.com/v1/models";
 const API_VERSION: &str = "2023-06-01";
 
 #[derive(Deserialize)]
@@ -52,6 +53,70 @@ pub struct ExtractResponse {
 
 fn usage_field(usage: &Value, name: &str) -> u64 {
     usage.get(name).and_then(Value::as_u64).unwrap_or(0)
+}
+
+#[derive(Serialize)]
+pub struct ModelChoice {
+    id: String,
+    label: String,
+}
+
+/// What this key can actually reach.
+///
+/// Asked of the API rather than written down here, for the same reason the
+/// model cards are data: a list compiled into a binary is a list that is wrong
+/// by the next release. It goes through the host because the key does.
+#[tauri::command]
+pub async fn anthropic_models() -> Result<Vec<ModelChoice>, String> {
+    let key = secrets::secret_get(secrets::ANTHROPIC.to_string())?
+        .ok_or("No Anthropic key is stored. Add one in Settings.")?;
+
+    let response = reqwest::Client::new()
+        .get(format!("{MODELS_ENDPOINT}?limit=100"))
+        .header("x-api-key", key)
+        .header("anthropic-version", API_VERSION)
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach the model list: {e}"))?;
+
+    let status = response.status();
+    let body: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("The model list was not JSON: {e}"))?;
+
+    if !status.is_success() {
+        let why = body
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(Value::as_str)
+            .unwrap_or("no reason given");
+        return Err(format!("The model list was refused: {why}"));
+    }
+
+    Ok(body
+        .get("data")
+        .and_then(Value::as_array)
+        .map(|models| {
+            models
+                .iter()
+                .filter_map(|m| {
+                    let id = m.get("id").and_then(Value::as_str)?;
+                    Ok::<ModelChoice, ()>(ModelChoice {
+                        id: id.to_string(),
+                        // The API's own display name where there is one; the id
+                        // otherwise, which is at least honest.
+                        label: m
+                            .get("display_name")
+                            .and_then(Value::as_str)
+                            .unwrap_or(id)
+                            .to_string(),
+                    })
+                    .ok()
+                })
+                .collect()
+        })
+        .unwrap_or_default())
 }
 
 #[tauri::command]

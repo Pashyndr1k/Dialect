@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { cacheStats, clearCache, type CacheStats } from './store.ts';
+import { ModelPicker } from './ModelPicker.tsx';
 import {
   ANTHROPIC_KEY,
   clearSecret,
@@ -122,6 +123,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
         ) : null}
 
         {error ? <p className="sheet-err">{error}</p> : null}
+
+        <ModelPicker />
 
         {/* What has already been paid for. Clearing it is the one control here
             that costs money later, so it says so rather than being tidy. */}

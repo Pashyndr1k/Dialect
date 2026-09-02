@@ -9,6 +9,8 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+
+import { currentModel } from './model.ts';
 import * as z from 'zod';
 import {
   costUsd,
@@ -39,15 +41,27 @@ export interface HostProviderOptions {
 
 export class HostProvider implements Provider {
   readonly id = 'anthropic-host';
-  readonly model: string;
 
   readonly #maxTokens: number;
   readonly #effort: HostProviderOptions['effort'];
+  #pinned: string | undefined;
 
   constructor(options: HostProviderOptions = {}) {
-    this.model = options.model ?? 'claude-sonnet-5';
+    this.#pinned = options.model;
     this.#maxTokens = options.maxTokens ?? 16000;
     this.#effort = options.effort;
+  }
+
+  /**
+   * Read fresh every time rather than fixed at construction.
+   *
+   * There is one gateway for the window's lifetime, and rebuilding it to change
+   * model would throw away the running total with it. So the choice is looked
+   * up when a call is made, and switching model costs nothing and forgets
+   * nothing.
+   */
+  get model(): string {
+    return this.#pinned ?? currentModel();
   }
 
   async extract<T>(request: StructuredRequest<T>): Promise<ProviderResult<T>> {

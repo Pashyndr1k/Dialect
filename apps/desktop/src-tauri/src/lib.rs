@@ -27,6 +27,7 @@ pub fn run() {
             secrets::secret_has,
             secrets::secret_delete,
             anthropic::anthropic_extract,
+            anthropic::anthropic_models,
             store::cache_get,
             store::cache_set,
             store::cache_stats,
