@@ -15,6 +15,7 @@ import { Editor } from './graph/Editor.tsx';
 import { Settings } from './Settings.tsx';
 import { Cards } from './Cards.tsx';
 import { Shelf } from './Shelf.tsx';
+import { Update } from './Update.tsx';
 import { BUILTIN } from './registry.ts';
 import { restoreSpend } from './gateway.ts';
 import { loadRegistry } from './channel.ts';
@@ -93,6 +94,8 @@ export function Shell(): React.ReactElement {
       ) : null}
 
       {settingsOpen ? <Settings onClose={() => setSettingsOpen(false)} /> : null}
+
+      <Update />
     </div>
   );
 }

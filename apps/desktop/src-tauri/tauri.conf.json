@@ -27,6 +27,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,5 +38,16 @@
     "resources": [
       "binaries/*"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJGQkZCQUVCRDE5NTA5MEIKUldRTENaWFI2N3EvTDBLOUxCOExFaXFxa0FhOTVPd0tETGdKK1JwdjVaT2cxV0Rtc0NnTjdwZGcK",
+      "endpoints": [
+        "https://github.com/Pashyndr1k/Dialect/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

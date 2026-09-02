@@ -818,3 +818,43 @@
   justify-content: space-between;
   gap: 0.6rem;
 }
+
+/* --- a new version, mentioned once ---------------------------------------- */
+.update {
+  position: fixed;
+  right: 0.9rem;
+  bottom: 0.9rem;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: min(30rem, calc(100vw - 2rem));
+  padding: 0.55rem 0.75rem;
+  font: 0.85rem var(--ui);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 14px 36px -18px rgb(0 0 0 / 0.55);
+}
+.update b {
+  font-weight: 650;
+}
+.update button {
+  font: 0.8rem var(--ui);
+  color: var(--ink);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.update button.ghost {
+  color: var(--ink-2);
+  background: none;
+  border-color: var(--rule);
+}
+.update-bad {
+  color: var(--bad);
+}
