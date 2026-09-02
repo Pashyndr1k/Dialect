@@ -1,14 +1,10 @@
 /**
- * The canvas.
+ * The canvas: a view of the graph, and nothing more.
  *
- * The graph is the document and React Flow is a view of it — positions are
- * written back, everything else flows one way. That matters because the graph
- * is also what gets saved, run and sent to someone, so there is no second copy
- * to fall out of step.
- *
- * Three things sit around the canvas because a node cannot hold them: the run
- * bar, which owns the money; the inspector, which holds the text a two-inch box
- * cannot show; and the add menu, which is where a node comes from.
+ * The document lives in `useGraphDoc` and the run in `useRun`. What is left
+ * here is the picture — which node objects React Flow is holding, which wires
+ * may be drawn, and what is selected — because those are the only things that
+ * belong to the screen rather than to the work.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,108 +23,99 @@ import '@xyflow/react/dist/style.css';
 
 import {
   canConnect,
-  checkGraph,
+  kindOf,
   refusalFor,
-  runGraph,
   sinksOf,
-  spendingNodes,
   type GraphDoc,
-  type GraphRunEvent,
   type Library,
   type LoadedRegistry,
-  type NodeOutputs,
   type NodeSpec,
+  type PortType,
+  type SavedSource,
 } from '@dialect/core';
 
-import { NODES, resolveSource } from './host.ts';
-import { EXAMPLES } from './examples.ts';
+import { NODES } from './host.ts';
 import { NodeBody } from './Node.tsx';
-import { BoardProvider, type NodeFace, type NodeState } from './NodeData.tsx';
+import { BoardProvider, type NodeFace } from './NodeData.tsx';
 import { Inspector } from './Inspector.tsx';
-import { gateway, BUDGET_USD, onSpend } from '../gateway.ts';
+import { RunBar } from './RunBar.tsx';
+import { useRun } from './useRun.ts';
+import { useGraphDoc } from './useGraphDoc.ts';
 import { pickFolder, pickReferences } from '../store.ts';
-import { idFor, listGraphs, openGraphsFolder, saveGraph, type SavedGraph } from '../graphs.ts';
 import { listSources } from '../sources.ts';
-import { OPEN_ID, rememberOpenGraph } from './open.ts';
-import type { SavedSource } from '@dialect/core';
-import { kindOf } from '@dialect/core';
 
 const nodeTypes = { dialect: NodeBody };
-
-/** A new id that reads as what it is, so a saved graph can be followed by eye. */
-const freshId = (type: string, taken: Set<string>): string => {
-  for (let n = 1; ; n += 1) {
-    const id = `${type}-${n}`;
-    if (!taken.has(id)) return id;
-  }
-};
-
-const EMPTY: GraphDoc = { version: 1, nodes: [], edges: [] };
 
 export interface EditorProps {
   registry: LoadedRegistry;
   library: Library;
   doc?: GraphDoc;
-  onDocChange?: (doc: GraphDoc) => void;
 }
 
-interface NodeRun {
-  state: NodeState;
-  note?: string;
-  error?: string;
-  /** What this node cost this run. Zero when the answer was already known. */
-  usd?: number;
+/** One end of a connection being dragged, as React Flow reports it. */
+type End = { nodeId?: string | undefined; id?: string | null | undefined } | null;
+
+/** What a named port on a named node carries, if both exist. */
+function portOf(
+  doc: GraphDoc,
+  nodeId: string | null | undefined,
+  port: string | null | undefined,
+  side: 'in' | 'out',
+): PortType | undefined {
+  const spec = NODES.get(doc.nodes.find((n) => n.id === nodeId)?.type ?? '');
+  return (side === 'out' ? spec?.outputs : spec?.inputs)?.[port ?? '']?.type;
 }
 
-function Board({ registry, library, doc: initial, onDocChange }: EditorProps): React.ReactElement {
-  const [doc, setDoc] = useState<GraphDoc>(initial ?? EMPTY);
-  const [runs, setRuns] = useState<Record<string, NodeRun>>({});
-  const [outputs, setOutputs] = useState<Map<string, NodeOutputs>>(new Map());
+function Board({ registry, library, doc: initial }: EditorProps): React.ReactElement {
   const [selected, setSelected] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
-  const [spent, setSpent] = useState(0);
-  const [refusal, setRefusal] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [opening, setOpening] = useState(false);
-  const [saved, setSaved] = useState<SavedGraph[]>([]);
-
-  // Kept across runs so editing one word re-executes only what is downstream of
-  // it. A ref rather than state: changing it must not repaint the canvas.
-  const memo = useRef(new Map<string, NodeOutputs>());
-  const stop = useRef<AbortController | null>(null);
-
   const [sources, setSources] = useState<SavedSource[]>([]);
+  const [flowNodes, setFlowNodes, onNodesChangeInternal] = useNodesState<Node>([]);
+
+  /**
+   * The document tells the run to forget, through a ref.
+   *
+   * The two need each other — a change makes the last run stale, and the run
+   * needs the document to run — so one of them has to be reached indirectly.
+   * A ref rather than a dependency, because depending on each other's identity
+   * would rebuild both on every keystroke.
+   */
+  const forget = useRef<(all?: boolean) => void>(() => {});
+
+  /**
+   * Opening a graph drops the view's nodes rather than reconciling them.
+   *
+   * Node objects are reused by id and two unrelated graphs can easily share one
+   * — both built-in examples have a `compile-1`. Reusing it kept the old
+   * position and drew the node in the middle of the new graph.
+   */
+  const onDocChanged = useCallback(
+    (opened: boolean): void => {
+      forget.current(opened);
+      if (opened) {
+        setFlowNodes([]);
+        setSelected(null);
+      }
+    },
+    [setFlowNodes],
+  );
+
+  const graph = useGraphDoc(initial, onDocChanged);
+  const { doc } = graph;
+  const run = useRun(doc, registry, library);
+  forget.current = run.forget;
+
   const world = useMemo(() => ({ registry, library, sources }), [registry, library, sources]);
 
-  useEffect(() => onSpend(setSpent), []);
+  // Kept readings are a shelf to drag from, not part of the build.
   useEffect(() => {
-    setSpent(gateway.spentUsd);
+    void listSources().then(setSources).catch(() => setSources([]));
   }, []);
-  useEffect(() => onDocChange?.(doc), [doc, onDocChange]);
-  // Where we are, not something anyone chose to keep. See open.ts.
-  useEffect(() => rememberOpenGraph(doc), [doc]);
-
-  const update = useCallback((next: (d: GraphDoc) => GraphDoc): void => {
-    setDoc((d) => next(d));
-  }, []);
-
-  const setParams = useCallback(
-    (id: string, patch: Record<string, unknown>): void => {
-      update((d) => ({
-        ...d,
-        nodes: d.nodes.map((n) => (n.id === id ? { ...n, params: { ...n.params, ...patch } } : n)),
-      }));
-      // The answer this node gave was for a different question, so forget it.
-      memo.current.clear();
-    },
-    [update],
-  );
 
   const pick = useCallback(
     async (id: string, key: string, what: 'file' | 'folder'): Promise<void> => {
       if (what === 'folder') {
         const dir = await pickFolder();
-        if (dir) setParams(id, { [key]: dir });
+        if (dir) graph.setParams(id, { [key]: dir });
         return;
       }
       const [path] = await pickReferences();
@@ -138,23 +125,12 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
       // wanted to tell an app that a .mp4 is a video. All three land together,
       // so a half-set reference never exists.
       const kind = kindOf(name);
-      setParams(id, { [key]: path, name, ...(kind ? { kind } : {}) });
+      graph.setParams(id, { [key]: path, name, ...(kind ? { kind } : {}) });
     },
-    [setParams],
+    [graph],
   );
 
   /* ---------------------------------------------------------- the picture --- */
-
-  /**
-   * React Flow's copy of the nodes, kept in state rather than derived.
-   *
-   * It has to be state because React Flow measures each node and writes the
-   * result back onto the node object; a fresh array every render throws that
-   * away, and an unmeasured node stays `visibility: hidden` forever. So the
-   * graph stays the source of truth for what exists and what it is set to, and
-   * this keeps what only the view can know — how big each box turned out.
-   */
-  const [flowNodes, setFlowNodes, onNodesChangeInternal] = useNodesState<Node>([]);
 
   /**
    * Membership only.
@@ -168,9 +144,7 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
   useEffect(() => {
     setFlowNodes((prev) => {
       const before = new Map(prev.map((n) => [n.id, n]));
-      const wanted = doc.nodes.map((n) => n.id).join(' ');
-      const have = prev.map((n) => n.id).join(' ');
-      if (wanted === have) return prev;
+      if (doc.nodes.map((n) => n.id).join(' ') === prev.map((n) => n.id).join(' ')) return prev;
 
       return doc.nodes.map(
         (n) =>
@@ -184,7 +158,7 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
           },
       );
     });
-  }, [doc.nodes]);
+  }, [doc.nodes, setFlowNodes]);
 
   /** What each node shows. Rebuilt freely: no measurement rides on it. */
   const faces = useMemo(() => {
@@ -192,21 +166,26 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
     for (const n of doc.nodes) {
       const spec = NODES.get(n.type) as NodeSpec;
       if (!spec) continue;
-      const run = runs[n.id];
+      const state = run.runs[n.id];
       map.set(n.id, {
         spec,
         params: { ...spec.defaults, ...n.params },
-        state: run?.state ?? 'idle',
-        ...(run?.note ? { note: run.note } : {}),
-        ...(run?.error ? { error: run.error } : {}),
+        state: state?.state ?? 'idle',
+        ...(state?.note ? { note: state.note } : {}),
+        ...(state?.error ? { error: state.error } : {}),
       });
     }
     return map;
-  }, [doc.nodes, runs]);
+  }, [doc.nodes, run.runs]);
 
   const board = useMemo(
-    () => ({ world, faces, setParams, pick: (id: string, key: string, what: 'file' | 'folder') => void pick(id, key, what) }),
-    [world, faces, setParams, pick],
+    () => ({
+      world,
+      faces,
+      setParams: graph.setParams,
+      pick: (id: string, key: string, what: 'file' | 'folder') => void pick(id, key, what),
+    }),
+    [world, faces, graph.setParams, pick],
   );
 
   const flowEdges: Edge[] = useMemo(
@@ -219,9 +198,9 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
         targetHandle: e.to.port,
         // The wire is coloured by what it carries, so a graph can be read
         // without opening anything.
-        className: `wire wire-${NODES.get(doc.nodes.find((n) => n.id === e.from.node)?.type ?? '')?.outputs[e.from.port]?.type ?? 'ir'}`,
+        className: `wire wire-${portOf(doc, e.from.node, e.from.port, 'out') ?? 'ir'}`,
       })),
-    [doc.edges, doc.nodes],
+    [doc],
   );
 
   const onNodesChange = useCallback(
@@ -232,16 +211,10 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
 
       for (const change of changes) {
         if (change.type === 'select' && change.selected) setSelected(change.id);
-        if (change.type === 'remove') {
-          update((d) => ({
-            ...d,
-            nodes: d.nodes.filter((n) => n.id !== change.id),
-            edges: d.edges.filter((e) => e.from.node !== change.id && e.to.node !== change.id),
-          }));
-        }
+        if (change.type === 'remove') graph.removeNode(change.id);
       }
     },
-    [update, onNodesChangeInternal],
+    [onNodesChangeInternal, graph],
   );
 
   /**
@@ -253,11 +226,10 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
    */
   const onNodeDragStop = useCallback((): void => {
     setFlowNodes((ns) => {
-      const at = new Map(ns.map((n) => [n.id, n.position]));
-      update((d) => ({ ...d, nodes: d.nodes.map((n) => ({ ...n, at: at.get(n.id) ?? n.at })) }));
+      graph.moved(new Map(ns.map((n) => [n.id, n.position])));
       return ns;
     });
-  }, [update]);
+  }, [setFlowNodes, graph]);
 
   /**
    * Whether a wire being dragged can land.
@@ -268,39 +240,23 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
    */
   const isValid = useCallback(
     (c: Connection | Edge): boolean => {
-      const from = NODES.get(doc.nodes.find((n) => n.id === c.source)?.type ?? '');
-      const to = NODES.get(doc.nodes.find((n) => n.id === c.target)?.type ?? '');
-      const out = from?.outputs[c.sourceHandle ?? ''];
-      const into = to?.inputs[c.targetHandle ?? ''];
-      if (!out || !into) return false;
-      return canConnect(out.type, into.type);
+      const out = portOf(doc, c.source, c.sourceHandle, 'out');
+      const into = portOf(doc, c.target, c.targetHandle, 'in');
+      return out !== undefined && into !== undefined && canConnect(out, into);
     },
-    [doc.nodes],
+    [doc],
   );
 
   const onConnect = useCallback(
     (c: Connection): void => {
-      const from = NODES.get(doc.nodes.find((n) => n.id === c.source)?.type ?? '');
-      const to = NODES.get(doc.nodes.find((n) => n.id === c.target)?.type ?? '');
-      const out = from?.outputs[c.sourceHandle ?? ''];
-      const into = to?.inputs[c.targetHandle ?? ''];
-      if (!out || !into) return;
-
-      if (!canConnect(out.type, into.type)) return;
-      setRefusal(null);
-      update((d) => ({
-        ...d,
-        edges: [
-          ...d.edges,
-          {
-            from: { node: c.source, port: c.sourceHandle ?? 'out' },
-            to: { node: c.target, port: c.targetHandle ?? 'in' },
-          },
-        ],
-      }));
-      memo.current.clear();
+      if (!isValid(c)) return;
+      run.say(null);
+      graph.connect(
+        { node: c.source, port: c.sourceHandle ?? 'out' },
+        { node: c.target, port: c.targetHandle ?? 'in' },
+      );
     },
-    [doc.nodes, update],
+    [isValid, graph, run],
   );
 
   /**
@@ -309,332 +265,81 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
    * `isValidConnection` refuses the drop before `onConnect` is ever called, so
    * a mismatched wire simply falls on the floor and nothing says why. This runs
    * whichever way the drag ended, and is the only place the refusal can be
-   * explained — which matters, because "it did not work" is the least useful
-   * thing an interface can say.
+   * explained — "it did not work" being the least useful thing an interface can
+   * say.
    */
   const onConnectEnd = useCallback(
-    (_event: unknown, state: { isValid?: boolean | null; fromHandle?: unknown; toHandle?: unknown }): void => {
-      if (state.isValid) {
-        setRefusal(null);
-        return;
-      }
-      const from = state.fromHandle as { nodeId?: string; id?: string | null } | null;
-      const to = state.toHandle as { nodeId?: string; id?: string | null } | null;
+    (_event: unknown, state: { isValid?: boolean | null; fromHandle?: End; toHandle?: End }) => {
+      if (state.isValid) return run.say(null);
       // Dropped on empty canvas rather than on a socket: nothing was refused,
       // the drag was just abandoned.
-      if (!from || !to) return;
+      if (!state.fromHandle || !state.toHandle) return;
 
-      const out = NODES.get(doc.nodes.find((n) => n.id === from.nodeId)?.type ?? '')?.outputs[
-        from.id ?? ''
-      ];
-      const into = NODES.get(doc.nodes.find((n) => n.id === to.nodeId)?.type ?? '')?.inputs[
-        to.id ?? ''
-      ];
-      if (out && into) setRefusal(refusalFor(out.type, into.type) ?? null);
+      const out = portOf(doc, state.fromHandle.nodeId, state.fromHandle.id, 'out');
+      const into = portOf(doc, state.toHandle.nodeId, state.toHandle.id, 'in');
+      if (out && into) run.say(refusalFor(out, into) ?? null);
     },
-    [doc.nodes],
+    [doc, run],
   );
 
-  /**
-   * Put a graph on the canvas. Whatever ran before belonged to another graph.
-   *
-   * The view's nodes are dropped rather than reconciled, because node objects
-   * are reused by id and two unrelated graphs can easily share one — both of
-   * the built-in examples have a `compile-1`. Reusing it kept the old position
-   * and drew the node in the middle of the new graph.
-   */
-  const load = useCallback((next: GraphDoc): void => {
-    setFlowNodes([]);
-    setDoc(next);
-    setRuns({});
-    setOutputs(new Map());
-    setSelected(null);
-    setRefusal(null);
-    memo.current.clear();
-    setOpening(false);
-  }, [setFlowNodes]);
-
-  /**
-   * Record one field override on the selected Edit fields node.
-   *
-   * The edit lands in the graph rather than in a panel, so it is saved with
-   * everything else and a graph sent to someone carries the corrections that
-   * were made to it.
-   */
-  const setField = useCallback(
-    (path: string, value: unknown): void => {
-      if (!selected) return;
-      const before = (doc.nodes.find((n) => n.id === selected)?.params?.set ?? {}) as Record<
-        string,
-        unknown
-      >;
-      setParams(selected, { set: { ...before, [path]: value } });
-    },
-    [selected, doc.nodes, setParams],
-  );
-
-  const refreshSaved = useCallback((): void => {
-    void listGraphs()
-      .then((all) => setSaved(all.filter((g) => g.id !== OPEN_ID)))
-      .catch(() => setSaved([]));
-  }, []);
-
-  useEffect(refreshSaved, [refreshSaved]);
-
-  // Kept readings are a shelf to drag from, not part of the build.
-  useEffect(() => {
-    void listSources().then(setSources).catch(() => setSources([]));
-  }, []);
-
-  /**
-   * Keep this graph under the name it carries.
-   *
-   * The name is the identity, so saving twice overwrites rather than piling up
-   * near-identical files — the same rule the templates and sources follow.
-   */
-  const keep = useCallback(async (): Promise<void> => {
-    const name = doc.name?.trim() || 'graph';
-    try {
-      await saveGraph(idFor(name), { ...doc, name });
-      setOpening(false);
-      refreshSaved();
-    } catch (err) {
-      setRefusal((err as Error).message);
-    }
-  }, [doc, refreshSaved]);
-
-  const addNode = useCallback(
-    (type: string): void => {
-      update((d) => {
-        const taken = new Set(d.nodes.map((n) => n.id));
-        // Dropped where there is room rather than on top of the last one.
-        const x = 60 + (d.nodes.length % 4) * 260;
-        const y = 60 + Math.floor(d.nodes.length / 4) * 220;
-        return { ...d, nodes: [...d.nodes, { id: freshId(type, taken), type, at: { x, y } }] };
-      });
-      setAdding(false);
-    },
-    [update],
-  );
-
-  /* -------------------------------------------------------------- the run --- */
-
-  const problems = useMemo(() => checkGraph(doc, NODES), [doc]);
-  const blocking = problems.filter((p) => p.fatal);
-  const willSpend = useMemo(() => spendingNodes(doc, NODES), [doc]);
-
-  const run = useCallback(async (): Promise<void> => {
-    if (running || blocking.length > 0 || doc.nodes.length === 0) return;
-
-    setRunning(true);
-    setRefusal(null);
-    const controller = new AbortController();
-    stop.current = controller;
-
-    // Cost per node is a delta around it. The gateway is the only thing that
-    // knows what was actually billed, and a cached answer bills nothing — which
-    // is exactly what the canvas should be able to show.
-    let mark = gateway.spentUsd;
-    const started = new Map<string, number>();
-
-    const onEvent = (e: GraphRunEvent): void => {
-      setRuns((r) => {
-        if (e.phase === 'start') {
-          started.set(e.node, gateway.spentUsd);
-          return { ...r, [e.node]: { state: 'running' } };
-        }
-        if (e.phase === 'cached') {
-          return { ...r, [e.node]: { state: 'cached', usd: 0, note: 'already known' } };
-        }
-        if (e.phase === 'failed') {
-          return { ...r, [e.node]: { state: 'failed', ...(e.error ? { error: e.error } : {}) } };
-        }
-        const usd = gateway.spentUsd - (started.get(e.node) ?? gateway.spentUsd);
-        return {
-          ...r,
-          [e.node]: {
-            state: 'done',
-            usd,
-            note:
-              (e.times && e.times > 1 ? `${e.times} times` : '') +
-              (usd > 0 ? `${e.times && e.times > 1 ? ', ' : ''}$${usd.toFixed(4)}` : ''),
-          },
-        };
-      });
-    };
-
-    try {
-      const result = await runGraph(
-        doc,
-        NODES,
-        {
-          gateway,
-          registry: registry.registry,
-          library,
-          resolve: resolveSource,
-          signal: controller.signal,
-        },
-        { memo: memo.current, onEvent },
-      );
-      setOutputs(result.outputs);
-      // Aim the inspector at something worth reading without being asked.
-      if (!selected) setSelected(sinksOf(doc)[0] ?? null);
-    } catch (err) {
-      setRefusal((err as Error).message);
-    } finally {
-      mark = gateway.spentUsd - mark;
-      void mark;
-      stop.current = null;
-      setRunning(false);
-    }
-  }, [doc, running, blocking.length, registry, library, selected]);
-
-  const selectedNode = doc.nodes.find((n) => n.id === selected);
+  const node = doc.nodes.find((n) => n.id === selected);
 
   return (
     <div className="graph">
-      <header className="run-bar">
-        <button
-          type="button"
-          className="run"
-          disabled={running || blocking.length > 0 || doc.nodes.length === 0}
-          onClick={() => void run()}
-        >
-          {running ? 'Running…' : 'Run'}
-        </button>
-        {running ? (
-          <button type="button" className="ghost" onClick={() => stop.current?.abort()}>
-            Stop
-          </button>
-        ) : null}
+      <RunBar
+        running={run.running}
+        canRun={run.blocking.length === 0 && doc.nodes.length > 0}
+        spent={run.spent}
+        willSpend={run.willSpend.length}
+        saved={graph.saved}
+        onRun={() => {
+          // Aim the inspector at something worth reading without being asked.
+          void run.go().then(() => setSelected((s) => s ?? sinksOf(doc)[0] ?? null));
+        }}
+        onStop={run.stop}
+        onAdd={graph.addNode}
+        onOpen={graph.open}
+        onSave={() => void graph.keep().catch((err: Error) => run.say(err.message))}
+      />
 
-        <div className="add">
-          <button type="button" className="ghost" onClick={() => setAdding((a) => !a)}>
-            Add node
-          </button>
-          {adding ? (
-            <ul className="add-menu">
-              {(['in', 'read', 'compose', 'shape', 'out'] as const).map((group) => (
-                <li key={group}>
-                  <b>{group}</b>
-                  <ul>
-                    {[...NODES.values()]
-                      .filter((s) => s.group === group)
-                      .map((s) => (
-                        <li key={s.type}>
-                          <button type="button" onClick={() => addNode(s.type)}>
-                            {s.title}
-                            {s.spends ? <i className="node-spends" /> : null}
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-
-        <div className="add">
-          <button type="button" className="ghost" onClick={() => setOpening((o) => !o)}>
-            Graphs
-          </button>
-          {opening ? (
-            <ul className="add-menu graph-menu">
-              <li>
-                <b>this one</b>
-                <ul>
-                  <li>
-                    <button type="button" onClick={() => void keep()}>
-                      Save
-                    </button>
-                  </li>
-                  <li>
-                    <button type="button" onClick={() => void openGraphsFolder()}>
-                      Show the folder
-                    </button>
-                  </li>
-                </ul>
-              </li>
-              <li>
-                <b>examples</b>
-                <ul>
-                  {EXAMPLES.map((ex) => (
-                    <li key={ex.id}>
-                      <button type="button" onClick={() => load(ex.doc)}>
-                        {ex.doc.name ?? ex.id}
-                        <span className="add-cost">{ex.about}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-              <li>
-                <b>saved</b>
-                <ul>
-                  {saved.length === 0 ? (
-                    <li>
-                      <span className="add-empty">none yet</span>
-                    </li>
-                  ) : (
-                    saved.map((g) => (
-                      <li key={g.id}>
-                        <button type="button" onClick={() => load(g.doc)}>
-                          {g.doc.name ?? g.id}
-                        </button>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </li>
-            </ul>
-          ) : null}
-        </div>
-
-        <span className="spacer" />
-
-        {willSpend.length > 0 ? (
-          <span className="will-spend" title="Nodes that can spend. Cached ones will not.">
-            {willSpend.length} paid step{willSpend.length === 1 ? '' : 's'}
-          </span>
-        ) : null}
-        <span className="spend" title={`Budget $${BUDGET_USD.toFixed(2)}`}>
-          ${spent.toFixed(4)}
-        </span>
-      </header>
-
-      {blocking.length > 0 && !running ? (
-        <p className="graph-problem">{blocking[0]?.message}</p>
+      {run.blocking.length > 0 && !run.running ? (
+        <p className="graph-problem">{run.blocking[0]?.message}</p>
       ) : null}
-      {refusal ? <p className="graph-problem">{refusal}</p> : null}
+      {run.refusal ? <p className="graph-problem">{run.refusal}</p> : null}
 
       <div className="graph-body">
         <BoardProvider value={board}>
-        <ReactFlow
-          nodes={flowNodes}
-          edges={flowEdges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onNodeDragStop={onNodeDragStop}
-          onConnect={onConnect}
-          onConnectEnd={onConnectEnd}
-          isValidConnection={isValid}
-          onPaneClick={() => setSelected(null)}
-          proOptions={{ hideAttribution: true }}
-          fitView
-        >
-          <Background gap={18} size={1} />
-          <Controls showInteractive={false} />
-        </ReactFlow>
+          <ReactFlow
+            nodes={flowNodes}
+            edges={flowEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onNodeDragStop={onNodeDragStop}
+            onConnect={onConnect}
+            onConnectEnd={onConnectEnd}
+            isValidConnection={isValid}
+            onPaneClick={() => setSelected(null)}
+            proOptions={{ hideAttribution: true }}
+            fitView
+          >
+            <Background gap={18} size={1} />
+            <Controls showInteractive={false} />
+          </ReactFlow>
         </BoardProvider>
 
         <Inspector
-          node={selectedNode}
-          spec={selectedNode ? NODES.get(selectedNode.type) : undefined}
-          outputs={selected ? outputs.get(selected) : undefined}
-          run={selected ? runs[selected] : undefined}
+          node={node}
+          spec={node ? NODES.get(node.type) : undefined}
+          outputs={selected ? run.outputs.get(selected) : undefined}
+          run={selected ? run.runs[selected] : undefined}
           {...(selected
-            ? { onSet: setField, onParam: (k: string, v: unknown) => setParams(selected, { [k]: v }) }
+            ? {
+                onSet: (path: string, value: unknown) =>
+                  graph.setParams(selected, {
+                    set: { ...((node?.params?.set ?? {}) as Record<string, unknown>), [path]: value },
+                  }),
+                onParam: (k: string, v: unknown) => graph.setParams(selected, { [k]: v }),
+              }
             : {})}
         />
       </div>

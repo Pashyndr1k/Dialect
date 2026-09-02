@@ -6,16 +6,11 @@
  * showing. That split is the whole reason a node editor stays usable: everything
  * that is a step in making a prompt is a node, and everything that is a fact
  * about this machine is not.
- *
- * The panels are still reachable while the canvas is being built. That toggle
- * goes when the canvas covers everything the panels do — not before, because
- * the way to lose work is to delete the road before the bridge is finished.
  */
 
 import { useEffect, useState } from 'react';
 import type { Library, LoadedRegistry } from '@dialect/core';
 
-import { App } from './App.tsx';
 import { Editor } from './graph/Editor.tsx';
 import { Settings } from './Settings.tsx';
 import { Cards } from './Cards.tsx';
@@ -28,10 +23,7 @@ import { STARTER_GRAPH } from './graph/examples.ts';
 import { loadOpenGraph } from './graph/open.ts';
 import type { GraphDoc } from '@dialect/core';
 
-type View = 'canvas' | 'panels';
-
 export function Shell(): React.ReactElement {
-  const [view, setView] = useState<View>('canvas');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cardsOpen, setCardsOpen] = useState(false);
   const [shelfOpen, setShelfOpen] = useState(false);
@@ -60,17 +52,6 @@ export function Shell(): React.ReactElement {
     })();
   }, []);
 
-  if (view === 'panels') {
-    return (
-      <>
-        <button type="button" className="view-toggle" onClick={() => setView('canvas')}>
-          Canvas
-        </button>
-        <App />
-      </>
-    );
-  }
-
   return (
     <div className="shell">
       <header className="shell-head">
@@ -78,9 +59,6 @@ export function Shell(): React.ReactElement {
           Dialect <span className="version">{__APP_VERSION__}</span>
         </h1>
         <span className="spacer" />
-        <button type="button" className="ghost" onClick={() => setView('panels')}>
-          Panels
-        </button>
         <button type="button" className="ghost" onClick={() => setShelfOpen(true)}>
           Kept
         </button>

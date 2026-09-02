@@ -48,14 +48,7 @@ let latest = 0;
 
 async function write(total: number): Promise<void> {
   try {
-    const session = await loadSession();
-    await saveSession({
-      version: SESSION_VERSION,
-      target: session?.target ?? '',
-      items: session?.items ?? [],
-      ...(session?.ir ? { ir: session.ir } : {}),
-      spentUsd: total,
-    });
+    await saveSession({ version: SESSION_VERSION, spentUsd: total });
   } catch {
     // A total that cannot be written is not worth failing a run over. The cap
     // still holds for this window; it is only the next one that forgets.

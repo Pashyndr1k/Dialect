@@ -11,8 +11,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { ALL_EXTENSIONS, EXTENSIONS, type PromptIR, type ResultCache } from '@dialect/core';
-import type { BatchItem } from './Batch.tsx';
+import { ALL_EXTENSIONS, EXTENSIONS, type ResultCache } from '@dialect/core';
 
 const hasHost = (): boolean =>
   typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -91,15 +90,21 @@ export async function cachedAnswer(key: string): Promise<unknown | undefined> {
 // The session
 // ---------------------------------------------------------------------------
 
-export const SESSION_VERSION = 1 as const;
+/**
+ * Bumped to 2 when the panels went: a session used to hold the open document,
+ * the chosen target and the batch list, and now holds none of them. Where the
+ * work is lives in the graph, which is a file of its own.
+ */
+export const SESSION_VERSION = 2 as const;
 
+/**
+ * What survives a restart that belongs to nothing else.
+ *
+ * One thing: what has been spent. A cap that resets when the window closes is
+ * not a cap, and this is the only reason the file still exists.
+ */
 export interface Session {
   version: typeof SESSION_VERSION;
-  target: string;
-  /** The document that was open. */
-  ir?: PromptIR;
-  /** The batch list, with the IR each finished item produced. */
-  items: Array<BatchItem & { ir?: PromptIR }>;
   spentUsd: number;
 }
 
