@@ -12,6 +12,7 @@ import { useState } from 'react';
 
 import { Actions } from './Actions.tsx';
 import { FieldEditor } from './FieldEditor.tsx';
+import { ShotsEditor } from './ShotsEditor.tsx';
 import {
   PORT_LABEL,
   type Finding,
@@ -28,6 +29,8 @@ export interface InspectorProps {
   run?: { state: string; usd?: number; error?: string } | undefined;
   /** Record an override on the selected node. Only an Edit fields node uses it. */
   onSet?: (path: string, value: unknown) => void;
+  /** Replace a param outright. Used by the shots editor. */
+  onParam?: (key: string, value: unknown) => void;
 }
 
 const LEVEL_ORDER: Record<Finding['level'], number> = { block: 0, warn: 1, autofix: 2 };
@@ -120,7 +123,7 @@ function Item({ value, index }: { value: Signal[number]; index: number }): React
   );
 }
 
-export function Inspector({ node, spec, outputs, run, onSet }: InspectorProps): React.ReactElement {
+export function Inspector({ node, spec, outputs, run, onSet, onParam }: InspectorProps): React.ReactElement {
   const ports = Object.entries(outputs ?? {});
   const [open, setOpen] = useState<string | null>(null);
   const port = ports.find(([name]) => name === open) ?? ports[0];
@@ -159,7 +162,16 @@ export function Inspector({ node, spec, outputs, run, onSet }: InspectorProps): 
         </nav>
       ) : null}
 
-      {!port ? (
+      {/* Before the output, not after it: a sequence with no shots refuses to
+          run at all, so its editor cannot wait for something to have run. */}
+      {spec.type === 'sequence' && onParam ? (
+        <div className="ins-body ins-body-edit">
+          <ShotsEditor
+            shots={(node.params?.shots ?? []) as never[]}
+            onChange={(shots) => onParam('shots', shots)}
+          />
+        </div>
+      ) : !port ? (
         <p className="ins-empty">
           {run?.state === 'idle' || !run ? 'Not run yet.' : 'This node produced nothing.'}
         </p>

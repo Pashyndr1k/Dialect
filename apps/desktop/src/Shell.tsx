@@ -18,6 +18,8 @@ import type { Library, LoadedRegistry } from '@dialect/core';
 import { App } from './App.tsx';
 import { Editor } from './graph/Editor.tsx';
 import { Settings } from './Settings.tsx';
+import { Cards } from './Cards.tsx';
+import { Shelf } from './Shelf.tsx';
 import { BUILTIN } from './registry.ts';
 import { restoreSpend } from './gateway.ts';
 import { loadRegistry } from './channel.ts';
@@ -31,6 +33,8 @@ type View = 'canvas' | 'panels';
 export function Shell(): React.ReactElement {
   const [view, setView] = useState<View>('canvas');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cardsOpen, setCardsOpen] = useState(false);
+  const [shelfOpen, setShelfOpen] = useState(false);
   const [registry, setRegistry] = useState<LoadedRegistry>(BUILTIN);
   const [library, setLibrary] = useState<Library | null>(null);
   const [opening, setOpening] = useState<GraphDoc | null>(null);
@@ -77,6 +81,12 @@ export function Shell(): React.ReactElement {
         <button type="button" className="ghost" onClick={() => setView('panels')}>
           Panels
         </button>
+        <button type="button" className="ghost" onClick={() => setShelfOpen(true)}>
+          Kept
+        </button>
+        <button type="button" className="ghost" onClick={() => setCardsOpen(true)}>
+          Cards
+        </button>
         <button type="button" className="ghost" onClick={() => setSettingsOpen(true)}>
           Settings
         </button>
@@ -87,6 +97,22 @@ export function Shell(): React.ReactElement {
       ) : (
         <p className="shell-loading">Reading the cards and templates…</p>
       )}
+
+      {cardsOpen ? (
+        <Cards
+          rejected={registry.rejected}
+          cardCount={registry.registry.profiles.size}
+          onChanged={() => void loadRegistry().then(setRegistry).catch(() => undefined)}
+          onClose={() => setCardsOpen(false)}
+        />
+      ) : null}
+
+      {shelfOpen ? (
+        <Shelf
+          onClose={() => setShelfOpen(false)}
+          onChanged={() => void listTemplates().then((t) => setLibrary(libraryWith(t)))}
+        />
+      ) : null}
 
       {settingsOpen ? <Settings onClose={() => setSettingsOpen(false)} /> : null}
     </div>

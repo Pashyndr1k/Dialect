@@ -656,3 +656,165 @@
   color: var(--ink);
   border-color: var(--accent);
 }
+
+/* --- the shelf: what has been kept ----------------------------------------- */
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.shelf-tabs {
+  display: flex;
+  gap: 0.2rem;
+}
+.shelf-tabs button {
+  font: 0.8rem var(--ui);
+  text-transform: capitalize;
+  color: var(--ink-2);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+.shelf-tabs button.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.shelf {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.shelf li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--rule);
+}
+.shelf li > div {
+  flex: 1;
+  min-width: 0;
+}
+.shelf b {
+  display: block;
+  font: 600 0.85rem var(--ui);
+}
+.shelf span {
+  font: 0.72rem var(--mono);
+  color: var(--ink-3);
+}
+.shelf li button {
+  font: 0.75rem var(--ui);
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+}
+/* Deleting is the only thing on this panel that cannot be undone. */
+.shelf li button:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: var(--bad-soft);
+}
+.shelf-empty {
+  margin: 0;
+  font: 0.85rem/1.5 var(--ui);
+  color: var(--ink-3);
+}
+
+/* --- the shots of a sequence ----------------------------------------------- */
+.ins-body-edit {
+  padding-top: 0.7rem;
+}
+.shots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.shot {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem 0.55rem;
+  background: var(--ground);
+}
+.shot > header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+.shot > header > b {
+  font: 600 0.75rem var(--mono);
+  color: var(--accent);
+}
+.shot > header input {
+  flex: 1;
+  min-width: 0;
+  font: 0.78rem var(--mono);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.15rem 0.3rem;
+}
+.shot > header button {
+  font: 0.9rem/1 var(--ui);
+  color: var(--ink-3);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+.shot > header button:hover {
+  color: var(--bad);
+}
+.shot label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.35rem;
+}
+.shot label > span {
+  font: 600 0.62rem/1 var(--ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.shot textarea,
+.shot select {
+  width: 100%;
+  font: 0.8rem/1.45 var(--ui);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.25rem 0.35rem;
+  resize: vertical;
+}
+.shot-add {
+  font: 0.8rem var(--ui);
+  color: var(--ink-2);
+  background: none;
+  border: 1px dashed var(--rule);
+  border-radius: 5px;
+  padding: 0.35rem;
+  cursor: pointer;
+}
+.shot-add:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.cache-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}

@@ -633,7 +633,9 @@ function Board({ registry, library, doc: initial, onDocChange }: EditorProps): R
           spec={selectedNode ? NODES.get(selectedNode.type) : undefined}
           outputs={selected ? outputs.get(selected) : undefined}
           run={selected ? runs[selected] : undefined}
-          {...(selected ? { onSet: setField } : {})}
+          {...(selected
+            ? { onSet: setField, onParam: (k: string, v: unknown) => setParams(selected, { [k]: v }) }
+            : {})}
         />
       </div>
     </div>
