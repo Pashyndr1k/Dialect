@@ -22,6 +22,7 @@ use std::process::Command;
 use base64::Engine;
 use serde::Serialize;
 use serde_json::Value;
+use crate::tools;
 
 /// Analysis is capped rather than run over a whole album track. Tempo and key
 /// do not change often enough to be worth the wait.
@@ -66,7 +67,7 @@ fn tag(json: &Value, name: &str) -> Option<String> {
 
 #[tauri::command]
 pub fn audio_probe(path: String) -> Result<AudioProbe, String> {
-    let output = Command::new("ffprobe")
+    let output = Command::new(tools::ffprobe())
         .args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams", &path])
         .output()
         .map_err(|e| format!("Could not run ffprobe: {e}. Install ffmpeg and put it on PATH."))?;
@@ -116,7 +117,7 @@ pub fn audio_probe(path: String) -> Result<AudioProbe, String> {
 
 /// Mono, one fixed rate, plain floats. Everything below reads this.
 fn decode(path: &str) -> Result<Vec<f32>, String> {
-    let output = Command::new("ffmpeg")
+    let output = Command::new(tools::ffmpeg())
         .args([
             "-v", "error",
             "-i", path,
@@ -360,7 +361,7 @@ fn key_of(chroma: &[f64; 12]) -> Option<Key> {
 
 /// Integrated loudness and range, the two numbers that describe a master.
 fn loudness(path: &str) -> Option<(f64, f64)> {
-    let output = Command::new("ffmpeg")
+    let output = Command::new(tools::ffmpeg())
         .args(["-v", "info", "-nostats", "-i", path, "-af", "ebur128", "-f", "null", "-"])
         .output()
         .ok()?;
@@ -390,7 +391,7 @@ pub struct Picture {
 }
 
 fn render(path: &str, kind: &str, filter: &str) -> Option<Picture> {
-    let output = Command::new("ffmpeg")
+    let output = Command::new(tools::ffmpeg())
         .args([
             "-v", "error",
             "-i", path,
@@ -457,12 +458,12 @@ mod tests {
     use super::*;
 
     fn ffmpeg_here() -> bool {
-        Command::new("ffmpeg").arg("-version").output().map(|o| o.status.success()).unwrap_or(false)
+        Command::new(tools::ffmpeg()).arg("-version").output().map(|o| o.status.success()).unwrap_or(false)
     }
 
     /// A signal built to order, so the right answer is known rather than judged.
     fn synthesise(expression: &str, seconds: f64) -> Option<Vec<f32>> {
-        let output = Command::new("ffmpeg")
+        let output = Command::new(tools::ffmpeg())
             .args([
                 "-v", "error",
                 "-f", "lavfi",

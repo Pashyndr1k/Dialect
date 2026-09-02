@@ -166,6 +166,13 @@ jobs:
           key: ${{ matrix.name }}
       - run: npm ci
 
+      # ffmpeg travels with the app so a machine that has never heard of it can
+      # still read a clip. Pinned and licence-checked in the script rather than
+      # here — see scripts/fetch-ffmpeg.sh, which explains why that matters.
+      - name: Fetch the ffmpeg that ships with it
+        shell: bash
+        run: ./scripts/fetch-ffmpeg.sh ${{ matrix.name }}
+
       # Split into steps on purpose.
       #
       # This was one call to tauri-action, which failed on all three platforms

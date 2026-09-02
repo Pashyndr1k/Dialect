@@ -18,3 +18,7 @@
 # has to travel with the tests that check it.
 /tests/fixtures/*
 !/tests/fixtures/signed-set/
+
+# The binaries themselves are fetched at release time; the note beside them is not.
+binaries/*
+!binaries/README.md

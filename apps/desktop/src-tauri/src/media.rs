@@ -18,6 +18,7 @@ use std::process::Command;
 use base64::Engine;
 use serde::Serialize;
 use serde_json::Value;
+use crate::tools;
 
 /// Frames sampled from one clip. More than a handful stops adding anything and
 /// starts costing real money per read.
@@ -27,6 +28,11 @@ const DEFAULT_FRAMES: u32 = 5;
 pub struct MediaTools {
     ffmpeg: bool,
     ffprobe: bool,
+    /// True when the copy in use came with the app rather than off PATH.
+    ///
+    /// Not a problem either way — but when a clip reads differently here than
+    /// somewhere else, the first useful question is which ffmpeg did it.
+    bundled: bool,
 }
 
 fn runs(program: &str) -> bool {
@@ -41,7 +47,14 @@ fn runs(program: &str) -> bool {
 /// picks a file and waits for nothing.
 #[tauri::command]
 pub fn media_tools() -> MediaTools {
-    MediaTools { ffmpeg: runs("ffmpeg"), ffprobe: runs("ffprobe") }
+    // The resolved paths, not the bare names: a bundled copy is the whole
+    // point, and probing "ffmpeg" would report none on a machine that has only
+    // ours.
+    MediaTools {
+        ffmpeg: runs(tools::ffmpeg()),
+        ffprobe: runs(tools::ffprobe()),
+        bundled: tools::is_bundled("ffmpeg"),
+    }
 }
 
 #[derive(Serialize)]
@@ -84,7 +97,7 @@ fn fraction(text: &str) -> f64 {
 
 #[tauri::command]
 pub fn media_probe(path: String) -> Result<Probe, String> {
-    let output = Command::new("ffprobe")
+    let output = Command::new(tools::ffprobe())
         .args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams", &path])
         .output()
         .map_err(|e| format!("Could not run ffprobe: {e}. Install ffmpeg and put it on PATH."))?;
@@ -165,7 +178,7 @@ pub fn media_frames(path: String, count: Option<u32>) -> Result<Vec<Frame>, Stri
     for at in timestamps(probe.duration_s, wanted) {
         // Seeking before the input is the fast form; one frame out, scaled down
         // because a model reads a 4K still no better than a 768px one.
-        let output = Command::new("ffmpeg")
+        let output = Command::new(tools::ffmpeg())
             .args([
                 "-v", "error",
                 "-ss", &format!("{at:.3}"),
@@ -227,7 +240,7 @@ mod tests {
     #[test]
     fn reads_a_real_clip() {
         let clip = fixture("clip.mp4");
-        if !clip.exists() || !runs("ffprobe") || !runs("ffmpeg") {
+        if !clip.exists() || !runs(tools::ffprobe()) || !runs(tools::ffmpeg()) {
             eprintln!("skipped: needs ffmpeg and a clip at {}", clip.display());
             return;
         }

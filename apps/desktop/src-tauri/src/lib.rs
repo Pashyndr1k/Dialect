@@ -14,6 +14,7 @@ mod files;
 mod media;
 mod secrets;
 mod store;
+mod tools;
 mod voice;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
