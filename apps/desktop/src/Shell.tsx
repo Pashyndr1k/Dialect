@@ -19,6 +19,7 @@ import { App } from './App.tsx';
 import { Editor } from './graph/Editor.tsx';
 import { Settings } from './Settings.tsx';
 import { BUILTIN } from './registry.ts';
+import { restoreSpend } from './gateway.ts';
 import { loadRegistry } from './channel.ts';
 import { builtinLibrary, libraryWith, listTemplates } from './templates.ts';
 import { STARTER_GRAPH } from './graph/examples.ts';
@@ -35,6 +36,8 @@ export function Shell(): React.ReactElement {
     // Cards and templates are read from disk, so the first paint uses what the
     // build shipped and this replaces it a moment later.
     void (async () => {
+      // What earlier sessions spent, before anything can be run.
+      await restoreSpend();
       try {
         setRegistry(await loadRegistry());
       } catch {
