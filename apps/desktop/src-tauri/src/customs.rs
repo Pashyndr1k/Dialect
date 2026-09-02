@@ -27,7 +27,21 @@ fn dir_name(what: &str) -> Result<&'static str, String> {
     match what {
         "templates" => Ok("templates"),
         "sources" => Ok("sources"),
+        "graphs" => Ok("graphs"),
         other => Err(format!("\"{other}\" is not something this keeps.")),
+    }
+}
+
+/// What a kind is written as.
+///
+/// Templates and sources are YAML because people write them by hand. A graph is
+/// made by dragging and is read back by machine, so it is JSON — and it has to
+/// round-trip exactly, which YAML does not promise.
+fn ext_for(what: &str) -> &'static str {
+    if what == "graphs" {
+        "json"
+    } else {
+        "yaml"
     }
 }
 
@@ -45,13 +59,13 @@ fn dir(app: &tauri::AppHandle, what: &str) -> Result<PathBuf, String> {
 }
 
 /// An id is a file name, so it has to be one and nothing more.
-fn checked_id(id: &str) -> Result<String, String> {
+fn checked_id(id: &str, ext: &str) -> Result<String, String> {
     let ok = !id.is_empty()
         && id.len() <= 64
         && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
 
     if ok {
-        Ok(format!("{id}.yaml"))
+        Ok(format!("{id}.{ext}"))
     } else {
         Err(format!(
             "\"{id}\" is not a usable template id — lower-case letters, digits and hyphens only."
@@ -74,7 +88,7 @@ pub fn authored_list(app: tauri::AppHandle, what: String) -> Result<Vec<StoredFi
     let mut out: Vec<StoredFile> = entries
         .filter_map(|entry| {
             let path = entry.ok()?.path();
-            if path.extension()?.to_str()? != "yaml" {
+            if path.extension()?.to_str()? != ext_for(&what) {
                 return None;
             }
             Some(StoredFile {
@@ -95,14 +109,14 @@ pub fn authored_save(
     id: String,
     text: String,
 ) -> Result<String, String> {
-    let path = dir(&app, &what)?.join(checked_id(&id)?);
+    let path = dir(&app, &what)?.join(checked_id(&id, ext_for(&what))?);
     fs::write(&path, text).map_err(|e| format!("Could not save that: {e}"))?;
     Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 pub fn authored_delete(app: tauri::AppHandle, what: String, id: String) -> Result<(), String> {
-    let path = dir(&app, &what)?.join(checked_id(&id)?);
+    let path = dir(&app, &what)?.join(checked_id(&id, ext_for(&what))?);
     match fs::remove_file(&path) {
         Ok(()) => Ok(()),
         // Already gone is the state that was asked for.
@@ -133,16 +147,33 @@ mod tests {
         }
         assert_eq!(dir_name("templates").unwrap(), "templates");
         assert_eq!(dir_name("sources").unwrap(), "sources");
+        assert_eq!(dir_name("graphs").unwrap(), "graphs");
+    }
+
+    #[test]
+    fn writes_each_kind_as_what_people_read_it_as() {
+        // Hand-written things are YAML; a graph is made by dragging and has to
+        // round-trip exactly, so it is JSON.
+        assert_eq!(ext_for("templates"), "yaml");
+        assert_eq!(ext_for("sources"), "yaml");
+        assert_eq!(ext_for("graphs"), "json");
     }
 
     #[test]
     fn only_accepts_an_id_that_is_a_file_name() {
-        assert_eq!(checked_id("rpg-character-sheet").unwrap(), "rpg-character-sheet.yaml");
-        assert_eq!(checked_id("a1").unwrap(), "a1.yaml");
+        assert_eq!(
+            checked_id("rpg-character-sheet", "yaml").unwrap(),
+            "rpg-character-sheet.yaml"
+        );
+        assert_eq!(checked_id("a1", "yaml").unwrap(), "a1.yaml");
+        assert_eq!(checked_id("a1", "json").unwrap(), "a1.json");
 
         for bad in ["", "../escape", "with/slash", "With-Caps", "spaces here", "dot.yaml"] {
-            assert!(checked_id(bad).is_err(), "{bad} should have been refused");
+            assert!(checked_id(bad, "yaml").is_err(), "{bad} should have been refused");
         }
-        assert!(checked_id(&"a".repeat(65)).is_err(), "an id has to fit in a name");
+        assert!(
+            checked_id(&"a".repeat(65), "yaml").is_err(),
+            "an id has to fit in a name"
+        );
     }
 }

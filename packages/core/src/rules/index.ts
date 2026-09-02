@@ -10,6 +10,7 @@ import { emotionsArePhysical } from './defs/emotions-are-physical.ts';
 import { onlyVisibleAndAudible } from './defs/only-visible-and-audible.ts';
 import { exitFrameMeansGone } from './defs/exit-frame-means-gone.ts';
 import { skinRealismBlock } from './defs/skin-realism-block.ts';
+import { monoVsColour } from './defs/mono-vs-colour.ts';
 
 /**
  * Every rule the build knows about. Profiles opt in by id; rules marked
@@ -28,6 +29,7 @@ export const ALL_RULES: Rule[] = [
   onlyVisibleAndAudible,
   exitFrameMeansGone,
   skinRealismBlock,
+  monoVsColour,
 ];
 
 export const RULES_BY_ID: ReadonlyMap<string, Rule> = new Map(ALL_RULES.map((r) => [r.id, r]));

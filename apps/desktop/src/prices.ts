@@ -6,14 +6,25 @@
  * cost differently depending on which button you reached for.
  *
  * Rough is fine — the number is there so nobody is surprised, not so anybody can
- * do accounting with it. The reading figure is the one live extraction this
- * project has actually measured, rounded up; the composing figure is smaller
- * because that call carries no picture.
+ * do accounting with it.
+ *
+ * These were measured against Opus, then scaled when the default model became
+ * Sonnet: the published rates are two fifths of Opus on both input and output,
+ * so the figures are two fifths of what was measured. That is arithmetic, not a
+ * measurement — the token counts should be the same but nothing here has
+ * watched a Sonnet run yet. The first one that happens should correct them.
  */
 
-export const PER_READ_USD = 0.05;
-export const PER_WRITE_USD = 0.01;
+/** Reading a reference: one call carrying pictures. */
+export const PER_READ_USD = 0.02;
+
+/** Composing, varying, filling a template: text in, text out. */
+export const PER_WRITE_USD = 0.004;
 
 /** What one press will cost: the references not yet read, plus the writing. */
 export const estimate = (unread: number, composes: boolean): number =>
   unread * PER_READ_USD + (composes ? PER_WRITE_USD : 0);
+
+/** Pennies, for a label. Rounded up, because a low guess is the bad surprise. */
+export const roughly = (usd: number): string =>
+  usd < 0.01 ? 'under 1c' : `about ${Math.ceil(usd * 100)}c`;

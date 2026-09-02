@@ -22,3 +22,4 @@ export * from './sequence/index.ts';
 export * from './compose/index.ts';
 export * from './sources/index.ts';
 export * from './vary/index.ts';
+export * from './graph/index.ts';
