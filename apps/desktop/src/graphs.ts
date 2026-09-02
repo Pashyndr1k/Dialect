@@ -80,3 +80,64 @@ export async function deleteGraph(id: string): Promise<void> {
 export async function openGraphsFolder(): Promise<void> {
   await openKeptFolder('graphs');
 }
+
+/* -------------------------------------------------------- somewhere else --- */
+
+/**
+ * Where the app keeps graphs, for saying out loud.
+ *
+ * People ask where their files are, and "in the app's data folder" is not an
+ * answer anyone can act on.
+ */
+export async function graphsFolder(): Promise<string> {
+  if (!hasHost()) return '(in this browser, not on disk)';
+  return invoke<string>('authored_folder', { what: 'graphs' });
+}
+
+/**
+ * Save this graph wherever the person says, through the system dialog.
+ *
+ * Separate from `saveGraph`, which files things under a name in the app's own
+ * folder. Both are worth having: one is a library, the other is a file you can
+ * put next to the project it belongs to and send to somebody.
+ *
+ * Returns the path written, or null if the dialog was dismissed — cancelling is
+ * not a failure and must not be reported as one.
+ */
+export async function saveGraphAs(doc: GraphDoc): Promise<string | null> {
+  if (!hasHost()) throw new Error('Saving to a folder needs the desktop app.');
+
+  const { save } = await import('@tauri-apps/plugin-dialog');
+  const path = await save({
+    title: 'Save this graph',
+    defaultPath: `${idFor(doc.name ?? 'graph')}.json`,
+    filters: [{ name: 'Dialect graph', extensions: ['json'] }],
+  });
+  if (!path) return null;
+
+  await invoke<void>('file_write', { path, text: `${JSON.stringify(doc, null, 2)}
+` });
+  return path;
+}
+
+/** Open a graph from anywhere on disk. Null when the dialog was dismissed. */
+export async function openGraphFile(): Promise<{ doc: GraphDoc; path: string } | null> {
+  if (!hasHost()) throw new Error('Opening a file needs the desktop app.');
+
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  const picked = await open({
+    title: 'Open a graph',
+    multiple: false,
+    filters: [{ name: 'Dialect graph', extensions: ['json'] }],
+  });
+  const path = typeof picked === 'string' ? picked : null;
+  if (!path) return null;
+
+  const text = await invoke<string>('file_text', { path });
+  const doc = JSON.parse(text) as GraphDoc;
+  // Said here rather than three screens later, when a node fails to appear.
+  if (!doc || !Array.isArray(doc.nodes) || !Array.isArray(doc.edges)) {
+    throw new Error(`${path.split(/[\/]/).pop()} is not a Dialect graph.`);
+  }
+  return { doc, path };
+}

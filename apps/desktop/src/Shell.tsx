@@ -28,15 +28,22 @@ import { loadRegistry } from './channel.ts';
 import { builtinLibrary, libraryWith, listTemplates } from './templates.ts';
 import { STARTER_GRAPH } from './graph/examples.ts';
 import { loadOpenGraph } from './graph/open.ts';
+import type { SavedGraph } from './graphs.ts';
 
 /** What the editor hands up so the title bar can name and keep the graph. */
 interface GraphHandles {
   name: string | undefined;
   dirty: boolean;
+  doc: GraphDoc;
   rename: (name: string) => void;
   save: () => void;
   open: (doc: GraphDoc) => void;
+  saved: SavedGraph[];
+  say: (message: string) => void;
 }
+
+/** A graph with nothing in it, for New. */
+const BLANK: GraphDoc = { version: 1, nodes: [], edges: [] };
 
 export function Shell(): React.ReactElement {
   const [sheet, setSheet] = useState<'kept' | 'cards' | 'settings' | null>(null);
@@ -81,12 +88,17 @@ export function Shell(): React.ReactElement {
           <GraphName
             name={graph.name}
             dirty={graph.dirty}
+            doc={graph.doc}
+            saved={graph.saved}
             onRename={graph.rename}
             onSave={(name) => {
               graph.rename(name);
               // The rename has to land before the save reads it.
               setTimeout(graph.save, 0);
             }}
+            onOpen={graph.open}
+            onNew={() => graph.open({ ...BLANK, name: undefined })}
+            onSay={graph.say}
           />
         ) : null}
 
@@ -111,8 +123,7 @@ export function Shell(): React.ReactElement {
 
       {sheet === 'cards' ? (
         <Cards
-          rejected={registry.rejected}
-          cardCount={registry.registry.profiles.size}
+          registry={registry}
           onChanged={() => void loadRegistry().then(setRegistry).catch(() => undefined)}
           onClose={() => setSheet(null)}
         />

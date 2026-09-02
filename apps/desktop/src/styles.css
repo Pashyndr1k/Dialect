@@ -626,3 +626,92 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   border-left: 2px solid var(--hot); background: var(--hot-soft); border-radius: 0 4px 4px 0;
 }
 .rows-s .row-name { font-family: inherit; font-size: 12.5px; }
+
+/* --- model cards: the list, and one card open ----------------------------- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.tabs button {
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.card-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(24rem, 46vh);
+  overflow-y: auto;
+}
+.card-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.card-row:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.card-row b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.card-id {
+  flex: 1;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The layer a card came from, because it decides what you can do to it. */
+.card-tag {
+  flex: none;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-radius: 999px;
+  color: var(--ink-3);
+  background: var(--rule);
+}
+.card-tag.tag-yours { color: var(--accent); background: var(--accent-soft); }
+.card-tag.tag-beaten { color: var(--ink-3); background: none; border: 1px dashed var(--rule); }
+
+.card-head { margin-top: 0; }
+.card-name { flex: 1; min-width: 8rem; }
+.card-text {
+  display: block;
+  width: 100%;
+  min-height: 20rem;
+  max-height: 46vh;
+  margin-top: 10px;
+  padding: 10px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  resize: vertical;
+  tab-size: 2;
+}
+.card-text:read-only { color: var(--ink-2); }

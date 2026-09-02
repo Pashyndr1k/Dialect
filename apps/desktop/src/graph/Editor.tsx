@@ -11,10 +11,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   useNodesState,
+  useReactFlow,
   type Connection,
   type Edge,
   type Node,
@@ -42,6 +42,7 @@ import { Inspector } from './Inspector.tsx';
 import { RunBar } from './RunBar.tsx';
 import { useRun } from './useRun.ts';
 import { useGraphDoc } from './useGraphDoc.ts';
+import { ContextMenu, type Spot } from './ContextMenu.tsx';
 import { pickFolder, pickReferences } from '../store.ts';
 import { listSources } from '../sources.ts';
 import type { SavedGraph } from '../graphs.ts';
@@ -60,10 +61,13 @@ export interface EditorProps {
   onGraph?: (state: {
     name: string | undefined;
     dirty: boolean;
+    doc: GraphDoc;
     rename: (name: string) => void;
     save: () => void;
     open: (doc: GraphDoc) => void;
     saved: SavedGraph[];
+    /** So the title bar's failures land where the editor's do. */
+    say: (message: string) => void;
   }) => void;
 }
 
@@ -85,6 +89,8 @@ function Board({ registry, library, doc: initial, onGraph }: EditorProps): React
   const [selected, setSelected] = useState<string | null>(null);
   const [sources, setSources] = useState<SavedSource[]>([]);
   const [flowNodes, setFlowNodes, onNodesChangeInternal] = useNodesState<Node>([]);
+  const [spot, setSpot] = useState<Spot | null>(null);
+  const flow = useReactFlow();
 
   /**
    * The document tells the run to forget, through a ref.
@@ -320,18 +326,28 @@ function Board({ registry, library, doc: initial, onGraph }: EditorProps): React
     [doc, run],
   );
 
-  // Kept in a ref and reported on change, so the title bar always has the
-  // current handles without the editor re-rendering when the bar does.
+  /**
+   * Reported to the title bar when it changes, and only then.
+   *
+   * Deliberately not depending on `run`: `useRun` builds its result fresh on
+   * every render, so an effect that depends on the whole of it fires on every
+   * render, hands the shell a new object, and is re-rendered by the shell doing
+   * so — a loop React only stops by refusing to continue. `say` is the one
+   * piece needed here and it is a setState function, which never changes.
+   */
+  const say = run.say;
   useEffect(() => {
     onGraph?.({
       name: doc.name,
       dirty: graph.dirty,
+      doc,
       rename: graph.rename,
-      save: () => void graph.keep().catch((err: Error) => run.say(err.message)),
+      save: () => void graph.keep().catch((err: Error) => say(err.message)),
       open: graph.open,
       saved: graph.saved,
+      say,
     });
-  }, [doc.name, graph.dirty, graph.rename, graph.keep, graph.open, graph.saved, onGraph, run]);
+  }, [doc, graph.dirty, graph.rename, graph.keep, graph.open, graph.saved, onGraph, say]);
 
   const node = doc.nodes.find((n) => n.id === selected);
 
@@ -367,17 +383,47 @@ function Board({ registry, library, doc: initial, onGraph }: EditorProps): React
             onConnectEnd={onConnectEnd}
             isValidConnection={isValid}
             onPaneClick={() => setSelected(null)}
+            onPaneContextMenu={(e) => {
+              e.preventDefault();
+              const m = e as unknown as MouseEvent;
+              setSpot({
+                x: m.clientX,
+                y: m.clientY,
+                at: flow.screenToFlowPosition({ x: m.clientX, y: m.clientY }),
+              });
+            }}
+            onNodeContextMenu={(e, n) => {
+              e.preventDefault();
+              setSelected(n.id);
+              setSpot({
+                x: e.clientX,
+                y: e.clientY,
+                node: n.id,
+                at: flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }),
+              });
+            }}
             proOptions={{ hideAttribution: true }}
             fitView
           >
             <Background gap={18} size={1} />
             <Controls showInteractive={false} />
-            {/* Where you are, in a graph too big to see at once. Hidden while
-                there is nothing to get lost in. */}
-            {doc.nodes.length > 3 ? (
-              <MiniMap pannable zoomable nodeStrokeWidth={2} className="graph-map" />
-            ) : null}
           </ReactFlow>
+
+          {spot ? (
+            <ContextMenu
+              spot={spot}
+              canUndo={graph.canUndo}
+              canRedo={graph.canRedo}
+              onAdd={graph.addNode}
+              onDuplicate={graph.duplicateNode}
+              onRemove={graph.removeNode}
+              onRun={() => void run.go()}
+              onUndo={graph.undo}
+              onRedo={graph.redo}
+              onFit={() => void flow.fitView({ duration: 200 })}
+              onClose={() => setSpot(null)}
+            />
+          ) : null}
         </BoardProvider>
 
         <Inspector

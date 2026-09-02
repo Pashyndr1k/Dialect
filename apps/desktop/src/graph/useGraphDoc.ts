@@ -37,7 +37,9 @@ export interface GraphDocApi {
   canUndo: boolean;
   canRedo: boolean;
   setParams: (id: string, patch: Record<string, unknown>) => void;
-  addNode: (type: string) => void;
+  addNode: (type: string, at?: { x: number; y: number }) => void;
+  /** The same node again, offset, wires not carried over. */
+  duplicateNode: (id: string) => void;
   removeNode: (id: string) => void;
   connect: (from: { node: string; port: string }, to: { node: string; port: string }) => void;
   open: (next: GraphDoc) => void;
@@ -135,13 +137,42 @@ export function useGraphDoc(
   );
 
   const addNode = useCallback(
-    (type: string): void =>
+    (type: string, at?: { x: number; y: number }): void =>
       edit((d) => {
         const taken = new Set(d.nodes.map((n) => n.id));
-        // Dropped where there is room rather than on top of the last one.
-        const x = 60 + (d.nodes.length % 4) * 260;
-        const y = 60 + Math.floor(d.nodes.length / 4) * 220;
-        return { ...d, nodes: [...d.nodes, { id: freshId(type, taken), type, at: { x, y } }] };
+        // Where you pointed, when you pointed — a right-click on the canvas
+        // means "here". Otherwise somewhere with room, rather than on top of
+        // the last one.
+        const spot = at ?? {
+          x: 60 + (d.nodes.length % 4) * 260,
+          y: 60 + Math.floor(d.nodes.length / 4) * 220,
+        };
+        return { ...d, nodes: [...d.nodes, { id: freshId(type, taken), type, at: spot }] };
+      }),
+    [edit],
+  );
+
+  /**
+   * A copy of one node, settings and all, a little down and to the right.
+   *
+   * Its wires are not copied. A duplicate of a node that was wired into the
+   * middle of a graph would silently double whatever ran through it, and the
+   * usual reason to duplicate is to try a second version of the same settings
+   * — which wants its own wires, chosen deliberately.
+   */
+  const duplicateNode = useCallback(
+    (id: string): void =>
+      edit((d) => {
+        const from = d.nodes.find((n) => n.id === id);
+        if (!from) return d;
+        const taken = new Set(d.nodes.map((n) => n.id));
+        const copy = {
+          ...from,
+          id: freshId(from.type, taken),
+          at: { x: (from.at?.x ?? 0) + 40, y: (from.at?.y ?? 0) + 40 },
+          ...(from.params ? { params: { ...from.params } } : {}),
+        };
+        return { ...d, nodes: [...d.nodes, copy] };
       }),
     [edit],
   );
@@ -220,6 +251,7 @@ export function useGraphDoc(
     canRedo: future.length > 0,
     setParams,
     addNode,
+    duplicateNode,
     removeNode,
     connect,
     open,

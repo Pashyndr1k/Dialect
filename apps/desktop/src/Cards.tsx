@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { Rejection } from '@dialect/core';
+import type { LoadedRegistry } from '@dialect/core';
+
+import { CardList } from './CardList.tsx';
 
 import {
   channelStatus,
@@ -20,22 +22,28 @@ import {
  * wanted last, and the card is the only thing between that change and a wrong
  * prompt — so the set has to be replaceable without a new binary.
  *
- * Which makes it a supply chain, and this panel is where that is admitted: a
- * set installs only if it is signed by a key trusted beforehand. Without a
+ * Which makes it a supply chain, and the second tab is where that is admitted:
+ * a set installs only if it is signed by a key trusted beforehand. Without a
  * trusted key nothing installs at all, and the panel says so rather than
  * offering a button that would.
+ *
+ * The cards themselves come first, because that is what someone opening a
+ * panel called "Model cards" came to see. Where the set came from is a question
+ * you have once; what a card says is a question you have every time one is
+ * wrong.
  */
 export function Cards({
-  rejected,
-  cardCount,
+  registry,
   onChanged,
   onClose,
 }: {
-  rejected: Rejection[];
-  cardCount: number;
+  registry: LoadedRegistry;
   onChanged: () => void;
   onClose: () => void;
 }) {
+  const [tab, setTab] = useState<'cards' | 'source'>('cards');
+  const rejected = registry.rejected;
+  const cardCount = registry.registry.profiles.size;
   const [status, setStatus] = useState<ChannelStatus | null>(null);
   const [keyDraft, setKeyDraft] = useState('');
   const [source, setSource] = useState('');
@@ -74,6 +82,18 @@ export function Cards({
           </button>
         </div>
 
+        <div className="tabs">
+          <button className={tab === 'cards' ? 'on' : ''} onClick={() => setTab('cards')}>
+            The cards
+          </button>
+          <button className={tab === 'source' ? 'on' : ''} onClick={() => setTab('source')}>
+            Where they come from
+          </button>
+        </div>
+
+        {tab === 'cards' ? <CardList registry={registry} onChanged={onChanged} /> : null}
+
+        <div hidden={tab !== 'source'}>
         <p className="sheet-p">
           {cardCount} cards in use.{' '}
           {status?.version
@@ -215,6 +235,7 @@ export function Cards({
           overrides anything above it. A card naming a renderer this build does not have is
           skipped rather than crashing the window.
         </p>
+        </div>
       </div>
     </div>
   );

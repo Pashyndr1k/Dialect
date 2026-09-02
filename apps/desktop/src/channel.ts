@@ -106,6 +106,24 @@ export const installChannel = (source: string, force = false): Promise<ChannelSt
 export const revertChannel = (): Promise<ChannelStatus> =>
   invoke<ChannelStatus>('channel_revert', {});
 
+/** The two layers that are read from disk, for looking at and editing. */
+export const channelCards = (): Promise<CardSource[]> => fromHost('channel_cards');
+export const myCards = (): Promise<CardSource[]> => fromHost('my_cards');
+
+/**
+ * One card of your own, written or replaced. Returns where it landed.
+ *
+ * Only your own: the built-in cards are in the binary and an installed set is
+ * checked against a signature, so writing into either would either be
+ * impossible or would break the thing that makes it trustworthy. Editing one of
+ * those means taking a copy first, which is what the panel offers.
+ */
+export const saveMyCard = (name: string, text: string): Promise<string> =>
+  invoke<string>('my_card_save', { name, text });
+
+export const deleteMyCard = (name: string): Promise<void> =>
+  invoke<void>('my_card_delete', { name });
+
 export async function openCardsFolder(): Promise<void> {
   if (!hasHost()) throw new Error('Opening a folder needs the desktop app.');
   await showFolder(await invoke<string>('cards_folder', {}));

@@ -396,6 +396,50 @@ pub fn my_cards(app: tauri::AppHandle) -> Result<Vec<(String, String)>, String> 
     Ok(out)
 }
 
+/// One card of your own, written into the my-models folder.
+///
+/// The name is a file name and nothing else — no slashes, no `..`, and it ends
+/// in `.yaml`. The web view names the file, and a web view that can name a path
+/// can name any path, so the naming happens here where it can be refused.
+#[tauri::command]
+pub fn my_card_save(app: tauri::AppHandle, name: String, text: String) -> Result<String, String> {
+    let file = card_file(&app, &name)?;
+    fs::write(&file, text).map_err(|e| format!("Could not write the card: {e}"))?;
+    Ok(file.to_string_lossy().to_string())
+}
+
+/// One of your own cards, removed. Built-in and installed cards are not here
+/// and cannot be reached from here — the folder is fixed.
+#[tauri::command]
+pub fn my_card_delete(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    let file = card_file(&app, &name)?;
+    if !file.exists() {
+        return Ok(());
+    }
+    fs::remove_file(&file).map_err(|e| format!("Could not remove the card: {e}"))
+}
+
+/// A file name that is a name, or a refusal. Kept separate from the path so it
+/// can be tested without a running app.
+fn card_name(name: &str) -> Result<&str, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("A card needs a file name.".to_string());
+    }
+    if name.contains(['/', '\\', ':']) || name.contains("..") {
+        return Err("A card's file name is a name, not a path.".to_string());
+    }
+    if !name.ends_with(".yaml") && !name.ends_with(".yml") {
+        return Err("A card is a .yaml file.".to_string());
+    }
+    Ok(name)
+}
+
+/// A file name turned into a path inside the my-models folder, or a refusal.
+fn card_file(app: &tauri::AppHandle, name: &str) -> Result<PathBuf, String> {
+    Ok(PathBuf::from(cards_folder(app.clone())?).join(card_name(name)?))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -691,5 +735,25 @@ label: newer
 
         assert!(tauri::async_runtime::block_on(fetch(&source, "safe.yaml")).is_ok());
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_card_of_your_own_is_named_not_addressed() {
+        // The web view supplies this name, and a web view that can name a path
+        // can name any path — so the refusals matter more than the acceptance.
+        for bad in [
+            "",
+            "   ",
+            "card.yaml.txt",
+            "notes.txt",
+            "../../secrets.yaml",
+            "sub/card.yaml",
+            "C:\\Windows\\evil.yaml",
+        ] {
+            assert!(card_name(bad).is_err(), "{bad} should not be a card name");
+        }
+
+        assert_eq!(card_name(" mine.yaml ").unwrap(), "mine.yaml");
+        assert_eq!(card_name("mine.yml").unwrap(), "mine.yml");
     }
 }

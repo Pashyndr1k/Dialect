@@ -203,3 +203,28 @@ mod tests {
     }
 
 }
+
+/// Write text to a path the person chose in a save dialog.
+///
+/// Deliberately not restricted to the folders this app manages: the whole point
+/// of "save as" is putting a file where you want it, and a save dialog is the
+/// person already having said where. What it will not do is decide the path
+/// itself — that comes from the dialog, never from the web view guessing.
+#[tauri::command]
+pub fn file_write(path: String, text: String) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Could not make that folder: {e}"))?;
+    }
+    fs::write(&path, text).map_err(|e| format!("Could not write there: {e}"))
+}
+
+/// Read a text file the person chose. Small files only — a graph is kilobytes,
+/// and the size limit above exists so a mis-click cannot load a video as text.
+#[tauri::command]
+pub fn file_text(path: String) -> Result<String, String> {
+    let meta = fs::metadata(&path).map_err(|e| format!("Could not open that file: {e}"))?;
+    if meta.len() > 4 * 1_048_576 {
+        return Err("That file is far too large to be a graph.".to_string());
+    }
+    fs::read_to_string(&path).map_err(|e| format!("Could not read that file: {e}"))
+}
