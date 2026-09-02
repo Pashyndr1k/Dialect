@@ -516,3 +516,73 @@
   font: 0.68rem var(--mono);
   color: var(--hot);
 }
+
+/* --- acting on a result ---------------------------------------------------- */
+.ins-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--rule);
+}
+.ins-actions button {
+  font: 0.78rem var(--ui);
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+}
+.ins-actions button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.ins-actions .said {
+  font: 0.74rem var(--ui);
+  color: var(--accent);
+}
+.ins-actions .said.bad {
+  color: var(--bad);
+}
+
+/* --- editing the document -------------------------------------------------- */
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.field > span {
+  font: 600 0.65rem/1 var(--ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  cursor: help;
+}
+.field textarea,
+.field input[type='number'] {
+  width: 100%;
+  font: 0.8rem/1.45 var(--ui);
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.3rem 0.4rem;
+  resize: vertical;
+}
+/* An edited field is the one thing on this panel that is not simply reported. */
+.field-set > span {
+  color: var(--accent);
+}
+.field-set textarea,
+.field-set input {
+  border-color: var(--accent);
+}

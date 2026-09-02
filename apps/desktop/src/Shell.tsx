@@ -23,6 +23,8 @@ import { restoreSpend } from './gateway.ts';
 import { loadRegistry } from './channel.ts';
 import { builtinLibrary, libraryWith, listTemplates } from './templates.ts';
 import { STARTER_GRAPH } from './graph/examples.ts';
+import { loadOpenGraph } from './graph/open.ts';
+import type { GraphDoc } from '@dialect/core';
 
 type View = 'canvas' | 'panels';
 
@@ -31,6 +33,7 @@ export function Shell(): React.ReactElement {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [registry, setRegistry] = useState<LoadedRegistry>(BUILTIN);
   const [library, setLibrary] = useState<Library | null>(null);
+  const [opening, setOpening] = useState<GraphDoc | null>(null);
 
   useEffect(() => {
     // Cards and templates are read from disk, so the first paint uses what the
@@ -38,6 +41,8 @@ export function Shell(): React.ReactElement {
     void (async () => {
       // What earlier sessions spent, before anything can be run.
       await restoreSpend();
+      // Where the last window was left, or the starter graph the first time.
+      setOpening((await loadOpenGraph()) ?? STARTER_GRAPH);
       try {
         setRegistry(await loadRegistry());
       } catch {
@@ -77,8 +82,8 @@ export function Shell(): React.ReactElement {
         </button>
       </header>
 
-      {library ? (
-        <Editor registry={registry} library={library} doc={STARTER_GRAPH} />
+      {library && opening ? (
+        <Editor registry={registry} library={library} doc={opening} />
       ) : (
         <p className="shell-loading">Reading the cards and templates…</p>
       )}

@@ -9,6 +9,9 @@
  */
 
 import { useState } from 'react';
+
+import { Actions } from './Actions.tsx';
+import { FieldEditor } from './FieldEditor.tsx';
 import {
   PORT_LABEL,
   type Finding,
@@ -23,6 +26,8 @@ export interface InspectorProps {
   spec?: NodeSpec | undefined;
   outputs?: NodeOutputs | undefined;
   run?: { state: string; usd?: number; error?: string } | undefined;
+  /** Record an override on the selected node. Only an Edit fields node uses it. */
+  onSet?: (path: string, value: unknown) => void;
 }
 
 const LEVEL_ORDER: Record<Finding['level'], number> = { block: 0, warn: 1, autofix: 2 };
@@ -115,7 +120,7 @@ function Item({ value, index }: { value: Signal[number]; index: number }): React
   );
 }
 
-export function Inspector({ node, spec, outputs, run }: InspectorProps): React.ReactElement {
+export function Inspector({ node, spec, outputs, run, onSet }: InspectorProps): React.ReactElement {
   const ports = Object.entries(outputs ?? {});
   const [open, setOpen] = useState<string | null>(null);
   const port = ports.find(([name]) => name === open) ?? ports[0];
@@ -160,6 +165,17 @@ export function Inspector({ node, spec, outputs, run }: InspectorProps): React.R
         </p>
       ) : (
         <div className="ins-body">
+          <Actions values={port[1]} />
+          {/* An Edit fields node is the one place the inspector is for writing
+              rather than reading, so it shows the document it produced as
+              something to change. */}
+          {spec.type === 'fields' && onSet && port[1][0]?.type === 'ir' ? (
+            <FieldEditor
+              ir={port[1][0].ir}
+              set={(node.params?.set ?? {}) as Record<string, unknown>}
+              onSet={onSet}
+            />
+          ) : null}
           {/* A wire carrying twenty things is twenty results, numbered, because
               which one is the fourth matters when you are comparing them. */}
           {port[1].length > 1 ? (
