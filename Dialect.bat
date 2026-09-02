@@ -6,10 +6,11 @@ title Dialect
 :: Dialect launcher.
 ::
 :: Double-click to run the app. The first run compiles it, which takes a few
-:: minutes; every run after that starts instantly from the built exe.
+:: minutes; later runs start instantly unless the code has changed since.
 ::
-::   Dialect.bat            launch (build only if there is nothing to launch)
-::   Dialect.bat rebuild    rebuild first, to pick up code changes
+::   Dialect.bat            launch, rebuilding first if the code has moved on
+::   Dialect.bat rebuild    rebuild whatever the state of things
+::   Dialect.bat run        launch what is there, without checking
 
 set EXE=apps\desktop\src-tauri\target\release\dialect.exe
 
@@ -51,9 +52,21 @@ if not exist node_modules (
   )
 )
 
-:: -- Build ------------------------------------------------------------------
+:: -- Which version this is --------------------------------------------------
+:: Read from the one place that decides it, so the console cannot disagree with
+:: the window.
+set VERSION=
+for /f "usebackq tokens=*" %%v in (`node -p "require('./package.json').version" 2^>nul`) do set VERSION=%%v
+
+:: -- Is what we have still the current code? ---------------------------------
+:: The exe existing is not the same as the exe being current. Without this,
+:: every launch after an edit or a pull silently starts the old build, and
+:: nothing on screen says so.
 if /i "%~1"=="rebuild" goto build
-if not exist "%EXE%" goto build
+if /i "%~1"=="run" goto launch
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\needs-build.ps1" -Exe "%EXE%" -Root "%CD%"
+if errorlevel 1 goto build
 goto launch
 
 :build
@@ -68,7 +81,11 @@ if not errorlevel 1 (
   exit /b 1
 )
 
-echo Building Dialect - the first build takes a few minutes, later ones are quick...
+if defined VERSION (
+  echo Building Dialect %VERSION% - the first build takes a few minutes, later ones are quick...
+) else (
+  echo Building Dialect - the first build takes a few minutes, later ones are quick...
+)
 echo.
 pushd apps\desktop
 call npx tauri build --no-bundle
@@ -88,6 +105,10 @@ if not exist "%EXE%" (
 )
 
 :launch
-echo Starting Dialect...
+if defined VERSION (
+  echo Starting Dialect %VERSION%...
+) else (
+  echo Starting Dialect...
+)
 start "" "%EXE%"
 exit /b 0
