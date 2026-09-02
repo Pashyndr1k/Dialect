@@ -13,6 +13,7 @@ import { PORT_LABEL, type PortSpec } from '@dialect/core';
 import { controlsFor, summaryOf, type Control, type World } from './controls.ts';
 import { useBoard, type NodeFace } from './NodeData.tsx';
 import { NODES } from './host.ts';
+import { DeckCard, Dictated } from './Widgets.tsx';
 
 /**
  * What a widget needs. Assembled here from the board rather than carried on the
@@ -141,6 +142,9 @@ function Widget({
       </label>
     );
   }
+
+  if (control.kind === 'mic') return <Dictated control={control} data={data} />;
+  if (control.kind === 'deck') return <DeckCard control={control} data={data} />;
 
   return (
     <label className="node-field">

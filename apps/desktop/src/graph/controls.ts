@@ -49,6 +49,8 @@ export type Control =
       apply?: (value: string, w: World) => Record<string, unknown>;
     }
   | { kind: 'number'; key: string; label: string; min: number; max: number }
+  | { kind: 'deck'; key: string; label: string }
+  | { kind: 'mic'; key: string; label: string; rows?: number; placeholder?: string }
   | { kind: 'file'; key: string; label: string }
   | { kind: 'folder'; key: string; label: string };
 
@@ -64,7 +66,9 @@ const roleChoices = (): Choice[] =>
   SOURCE_ROLES.map((r) => ({ value: r, label: ROLE_LABEL[r] }));
 
 const CONTROLS: Record<string, Control[]> = {
-  words: [{ kind: 'text', key: 'text', label: 'Words', rows: 4, placeholder: 'What do you want?' }],
+  // A microphone beside the box, not a channel of its own: dictation is a way
+  // of filling the field, not a different kind of input.
+  words: [{ kind: 'mic', key: 'text', label: 'Words', rows: 4, placeholder: 'What do you want?' }],
 
   reference: [{ kind: 'file', key: 'path', label: 'File' }],
 
@@ -149,6 +153,21 @@ const CONTROLS: Record<string, Control[]> = {
       options: () => VARY_AXES.map((a) => ({ value: a, label: AXIS_LABEL[a] })),
     },
     { kind: 'number', key: 'count', label: 'How many', min: 2, max: 12 },
+    {
+      kind: 'text',
+      key: 'brief',
+      label: 'Narrowed to',
+      rows: 2,
+      placeholder: 'Optional. "townsfolk", "all at dusk"…',
+    },
+    {
+      // One card, held on the node rather than drawn fresh each run: a set of
+      // variations that changed every time you asked for it would not be a set
+      // anyone could go back to.
+      kind: 'deck',
+      key: 'nudge',
+      label: 'One thing true of all',
+    },
   ],
 
   learn: [

@@ -586,3 +586,73 @@
 .field-set input {
   border-color: var(--accent);
 }
+
+/* --- dictation and decks --------------------------------------------------- */
+.field-with-mic {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.node-field .mic {
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.55rem;
+  line-height: 1;
+  color: var(--ink-3);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.node-field .mic:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+/* Recording is the one state on a node that is happening right now. */
+.node-field .mic.on {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: var(--bad-soft);
+}
+.field-wrong {
+  font: 0.7rem var(--ui);
+  font-style: normal;
+  color: var(--bad);
+}
+
+.deck-held {
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.35rem 0.45rem;
+}
+.deck-held b {
+  display: block;
+  font: 600 0.75rem var(--ui);
+}
+.deck-held p {
+  margin: 0.15rem 0 0.35rem;
+  font: 0.72rem/1.4 var(--ui);
+  color: var(--ink-2);
+}
+.deck-buttons {
+  display: flex;
+  gap: 0.3rem;
+}
+.deck-buttons button {
+  font: 0.7rem var(--ui);
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  cursor: pointer;
+}
+.deck-buttons button:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}

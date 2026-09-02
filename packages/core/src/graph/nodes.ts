@@ -26,7 +26,7 @@ import { learnTemplate, type CastSize, type TemplateKind } from '../templates/le
 import { applyVariant, vary } from '../vary/vary.ts';
 import { SOURCE_ROLES, type Bundle, type SourceRole } from '../compose/types.ts';
 import type { PromptIR } from '../ir/types.ts';
-import type { VaryAxis } from '../vary/types.ts';
+import type { DeckEntry, VaryAxis } from '../vary/types.ts';
 import {
   GraphError,
   type GraphLines,
@@ -373,8 +373,19 @@ const specs: NodeSpec[] = [
       const { ir } = one(inputs.ir, 'ir', 'ir');
       const axis = str(params, 'axis', 'subject') as VaryAxis;
       const count = typeof params.count === 'number' ? params.count : 4;
+      const brief = str(params, 'brief').trim();
 
-      const result = await vary(ctx.gateway, ir, { axis, count });
+      // A card drawn from a deck, carried on the node rather than redrawn each
+      // run: a variation set that changed every time it was asked for would not
+      // be a set anyone could go back to.
+      const nudge = params.nudge as DeckEntry | undefined;
+
+      const result = await vary(ctx.gateway, ir, {
+        axis,
+        count,
+        ...(brief ? { brief } : {}),
+        ...(nudge && typeof nudge === 'object' && nudge.id ? { nudge } : {}),
+      });
       return {
         out: result.variants.map((v) => ({
           type: 'ir' as const,
