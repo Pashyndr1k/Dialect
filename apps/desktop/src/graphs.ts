@@ -10,6 +10,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import type { GraphDoc } from '@dialect/core';
+import { openKeptFolder } from './folders.ts';
 
 const hasHost = (): boolean => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -77,8 +78,5 @@ export async function deleteGraph(id: string): Promise<void> {
 }
 
 export async function openGraphsFolder(): Promise<void> {
-  if (!hasHost()) return;
-  const dir = await invoke<string>('authored_folder', { what: 'graphs' });
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(dir).catch(() => undefined);
+  await openKeptFolder('graphs');
 }

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { loadLayers, RENDERERS, type CardSource, type LoadedRegistry } from '@dialect/core';
+import { showFolder } from './folders.ts';
 
 /**
  * Where the model cards come from.
@@ -106,8 +107,6 @@ export const revertChannel = (): Promise<ChannelStatus> =>
   invoke<ChannelStatus>('channel_revert', {});
 
 export async function openCardsFolder(): Promise<void> {
-  if (!hasHost()) return;
-  const dir = await invoke<string>('cards_folder', {});
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(dir).catch(() => undefined);
+  if (!hasHost()) throw new Error('Opening a folder needs the desktop app.');
+  await showFolder(await invoke<string>('cards_folder', {}));
 }

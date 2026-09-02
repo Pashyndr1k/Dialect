@@ -1,10 +1,15 @@
 /**
  * One node, on the canvas.
  *
- * Two things a node must say without being clicked: what it is set to, and what
- * happened to it last run. Everything else — the prompt it made, the findings
- * against it — goes to the inspector, because a node is two inches wide and a
- * prompt is several hundred words.
+ * Laid out in three bands, top to bottom: what it is, what it connects to, and
+ * what it is set to. Nothing overlaps anything, which was not true before —
+ * port labels were pinned to the node's edges and sat straight on top of the
+ * fields, so a Compile node showed its model dropdown with the word "ir"
+ * printed across it.
+ *
+ * Sockets now get their own rows: an input on the left of a row, an output on
+ * the right of the same row, and the label beside each. The rows are as tall as
+ * text needs, so a node with six sockets is taller rather than more crowded.
  */
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';
@@ -25,49 +30,59 @@ interface Face extends NodeFace {
   onPick: (key: string, what: 'file' | 'folder') => void;
 }
 
-/** Ports are laid out evenly down the side, so a wire always has somewhere to land. */
-const at = (index: number, total: number): string => `${((index + 1) / (total + 1)) * 100}%`;
-
-function Port({
-  name,
-  spec,
-  side,
-  index,
-  total,
+/**
+ * One row of sockets: at most one in, at most one out.
+ *
+ * Pairing them by position rather than listing inputs then outputs keeps a
+ * node short — most have one of each — and puts the wire where the eye already
+ * expects it, level with its own name.
+ */
+function PortRow({
+  input,
+  output,
 }: {
-  name: string;
-  spec: PortSpec;
-  side: 'in' | 'out';
-  index: number;
-  total: number;
+  input?: [string, PortSpec] | undefined;
+  output?: [string, PortSpec] | undefined;
 }): React.ReactElement {
-  const label = spec.label ?? name;
+  const title = ([name, spec]: [string, PortSpec]): string =>
+    `${spec.label ?? name} — ${PORT_LABEL[spec.type]}${spec.optional ? ', optional' : ''}`;
+
   return (
-    <>
-      <Handle
-        id={name}
-        type={side === 'in' ? 'target' : 'source'}
-        position={side === 'in' ? Position.Left : Position.Right}
-        style={{ top: at(index, total) }}
-        // The port's type is its colour and its title, so a refused connection
-        // is explainable before it is attempted.
-        className={`port port-${spec.type}${spec.optional ? ' port-optional' : ''}`}
-        title={`${label} — ${PORT_LABEL[spec.type]}${spec.optional ? ', optional' : ''}`}
-      />
-      <span className={`port-label port-label-${side}`} style={{ top: at(index, total) }}>
-        {label}
-      </span>
-    </>
+    <div className="prow">
+      {input ? (
+        <>
+          <Handle
+            id={input[0]}
+            type="target"
+            position={Position.Left}
+            className={`port port-${input[1].type}${input[1].optional ? ' port-optional' : ''}`}
+            title={title(input)}
+          />
+          <span className="prow-in">{input[1].label ?? input[0]}</span>
+        </>
+      ) : (
+        <span />
+      )}
+
+      {output ? (
+        <>
+          <span className="prow-out">{output[1].label ?? output[0]}</span>
+          <Handle
+            id={output[0]}
+            type="source"
+            position={Position.Right}
+            className={`port port-${output[1].type}${output[1].optional ? ' port-optional' : ''}`}
+            title={title(output)}
+          />
+        </>
+      ) : (
+        <span />
+      )}
+    </div>
   );
 }
 
-function Widget({
-  control,
-  data,
-}: {
-  control: Control;
-  data: Face;
-}): React.ReactElement {
+function Widget({ control, data }: { control: Control; data: Face }): React.ReactElement {
   const value = data.params[control.key];
 
   if (control.kind === 'text') {
@@ -149,7 +164,11 @@ function Widget({
   return (
     <label className="node-field">
       <span>{control.label}</span>
-      <button type="button" className="nodrag node-pick" onClick={() => data.onPick(control.key, control.kind)}>
+      <button
+        type="button"
+        className="nodrag node-pick"
+        onClick={() => data.onPick(control.key, control.kind)}
+      >
         {typeof value === 'string' && value
           ? (value.split(/[\\/]/).pop() ?? value)
           : control.kind === 'file'
@@ -165,8 +184,7 @@ export function NodeBody({ id, data, selected }: NodeProps): React.ReactElement 
   // The type is carried on the node itself because it never changes, and
   // because the ports have to be rendered on the very first paint: React Flow
   // keeps a node hidden until it has found its handles, and a node that was
-  // ever drawn without them stays hidden for good. That is what an
-  // "empty frame while we catch up" fallback cost, twice.
+  // ever drawn without them stays hidden for good.
   const spec = NODES.get((data as { type?: string }).type ?? '');
   const face = board.faces.get(id);
 
@@ -182,24 +200,32 @@ export function NodeBody({ id, data, selected }: NodeProps): React.ReactElement 
     onParams: (patch) => board.setParams(id, patch),
     onPick: (key, what) => board.pick(id, key, what),
   };
+
   const inputs = Object.entries(d.spec.inputs);
   const outputs = Object.entries(d.spec.outputs);
+  const rows = Math.max(inputs.length, outputs.length);
   const controls = controlsFor(d.spec.type);
   const summary = summaryOf(d.spec.type, d.params, d.world);
 
   return (
-    <div
-      className={`node node-${d.spec.group} node-${d.state}${selected ? ' node-selected' : ''}`}
-    >
-      {inputs.map(([name, spec], i) => (
-        <Port key={name} name={name} spec={spec} side="in" index={i} total={inputs.length} />
-      ))}
-
+    <div className={`node node-${d.spec.group} node-${d.state}${selected ? ' node-selected' : ''}`}>
       <header className="node-head">
         <b>{d.spec.title}</b>
         {/* Amber only where money can go, so a glance at a graph shows the bill. */}
         {d.spec.spends ? <i className="node-spends" title="This node can spend" /> : null}
       </header>
+
+      {rows > 0 ? (
+        <div className="node-ports">
+          {Array.from({ length: rows }, (_, i) => (
+            <PortRow
+              key={i}
+              {...(inputs[i] ? { input: inputs[i] } : {})}
+              {...(outputs[i] ? { output: outputs[i] } : {})}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {summary ? <p className="node-summary">{summary}</p> : null}
 
@@ -213,10 +239,6 @@ export function NodeBody({ id, data, selected }: NodeProps): React.ReactElement 
 
       {d.state === 'failed' && d.error ? <p className="node-error">{d.error}</p> : null}
       {d.state !== 'failed' && d.note ? <p className="node-note">{d.note}</p> : null}
-
-      {outputs.map(([name, spec], i) => (
-        <Port key={name} name={name} spec={spec} side="out" index={i} total={outputs.length} />
-      ))}
     </div>
   );
 }

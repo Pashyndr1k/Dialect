@@ -93,6 +93,7 @@ const HOST_NODES: NodeSpec[] = [
     type: 'folder',
     title: 'Folder',
     group: 'in',
+    hint: 'Every readable file in a folder, on one wire. This is batch.',
     inputs: {},
     outputs: { out: { type: 'source' } },
     async run(_inputs, params) {
@@ -120,6 +121,7 @@ const HOST_NODES: NodeSpec[] = [
     type: 'save',
     title: 'Save',
     group: 'out',
+    hint: 'Writes each prompt to a file in a folder you choose.',
     // Whole: writing one file per prompt is one trip to a folder chooser, not
     // twenty. A node that ran per item would ask twenty times.
     inputs: { prompts: { type: 'prompt', whole: true } },

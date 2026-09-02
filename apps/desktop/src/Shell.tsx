@@ -2,16 +2,22 @@
  * What the canvas sits inside.
  *
  * The chrome — the key, the budget, the libraries — was never part of the
- * pipeline, so it does not become nodes. It lives here, around whatever view is
- * showing. That split is the whole reason a node editor stays usable: everything
- * that is a step in making a prompt is a node, and everything that is a fact
- * about this machine is not.
+ * pipeline, so it does not become nodes. It lives here, around the canvas.
+ * That split is the whole reason a node editor stays usable: everything that
+ * is a step in making a prompt is a node, and everything that is a fact about
+ * this machine is not.
+ *
+ * The title bar reads left to right as: what this is, what you are working on,
+ * and what you keep. Which document you have open belongs beside the
+ * application's name — that is where every other program with documents puts
+ * it, and before this the graph had a name that was never shown anywhere.
  */
 
-import { useEffect, useState } from 'react';
-import type { Library, LoadedRegistry } from '@dialect/core';
+import { useCallback, useEffect, useState } from 'react';
+import type { GraphDoc, Library, LoadedRegistry } from '@dialect/core';
 
 import { Editor } from './graph/Editor.tsx';
+import { GraphName } from './graph/GraphName.tsx';
 import { Settings } from './Settings.tsx';
 import { Cards } from './Cards.tsx';
 import { Shelf } from './Shelf.tsx';
@@ -22,15 +28,22 @@ import { loadRegistry } from './channel.ts';
 import { builtinLibrary, libraryWith, listTemplates } from './templates.ts';
 import { STARTER_GRAPH } from './graph/examples.ts';
 import { loadOpenGraph } from './graph/open.ts';
-import type { GraphDoc } from '@dialect/core';
+
+/** What the editor hands up so the title bar can name and keep the graph. */
+interface GraphHandles {
+  name: string | undefined;
+  dirty: boolean;
+  rename: (name: string) => void;
+  save: () => void;
+  open: (doc: GraphDoc) => void;
+}
 
 export function Shell(): React.ReactElement {
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [cardsOpen, setCardsOpen] = useState(false);
-  const [shelfOpen, setShelfOpen] = useState(false);
+  const [sheet, setSheet] = useState<'kept' | 'cards' | 'settings' | null>(null);
   const [registry, setRegistry] = useState<LoadedRegistry>(BUILTIN);
   const [library, setLibrary] = useState<Library | null>(null);
   const [opening, setOpening] = useState<GraphDoc | null>(null);
+  const [graph, setGraph] = useState<GraphHandles | null>(null);
 
   useEffect(() => {
     // Cards and templates are read from disk, so the first paint uses what the
@@ -53,47 +66,67 @@ export function Shell(): React.ReactElement {
     })();
   }, []);
 
+  const onGraph = useCallback((state: GraphHandles) => setGraph(state), []);
+
   return (
     <div className="shell">
       <header className="shell-head">
         <h1>
           Dialect <span className="version">{__APP_VERSION__}</span>
         </h1>
+
+        <span className="shell-sep" />
+
+        {graph ? (
+          <GraphName
+            name={graph.name}
+            dirty={graph.dirty}
+            onRename={graph.rename}
+            onSave={(name) => {
+              graph.rename(name);
+              // The rename has to land before the save reads it.
+              setTimeout(graph.save, 0);
+            }}
+          />
+        ) : null}
+
         <span className="spacer" />
-        <button type="button" className="ghost" onClick={() => setShelfOpen(true)}>
+
+        <button type="button" className="btn ghost" onClick={() => setSheet('kept')}>
           Kept
         </button>
-        <button type="button" className="ghost" onClick={() => setCardsOpen(true)}>
-          Cards
+        <button type="button" className="btn ghost" onClick={() => setSheet('cards')}>
+          Models
         </button>
-        <button type="button" className="ghost" onClick={() => setSettingsOpen(true)}>
+        <button type="button" className="btn ghost" onClick={() => setSheet('settings')}>
           Settings
         </button>
       </header>
 
       {library && opening ? (
-        <Editor registry={registry} library={library} doc={opening} />
+        <Editor registry={registry} library={library} doc={opening} onGraph={onGraph} />
       ) : (
         <p className="shell-loading">Reading the cards and templates…</p>
       )}
 
-      {cardsOpen ? (
+      {sheet === 'cards' ? (
         <Cards
           rejected={registry.rejected}
           cardCount={registry.registry.profiles.size}
           onChanged={() => void loadRegistry().then(setRegistry).catch(() => undefined)}
-          onClose={() => setCardsOpen(false)}
+          onClose={() => setSheet(null)}
         />
       ) : null}
 
-      {shelfOpen ? (
+      {sheet === 'kept' ? (
         <Shelf
-          onClose={() => setShelfOpen(false)}
+          onClose={() => setSheet(null)}
           onChanged={() => void listTemplates().then((t) => setLibrary(libraryWith(t)))}
+          onOpenGraph={(doc) => graph?.open(doc)}
         />
       ) : null}
 
-      {settingsOpen ? <Settings onClose={() => setSettingsOpen(false)} /> : null}
+      {sheet === 'settings' ? <Settings onClose={() => setSheet(null)} /> : null}
 
       <Update />
     </div>

@@ -5,8 +5,12 @@
  * graph reaches for, so they belong around the canvas rather than on it. Making
  * them is somewhere else in every case: a template is learned by a node and
  * filed from the inspector, a reading is kept from the inspector, a graph is
- * saved from the run bar. This is only where they are looked at and thrown
- * away.
+ * named and saved in the title bar.
+ *
+ * It is also where a graph is opened from, which used to be a third menu on the
+ * toolbar. A list of your saved things is the obvious place to pick one out of,
+ * and a menu that only listed them was a second answer to a question already
+ * answered here.
  *
  * Every one of them is a file, and the folder button is the honest admission of
  * that: when something here is wrong, a text editor will fix it faster than any
@@ -14,20 +18,42 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { SavedSource, Template } from '@dialect/core';
+import type { GraphDoc, SavedSource, Template } from '@dialect/core';
 
 import { deleteSource, listSources, openSourcesFolder } from './sources.ts';
 import { deleteTemplate, listTemplates, openTemplatesFolder } from './templates.ts';
 import { deleteGraph, listGraphs, openGraphsFolder, type SavedGraph } from './graphs.ts';
 import { OPEN_ID } from './graph/open.ts';
+import { EXAMPLES } from './graph/examples.ts';
 
-type Tab = 'templates' | 'readings' | 'graphs';
+type Tab = 'graphs' | 'templates' | 'readings';
 
-export function Shelf({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
-  const [tab, setTab] = useState<Tab>('templates');
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'graphs', label: 'Graphs' },
+  { id: 'templates', label: 'Templates' },
+  { id: 'readings', label: 'Readings' },
+];
+
+export interface ShelfProps {
+  onClose: () => void;
+  onChanged: () => void;
+  onOpenGraph: (doc: GraphDoc) => void;
+}
+
+interface Row {
+  id: string;
+  name: string;
+  note: string;
+  open?: () => void;
+  remove?: () => void;
+}
+
+export function Shelf({ onClose, onChanged, onOpenGraph }: ShelfProps): React.ReactElement {
+  const [tab, setTab] = useState<Tab>('graphs');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [readings, setReadings] = useState<SavedSource[]>([]);
   const [graphs, setGraphs] = useState<SavedGraph[]>([]);
+  const [wrong, setWrong] = useState<string | null>(null);
 
   const refresh = useCallback((): void => {
     void listTemplates().then(setTemplates).catch(() => setTemplates([]));
@@ -41,40 +67,53 @@ export function Shelf({ onClose, onChanged }: { onClose: () => void; onChanged: 
   useEffect(refresh, [refresh]);
 
   const remove = (go: Promise<void>): void => {
-    void go.then(() => {
-      refresh();
-      onChanged();
-    });
+    void go
+      .then(() => {
+        refresh();
+        onChanged();
+      })
+      .catch((err: Error) => setWrong(err.message));
   };
 
-  const rows: Array<{ id: string; name: string; note: string; go: () => void }> =
-    tab === 'templates'
-      ? templates.map((t) => ({
-          id: t.id,
-          name: t.name,
-          note: [t.modality, t.target].filter(Boolean).join(' · '),
-          go: () => remove(deleteTemplate(t.id)),
+  const take = (doc: GraphDoc): void => {
+    onOpenGraph(doc);
+    onClose();
+  };
+
+  const rows: Row[] =
+    tab === 'graphs'
+      ? graphs.map((g) => ({
+          id: g.id,
+          name: g.doc.name ?? g.id,
+          note: `${g.doc.nodes.length} nodes`,
+          open: () => take(g.doc),
+          remove: () => remove(deleteGraph(g.id)),
         }))
-      : tab === 'readings'
-        ? readings.map((s) => ({
+      : tab === 'templates'
+        ? templates.map((t) => ({
+            id: t.id,
+            name: t.name,
+            note: [t.modality, t.target].filter(Boolean).join(' · '),
+            remove: () => remove(deleteTemplate(t.id)),
+          }))
+        : readings.map((s) => ({
             id: s.id,
             name: s.name,
             note: `${s.kind} · ${s.role} · ${s.lines.length} lines`,
-            go: () => remove(deleteSource(s.id)),
-          }))
-        : graphs.map((g) => ({
-            id: g.id,
-            name: g.doc.name ?? g.id,
-            note: `${g.doc.nodes.length} nodes`,
-            go: () => remove(deleteGraph(g.id)),
+            remove: () => remove(deleteSource(s.id)),
           }));
 
   const openFolder = (): void => {
-    void (tab === 'templates'
-      ? openTemplatesFolder()
-      : tab === 'readings'
-        ? openSourcesFolder()
-        : openGraphsFolder());
+    const go =
+      tab === 'templates'
+        ? openTemplatesFolder()
+        : tab === 'readings'
+          ? openSourcesFolder()
+          : openGraphsFolder();
+    // No longer swallowed: this button did nothing at all for months because
+    // the permission it needs was never asked for and the failure was caught
+    // and dropped.
+    void go.catch((err: Error) => setWrong(err.message));
   };
 
   return (
@@ -82,28 +121,35 @@ export function Shelf({ onClose, onChanged }: { onClose: () => void; onChanged: 
       <div className="sheet-box">
         <header className="sheet-head">
           <nav className="shelf-tabs">
-            {(['templates', 'readings', 'graphs'] as const).map((t) => (
-              <button key={t} type="button" className={t === tab ? 'on' : ''} onClick={() => setTab(t)}>
-                {t}
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={t.id === tab ? 'btn tab on' : 'btn tab'}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
               </button>
             ))}
           </nav>
           <span className="spacer" />
-          <button type="button" className="ghost" onClick={openFolder}>
+          <button type="button" className="btn ghost" onClick={openFolder}>
             Open the folder
           </button>
-          <button type="button" className="ghost" onClick={onClose}>
+          <button type="button" className="btn ghost" onClick={onClose}>
             Close
           </button>
         </header>
 
+        {wrong ? <p className="shelf-wrong">{wrong}</p> : null}
+
         {rows.length === 0 ? (
           <p className="shelf-empty">
-            {tab === 'templates'
-              ? 'No templates yet. Learn one from a prompt that already works.'
-              : tab === 'readings'
-                ? 'No readings kept yet. Keep one from the inspector after reading a reference.'
-                : 'No graphs saved yet.'}
+            {tab === 'graphs'
+              ? 'Nothing saved yet. Name a graph in the title bar and press Save.'
+              : tab === 'templates'
+                ? 'No templates yet. Learn one from a prompt that already works.'
+                : 'No readings kept yet. Keep one from the panel after reading a reference.'}
           </p>
         ) : (
           <ul className="shelf">
@@ -113,13 +159,46 @@ export function Shelf({ onClose, onChanged }: { onClose: () => void; onChanged: 
                   <b>{r.name}</b>
                   <span>{r.note}</span>
                 </div>
-                <button type="button" onClick={r.go} title={`Delete ${r.name}`}>
+                {r.open ? (
+                  <button type="button" className="btn ghost" onClick={r.open}>
+                    Open
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn danger"
+                  onClick={r.remove}
+                  title={`Delete ${r.name}`}
+                >
                   Delete
                 </button>
               </li>
             ))}
           </ul>
         )}
+
+        {/* The examples live with the saved graphs because that is what they
+            are: graphs, which happen to have shipped with the app. */}
+        {tab === 'graphs' ? (
+          <>
+            <h4 className="shelf-sub">Examples</h4>
+            <ul className="shelf">
+              {EXAMPLES.map((ex) => (
+                <li key={ex.id}>
+                  <div>
+                    <b>{ex.doc.name ?? ex.id}</b>
+                    <span>
+                      {ex.doc.nodes.length} nodes · {ex.about}
+                    </span>
+                  </div>
+                  <button type="button" className="btn ghost" onClick={() => take(ex.doc)}>
+                    Open
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
       </div>
     </div>
   );

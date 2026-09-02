@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   Controls,
+  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   useNodesState,
@@ -43,6 +44,7 @@ import { useRun } from './useRun.ts';
 import { useGraphDoc } from './useGraphDoc.ts';
 import { pickFolder, pickReferences } from '../store.ts';
 import { listSources } from '../sources.ts';
+import type { SavedGraph } from '../graphs.ts';
 
 const nodeTypes = { dialect: NodeBody };
 
@@ -50,6 +52,19 @@ export interface EditorProps {
   registry: LoadedRegistry;
   library: Library;
   doc?: GraphDoc;
+  /**
+   * The title bar owns the name and the Save button, so it needs to see the
+   * document and be able to act on it. Handed up rather than duplicated: two
+   * places holding a name is two places for it to be wrong.
+   */
+  onGraph?: (state: {
+    name: string | undefined;
+    dirty: boolean;
+    rename: (name: string) => void;
+    save: () => void;
+    open: (doc: GraphDoc) => void;
+    saved: SavedGraph[];
+  }) => void;
 }
 
 /** One end of a connection being dragged, as React Flow reports it. */
@@ -66,7 +81,7 @@ function portOf(
   return (side === 'out' ? spec?.outputs : spec?.inputs)?.[port ?? '']?.type;
 }
 
-function Board({ registry, library, doc: initial }: EditorProps): React.ReactElement {
+function Board({ registry, library, doc: initial, onGraph }: EditorProps): React.ReactElement {
   const [selected, setSelected] = useState<string | null>(null);
   const [sources, setSources] = useState<SavedSource[]>([]);
   const [flowNodes, setFlowNodes, onNodesChangeInternal] = useNodesState<Node>([]);
@@ -105,6 +120,29 @@ function Board({ registry, library, doc: initial }: EditorProps): React.ReactEle
   forget.current = run.forget;
 
   const world = useMemo(() => ({ registry, library, sources }), [registry, library, sources]);
+
+  /**
+   * Undo and redo on the keys every editor uses.
+   *
+   * Skipped while a field has focus, because inside a text box those keys
+   * already mean something and taking them would be worse than not having them.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
+      const el = document.activeElement;
+      const typing =
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        (el instanceof HTMLElement && el.isContentEditable);
+      if (typing) return;
+      e.preventDefault();
+      if (e.shiftKey) graph.redo();
+      else graph.undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [graph]);
 
   // Kept readings are a shelf to drag from, not part of the build.
   useEffect(() => {
@@ -282,6 +320,19 @@ function Board({ registry, library, doc: initial }: EditorProps): React.ReactEle
     [doc, run],
   );
 
+  // Kept in a ref and reported on change, so the title bar always has the
+  // current handles without the editor re-rendering when the bar does.
+  useEffect(() => {
+    onGraph?.({
+      name: doc.name,
+      dirty: graph.dirty,
+      rename: graph.rename,
+      save: () => void graph.keep().catch((err: Error) => run.say(err.message)),
+      open: graph.open,
+      saved: graph.saved,
+    });
+  }, [doc.name, graph.dirty, graph.rename, graph.keep, graph.open, graph.saved, onGraph, run]);
+
   const node = doc.nodes.find((n) => n.id === selected);
 
   return (
@@ -291,15 +342,12 @@ function Board({ registry, library, doc: initial }: EditorProps): React.ReactEle
         canRun={run.blocking.length === 0 && doc.nodes.length > 0}
         spent={run.spent}
         willSpend={run.willSpend.length}
-        saved={graph.saved}
         onRun={() => {
           // Aim the inspector at something worth reading without being asked.
           void run.go().then(() => setSelected((s) => s ?? sinksOf(doc)[0] ?? null));
         }}
         onStop={run.stop}
         onAdd={graph.addNode}
-        onOpen={graph.open}
-        onSave={() => void graph.keep().catch((err: Error) => run.say(err.message))}
       />
 
       {run.blocking.length > 0 && !run.running ? (
@@ -324,6 +372,11 @@ function Board({ registry, library, doc: initial }: EditorProps): React.ReactEle
           >
             <Background gap={18} size={1} />
             <Controls showInteractive={false} />
+            {/* Where you are, in a graph too big to see at once. Hidden while
+                there is nothing to get lost in. */}
+            {doc.nodes.length > 3 ? (
+              <MiniMap pannable zoomable nodeStrokeWidth={2} className="graph-map" />
+            ) : null}
           </ReactFlow>
         </BoardProvider>
 

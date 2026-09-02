@@ -7,6 +7,8 @@ import {
   type Template,
 } from '@dialect/core';
 
+import { openKeptFolder } from './folders.ts';
+
 /**
  * Templates: the ones that ship, and the ones someone made.
  *
@@ -81,10 +83,7 @@ export async function deleteTemplate(id: string): Promise<void> {
 }
 
 export async function openTemplatesFolder(): Promise<void> {
-  if (!hasHost()) return;
-  const dir = await invoke<string>('authored_folder', { what: 'templates' });
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(dir).catch(() => undefined);
+  await openKeptFolder('templates');
 }
 
 /**

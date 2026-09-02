@@ -154,6 +154,14 @@ export interface NodeSpec {
   title: string;
   /** Groups the node in the editor's menu. */
   group: 'in' | 'read' | 'compose' | 'shape' | 'out';
+  /**
+   * One line, for the menu you pick this from.
+   *
+   * What it is for, not what it is called again. A catalogue of sixteen names
+   * with no other words on it makes you open each one to find out which is
+   * which, and that is not a catalogue, it is a list of guesses.
+   */
+  hint: string;
   inputs: Record<string, PortSpec>;
   outputs: Record<string, PortSpec>;
   /**

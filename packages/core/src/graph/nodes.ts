@@ -80,6 +80,7 @@ const specs: NodeSpec[] = [
     type: 'words',
     title: 'Words',
     group: 'in',
+    hint: 'Something you type. The starting point when you have no reference.',
     inputs: {},
     outputs: { out: { type: 'words' } },
     defaults: { text: '' },
@@ -94,6 +95,7 @@ const specs: NodeSpec[] = [
     type: 'reference',
     title: 'Reference',
     group: 'in',
+    hint: 'A file from disk — a still, a clip or a track. Not looked at yet.',
     inputs: {},
     outputs: { out: { type: 'source' } },
     async run(_inputs, params) {
@@ -112,6 +114,7 @@ const specs: NodeSpec[] = [
     type: 'kept',
     title: 'Kept reading',
     group: 'in',
+    hint: 'A reading you saved earlier. Free, and always word-for-word the same.',
     inputs: {},
     outputs: { out: { type: 'lines' } },
     async run(_inputs, params) {
@@ -138,6 +141,7 @@ const specs: NodeSpec[] = [
     type: 'document',
     title: 'Document',
     group: 'in',
+    hint: 'A description you already have, pasted in or wired from elsewhere.',
     inputs: {},
     outputs: { out: { type: 'ir' } },
     async run(_inputs, params) {
@@ -168,6 +172,7 @@ const specs: NodeSpec[] = [
     type: 'template',
     title: 'Template',
     group: 'in',
+    hint: 'One of your saved templates, ready to be filled in.',
     inputs: {},
     outputs: { out: { type: 'template' } },
     async run(_inputs, params, ctx) {
@@ -192,6 +197,7 @@ const specs: NodeSpec[] = [
     type: 'read',
     title: 'Read',
     group: 'read',
+    hint: 'Looks at a reference and says what is in it. The step that costs.',
     inputs: { source: { type: 'source' } },
     outputs: {
       out: { type: 'lines' },
@@ -245,6 +251,7 @@ const specs: NodeSpec[] = [
     type: 'role',
     title: 'Role',
     group: 'read',
+    hint: 'Says what a reading is for — the subject, or only the look.',
     inputs: { lines: { type: 'lines' } },
     outputs: { out: { type: 'lines' } },
     defaults: { role: 'subject' },
@@ -264,6 +271,7 @@ const specs: NodeSpec[] = [
     type: 'compose',
     title: 'Compose',
     group: 'compose',
+    hint: 'Puts words and readings together into one description.',
     inputs: {
       // Whole, because combining is the entire job: a bundle with one source in
       // it is a bundle that did not need composing.
@@ -309,6 +317,7 @@ const specs: NodeSpec[] = [
     type: 'idea',
     title: 'Idea',
     group: 'compose',
+    hint: 'Grows a sentence into a full description on its own.',
     inputs: { words: { type: 'words' } },
     outputs: { out: { type: 'ir' } },
     spends: true,
@@ -326,6 +335,7 @@ const specs: NodeSpec[] = [
     type: 'fill',
     title: 'Fill template',
     group: 'compose',
+    hint: 'Fills a template from a few words.',
     inputs: {
       words: { type: 'words' },
       template: { type: 'template' },
@@ -347,6 +357,7 @@ const specs: NodeSpec[] = [
     type: 'fields',
     title: 'Edit fields',
     group: 'shape',
+    hint: 'Change the description by hand: light, era, framing, faces.',
     inputs: { ir: { type: 'ir' } },
     outputs: { out: { type: 'ir' } },
     defaults: { set: {} },
@@ -365,6 +376,7 @@ const specs: NodeSpec[] = [
     type: 'vary',
     title: 'Vary',
     group: 'shape',
+    hint: 'Many versions along one axis, from a single request.',
     inputs: { ir: { type: 'ir' } },
     outputs: { out: { type: 'ir' } },
     spends: true,
@@ -399,6 +411,7 @@ const specs: NodeSpec[] = [
     type: 'sequence',
     title: 'Sequence',
     group: 'shape',
+    hint: 'Several shots that inherit one world, so nothing drifts.',
     inputs: { ir: { type: 'ir' } },
     outputs: { out: { type: 'ir' } },
     defaults: { shots: [] },
@@ -424,6 +437,7 @@ const specs: NodeSpec[] = [
     type: 'learn',
     title: 'Learn template',
     group: 'shape',
+    hint: 'Takes a prompt that works and turns it into a template.',
     inputs: { words: { type: 'words' } },
     outputs: { out: { type: 'template' } },
     spends: true,
@@ -448,6 +462,7 @@ const specs: NodeSpec[] = [
     type: 'compile',
     title: 'Compile',
     group: 'out',
+    hint: 'Writes the description out in one model’s own dialect. Free.',
     inputs: { ir: { type: 'ir' } },
     outputs: { out: { type: 'prompt' } },
     defaults: { target: '' },

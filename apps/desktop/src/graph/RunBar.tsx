@@ -1,33 +1,35 @@
 /**
  * The bar above the canvas.
  *
- * Three jobs: start and stop a run, put a node on the canvas, and say what is
- * about to be spent. The last is why the bar exists at all — a node can show
- * what it cost afterwards, but only something outside the graph can say what
- * pressing the button will cost before it is pressed.
+ * Centred, because it is the only thing on screen you reach for repeatedly and
+ * a control you use constantly should not be in a corner. Three groups, in the
+ * order the work happens: build, run, and what it is costing.
+ *
+ * Saving and opening are not here any more. A graph has a name now, and the
+ * name lives in the title bar where a document's name belongs — so keeping it
+ * belongs there too, next to the thing being named.
  */
 
 import { useState } from 'react';
-import type { GraphDoc } from '@dialect/core';
 
 import { NODES } from './host.ts';
-import { EXAMPLES } from './examples.ts';
-import { openGraphsFolder, type SavedGraph } from '../graphs.ts';
-import { BUDGET_USD } from '../gateway.ts';
 
-const GROUPS = ['in', 'read', 'compose', 'shape', 'out'] as const;
+const GROUPS: Array<{ id: 'in' | 'read' | 'compose' | 'shape' | 'out'; label: string }> = [
+  { id: 'in', label: 'Bring in' },
+  { id: 'read', label: 'Read' },
+  { id: 'compose', label: 'Describe' },
+  { id: 'shape', label: 'Shape' },
+  { id: 'out', label: 'Get out' },
+];
 
 export interface RunBarProps {
   running: boolean;
   canRun: boolean;
   spent: number;
   willSpend: number;
-  saved: SavedGraph[];
   onRun: () => void;
   onStop: () => void;
   onAdd: (type: string) => void;
-  onOpen: (doc: GraphDoc) => void;
-  onSave: () => void;
 }
 
 export function RunBar({
@@ -35,145 +37,76 @@ export function RunBar({
   canRun,
   spent,
   willSpend,
-  saved,
   onRun,
   onStop,
   onAdd,
-  onOpen,
-  onSave,
 }: RunBarProps): React.ReactElement {
-  const [menu, setMenu] = useState<'add' | 'graphs' | null>(null);
-  const toggle = (which: 'add' | 'graphs'): void => setMenu((m) => (m === which ? null : which));
+  const [adding, setAdding] = useState(false);
 
   return (
     <header className="run-bar">
-      <button type="button" className="run" disabled={!canRun || running} onClick={onRun}>
-        {running ? 'Running…' : 'Run'}
-      </button>
-      {running ? (
-        <button type="button" className="ghost" onClick={onStop}>
-          Stop
-        </button>
-      ) : null}
-
-      <div className="add">
-        <button type="button" className="ghost" onClick={() => toggle('add')}>
+      <div className="bar-group">
+        <button type="button" className="btn ghost" onClick={() => setAdding((a) => !a)}>
           Add node
         </button>
-        {menu === 'add' ? (
-          <ul className="add-menu">
-            {GROUPS.map((group) => (
-              <li key={group}>
-                <b>{group}</b>
-                <ul>
-                  {[...NODES.values()]
-                    .filter((s) => s.group === group)
-                    .map((s) => (
-                      <li key={s.type}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onAdd(s.type);
-                            setMenu(null);
-                          }}
-                        >
-                          {s.title}
-                          {/* Amber wherever money can go, here as on the node. */}
-                          {s.spends ? <i className="node-spends" /> : null}
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
 
-      <div className="add">
-        <button type="button" className="ghost" onClick={() => toggle('graphs')}>
-          Graphs
-        </button>
-        {menu === 'graphs' ? (
-          <ul className="add-menu graph-menu">
-            <li>
-              <b>this one</b>
-              <ul>
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSave();
-                      setMenu(null);
-                    }}
-                  >
-                    Save
-                  </button>
-                </li>
-                <li>
-                  <button type="button" onClick={() => void openGraphsFolder()}>
-                    Show the folder
-                  </button>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <b>examples</b>
-              <ul>
-                {EXAMPLES.map((ex) => (
-                  <li key={ex.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpen(ex.doc);
-                        setMenu(null);
-                      }}
-                    >
-                      {ex.doc.name ?? ex.id}
-                      <span className="add-cost">{ex.about}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </li>
-            <li>
-              <b>saved</b>
-              <ul>
-                {saved.length === 0 ? (
-                  <li>
-                    <span className="add-empty">none yet</span>
-                  </li>
-                ) : (
-                  saved.map((g) => (
-                    <li key={g.id}>
+        {adding ? (
+          <>
+            {/* Anywhere else closes it, so the menu never has to be dismissed
+                deliberately. */}
+            <div className="menu-shade" onClick={() => setAdding(false)} />
+            <div className="add-menu">
+              {GROUPS.map((group) => (
+                <section key={group.id}>
+                  <h4>{group.label}</h4>
+                  {[...NODES.values()]
+                    .filter((s) => s.group === group.id)
+                    .map((s) => (
                       <button
+                        key={s.type}
                         type="button"
                         onClick={() => {
-                          onOpen(g.doc);
-                          setMenu(null);
+                          onAdd(s.type);
+                          setAdding(false);
                         }}
                       >
-                        {g.doc.name ?? g.id}
+                        <b>
+                          {s.title}
+                          {s.spends ? <i className="node-spends" title="This one can spend" /> : null}
+                        </b>
+                        {/* One line about what it is for. Sixteen bare names is
+                            a list of guesses, not a catalogue. */}
+                        <span>{s.hint}</span>
                       </button>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </li>
-          </ul>
+                    ))}
+                </section>
+              ))}
+            </div>
+          </>
         ) : null}
       </div>
 
-      <span className="spacer" />
+      <div className="bar-group">
+        <button type="button" className="btn run" disabled={!canRun || running} onClick={onRun}>
+          {running ? 'Running…' : 'Run'}
+        </button>
+        {running ? (
+          <button type="button" className="btn ghost" onClick={onStop}>
+            Stop
+          </button>
+        ) : null}
+      </div>
 
-      {willSpend > 0 ? (
-        <span className="will-spend" title="Nodes that can spend. Cached ones will not.">
-          {willSpend} paid step{willSpend === 1 ? '' : 's'}
+      <div className="bar-group bar-cost">
+        {willSpend > 0 ? (
+          <span className="will-spend" title="Steps that can spend. Cached ones will not.">
+            {willSpend} paid
+          </span>
+        ) : null}
+        <span className="spend" title="Spent so far">
+          ${spent.toFixed(4)}
         </span>
-      ) : null}
-      <span className="spend" title={`Budget $${BUDGET_USD.toFixed(2)}`}>
-        ${spent.toFixed(4)}
-      </span>
+      </div>
     </header>
   );
 }

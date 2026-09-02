@@ -6,6 +6,8 @@ import {
   type SavedSource,
 } from '@dialect/core';
 
+import { openKeptFolder } from './folders.ts';
+
 /**
  * Sources someone kept, as files the host holds.
  *
@@ -61,8 +63,5 @@ export async function deleteSource(id: string): Promise<void> {
 }
 
 export async function openSourcesFolder(): Promise<void> {
-  if (!hasHost()) return;
-  const dir = await invoke<string>('authored_folder', { what: 'sources' });
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(dir).catch(() => undefined);
+  await openKeptFolder('sources');
 }

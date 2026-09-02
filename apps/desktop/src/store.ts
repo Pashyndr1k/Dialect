@@ -237,10 +237,8 @@ export async function savePromptsTo(files: OutFile[]): Promise<string | null> {
   return dir;
 }
 
-export async function showFolder(dir: string): Promise<void> {
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(dir).catch(() => undefined);
-}
+// showFolder moved to folders.ts, where the permission it needs is asked for.
+export { showFolder } from './folders.ts';
 
 // ---------------------------------------------------------------------------
 // Reading a clip

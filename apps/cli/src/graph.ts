@@ -147,6 +147,7 @@ const folderNode: NodeSpec = {
   type: 'folder',
   title: 'Folder',
   group: 'in',
+  hint: 'Every readable file in a folder, on one wire.',
   inputs: {},
   outputs: { out: { type: 'source' } },
   async run(_inputs, params) {
@@ -174,6 +175,7 @@ function saveNode(outDir: string): NodeSpec {
     type: 'save',
     title: 'Save',
     group: 'out',
+    hint: 'Writes each prompt to a file.',
     inputs: { prompts: { type: 'prompt', whole: true } },
     outputs: {},
     async run(inputs) {
