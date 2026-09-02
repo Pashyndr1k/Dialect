@@ -11,7 +11,13 @@
  */
 
 import { useState } from 'react';
-import { sourceId, templateToYaml, type SavedSource, type Value } from '@dialect/core';
+import {
+  promptFileName,
+  sourceId,
+  templateToYaml,
+  type SavedSource,
+  type Value,
+} from '@dialect/core';
 
 import { listSources, saveSource } from '../sources.ts';
 import { listTemplates, saveTemplate } from '../templates.ts';
@@ -19,11 +25,6 @@ import { savePromptsTo } from '../store.ts';
 
 /** Short-lived word under the buttons: what just happened, in one line. */
 type Said = { text: string; bad?: boolean } | null;
-
-const fileNameOf = (title: string, index: number): string => {
-  const safe = (title.trim() || `prompt-${index + 1}`).replace(/[^\w. -]+/g, '-').slice(0, 60);
-  return `${safe}.txt`;
-};
 
 export function Actions({ values }: { values: readonly Value[] }): React.ReactElement | null {
   const [said, setSaid] = useState<Said>(null);
@@ -63,9 +64,12 @@ export function Actions({ values }: { values: readonly Value[] }): React.ReactEl
       label: prompts.length > 1 ? 'Save all' : 'Save',
       go: () =>
         run(async () => {
+          // A set saved together must not overwrite itself: one document
+          // rendered for three models is three prompts with one title.
+          const taken = new Set<string>();
           const where = await savePromptsTo(
             prompts.map((p, i) => ({
-              name: fileNameOf(p.ir.title ?? '', i),
+              name: promptFileName(p, i + 1, taken),
               contents: p.render.text,
             })),
           );

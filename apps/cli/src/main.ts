@@ -22,6 +22,7 @@ import {
 import { applyTemplate, chainFor, MissingVariablesError } from '@dialect/core';
 import { loadBuiltinRegistry } from '@dialect/core/node';
 import { loadBuiltinLibrary } from '@dialect/core/templates-node';
+import { runGraphFile } from './graph.ts';
 import { runBatch } from './batch.ts';
 import { manifestFor, newKeypair, publicKeyOf, signSet } from './sign.ts';
 import { clipExists, DEFAULT_CLIP, runProbe, writeReport } from './probe.ts';
@@ -33,6 +34,7 @@ const USAGE = `dialect — compile a Prompt IR into one model's dialect
   dialect extract <image>   --target <model-id> [--budget <usd>] [--ir-out <file>]
   dialect targets [--job <job>]
   dialect batch <folder>    --target <model-id> --out <dir> [--budget <usd>]
+  dialect graph <graph.json> --out <dir> [--budget <usd>]
   dialect templates [--modality <image|video|audio>]
   dialect apply <template-id> --target <model-id> [--set name=value ...] [--ir-out <file>]
   dialect keygen            [--key-out <file>]
@@ -292,6 +294,54 @@ async function cmdApply(): Promise<number> {
 }
 
 
+/**
+ * Run a graph built in the window, here, over whatever it points at.
+ *
+ * The same runner and the same nodes; only the resolver differs, because core
+ * opens no files and each front end brings its own way of doing so.
+ */
+async function cmdGraph(): Promise<number> {
+  const file = argv[3];
+  const out = flag('out');
+
+  if (!file || !out) {
+    stderr.write(USAGE);
+    return 2;
+  }
+
+  if (!processEnv['ANTHROPIC_API_KEY']) {
+    stderr.write(
+      'No key in this shell. The desktop app keeps its key in the OS credential store,\n' +
+        'which another process cannot read — that is the point of putting it there.\n\n' +
+        `${RUN_LINE}\n\nNothing was spent.\n`,
+    );
+    return 2;
+  }
+
+  const budgetUsd = Number.parseFloat(flag('budget') ?? '5.00');
+  const gateway = new Gateway(new AnthropicProvider(), {
+    budgetUsd,
+    onSpend: (_usage, total) => stdout.write(`  spent $${total.toFixed(4)}\n`),
+  });
+
+  stdout.write(`Running ${file}, capped at $${budgetUsd.toFixed(2)}.\n`);
+
+  const report = await runGraphFile({
+    file,
+    out,
+    gateway,
+    registry: await loadBuiltinRegistry(),
+    library: await loadBuiltinLibrary(),
+    onNode: (line) => stdout.write(`${line}\n`),
+  });
+
+  stdout.write(
+    `\n${report.prompts} prompt(s) · ${report.ran} step(s) run, ` +
+      `${report.cached} already known · $${gateway.spentUsd.toFixed(4)}\n`,
+  );
+  return 0;
+}
+
 async function cmdBatch(): Promise<number> {
   const folder = argv[3];
   const target = flag('target');
@@ -438,6 +488,8 @@ async function main(): Promise<number> {
       return cmdTargets();
     case 'batch':
       return cmdBatch();
+    case 'graph':
+      return cmdGraph();
     case 'templates':
       return cmdTemplates();
     case 'apply':
