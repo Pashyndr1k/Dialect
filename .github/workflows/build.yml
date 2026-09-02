@@ -39,14 +39,20 @@ jobs:
     # Reports, does not gate — for now, and not because the failure is
     # acceptable.
     #
-    # These 38 tests pass on the machine this is built on, and pass against a
-    # tree containing only tracked files, which is what the runner checks out.
-    # They fail on the runner for a reason that needs the job log to read, and
-    # the log needs repo admin. Two guesses at it were wrong.
+    # These 39 tests pass on the machine this is built on; they pass against a
+    # tree of only tracked files, which is what the runner checks out; and they
+    # pass with ffmpeg taken off PATH, which is the state the runner is in.
+    # Three reproductions, three passes, and it still fails up there.
+    #
+    # Job logs need admin rights on the repository — that was checked, not
+    # assumed, and the API says so in as many words even though the repository
+    # is public. Annotations do not, so the step below turns the tail of the
+    # output into annotations, which anyone can then read. Guessing was tried
+    # first and cost more than this would have.
     #
     # A gate nobody can explain is worse than no gate: it teaches people to
     # ignore red. So the signal stays visible and stops blocking, and this flag
-    # comes off the moment the log is read.
+    # comes off the moment the annotations say what is wrong.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
@@ -55,9 +61,32 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
           key: windows-test
-      # ffmpeg is not on the runner; the tests that want it say so and skip.
-      - run: cargo test --lib
+
+      # Split so the step *name* narrows it before anything has to be read: the
+      # build job compiles this crate happily but never compiles its tests, so
+      # "compile" failing and "run" failing mean quite different things.
+      - name: Compile the host tests
+        shell: bash
         working-directory: apps/desktop/src-tauri
+        run: |
+          set +e
+          out=$(cargo test --lib --no-run 2>&1); code=$?
+          echo "$out"
+          [ $code -eq 0 ] && exit 0
+          echo "$out" | tail -30 | while IFS= read -r line; do echo "::error::${line}"; done
+          exit $code
+
+      # ffmpeg is not on the runner; the tests that want it say so and skip.
+      - name: Run the host tests
+        shell: bash
+        working-directory: apps/desktop/src-tauri
+        run: |
+          set +e
+          out=$(cargo test --lib 2>&1); code=$?
+          echo "$out"
+          [ $code -eq 0 ] && exit 0
+          echo "$out" | tail -30 | while IFS= read -r line; do echo "::error::${line}"; done
+          exit $code
 
   # Draft first, publish last.
   #
