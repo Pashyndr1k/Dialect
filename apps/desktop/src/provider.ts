@@ -45,7 +45,7 @@ export class HostProvider implements Provider {
   readonly #effort: HostProviderOptions['effort'];
 
   constructor(options: HostProviderOptions = {}) {
-    this.model = options.model ?? 'claude-opus-5';
+    this.model = options.model ?? 'claude-sonnet-5';
     this.#maxTokens = options.maxTokens ?? 16000;
     this.#effort = options.effort;
   }

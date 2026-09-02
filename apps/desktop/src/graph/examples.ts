@@ -14,6 +14,7 @@
 import type { GraphDoc } from '@dialect/core';
 
 import imageExample from '../example.image.json';
+import { estimate, roughly, PER_WRITE_USD } from '../prices.ts';
 
 export interface Example {
   id: string;
@@ -84,7 +85,13 @@ const BUNDLE: GraphDoc = {
 
 export const EXAMPLES: Example[] = [
   { id: 'starter', doc: STARTER, about: 'free' },
-  { id: 'bundle', doc: BUNDLE, about: 'about 14c' },
+  {
+    id: 'bundle',
+    doc: BUNDLE,
+    // Worked out from the prices rather than written down, so it cannot drift
+    // when the model changes. Two reads, then composing and varying.
+    about: roughly(estimate(2, true) + PER_WRITE_USD),
+  },
 ];
 
 export const STARTER_GRAPH = STARTER;

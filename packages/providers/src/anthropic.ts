@@ -34,7 +34,7 @@ export class AnthropicProvider implements Provider {
 
   constructor(options: AnthropicProviderOptions = {}) {
     this.#client = options.apiKey ? new Anthropic({ apiKey: options.apiKey }) : new Anthropic();
-    this.model = options.model ?? 'claude-opus-5';
+    this.model = options.model ?? 'claude-sonnet-5';
     this.#maxTokens = options.maxTokens ?? 16000;
     this.#effort = options.effort;
   }

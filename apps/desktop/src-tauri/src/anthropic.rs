@@ -221,7 +221,7 @@ mod tests {
                 "base64": base64(&image),
             }],
             "schema": payload["schema"],
-            "model": "claude-opus-5",
+            "model": "claude-sonnet-5",
             "max_tokens": 16000,
             "effort": null,
         }))

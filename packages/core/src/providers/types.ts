@@ -46,7 +46,7 @@ export interface ProviderResult<T> {
 export interface Provider {
   /** Adapter id, e.g. `anthropic`. Part of the cache key. */
   readonly id: string;
-  /** Model id, e.g. `claude-opus-5`. Part of the cache key. */
+  /** Model id, e.g. `claude-sonnet-5`. Part of the cache key. */
   readonly model: string;
   extract<T>(request: StructuredRequest<T>): Promise<ProviderResult<T>>;
 }
