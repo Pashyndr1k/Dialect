@@ -42,6 +42,7 @@ the code, which is the point: the interface says what the type says.
 | **Graph** | project, workspace, flow, canvas | What you build and save. The canvas is the surface you build it on; the graph is the thing itself. |
 | **Node** | block, step, box | One thing in a graph. |
 | **Wire** | edge, connection, link | What joins two nodes. `edge` is the type name; the interface says wire. |
+| **Tab** | window, pane, document slot | One open graph. Several can be open; one is on screen. |
 
 ## Node groups
 
@@ -66,7 +67,7 @@ unrelated ideas rather than one series.
 | --- | --- | --- |
 | **Run** | execute, build, generate, compile | Running a graph is the one verb for making it happen. |
 | **Save** | keep, store, write | Save puts a graph in Dialect's own folder under its name. **Save as** puts a copy anywhere. |
-| **Kept** | saved sources, library, shelf | The shelf of readings, templates and graphs you kept. It is a proper noun for that shelf and is not a synonym for Save. |
+| **Memory** | Kept, library, shelf, cache | The panel holding readings and templates — the expensive half of earlier sessions, kept so it need not happen twice. It was called Kept, which read as a verb and sat one word away from Save. Graphs are not in it: they are documents, and they live in the tabs. |
 | **Show in the file manager** | open the folder, reveal, browse | Naming Explorer or Finder generically. "Open the folder" never said which folder, and the answer people wanted was the path. |
 
 ## One exemption

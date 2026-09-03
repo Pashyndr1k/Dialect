@@ -173,14 +173,12 @@ export function GraphName({
               }}
             >
               Save
-              <span>to Dialect’s own folder</span>
             </button>
             <button type="button" onClick={() => act(async () => {
               const path = await saveGraphAs(doc);
               if (path) onSay(`Saved to ${path}`);
             })}>
               Save as…
-              <span>anywhere you like</span>
             </button>
 
             {saved.length > 0 ? (
@@ -191,7 +189,6 @@ export function GraphName({
                   <div key={g.id} className="doc-row">
                     <button type="button" onClick={() => { setMenu(false); onOpen(g.doc); }}>
                       {g.doc.name ?? g.id}
-                      <span>{g.doc.nodes.length} nodes</span>
                     </button>
                     {/* Asked about, because a graph is work and a mis-aimed
                         click in a list is how work disappears. */}
@@ -224,9 +221,9 @@ export function GraphName({
             {EXAMPLES.map((ex) => (
               <button key={ex.id} type="button" onClick={() => { setMenu(false); onOpen(ex.doc); }}>
                 {ex.doc.name ?? ex.id}
-                <span>
-                  {ex.doc.nodes.length} nodes · {ex.about}
-                </span>
+                {/* What it costs to run, and nothing else. The node count was
+                    a number nobody was deciding anything on. */}
+                <span>{ex.about}</span>
               </button>
             ))}
 

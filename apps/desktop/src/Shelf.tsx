@@ -1,43 +1,37 @@
 /**
- * What has been kept: templates, readings, graphs.
+ * Memory: what the app kept from work already done.
  *
- * A shelf, not a step. Nothing here makes a prompt — these are the things a
- * graph reaches for, so they belong around the canvas rather than on it. Making
- * them is somewhere else in every case: a template is learned by a node and
- * filed from the inspector, a reading is kept from the inspector, a graph is
- * named and saved in the title bar.
+ * Two things, and they share the one property that decides what this panel is
+ * for. A reading was paid for once and is free for ever after; a template was
+ * learned from a prompt that worked and can be filled in again. Both are the
+ * expensive half of some earlier session, kept so it need not happen twice.
  *
- * It is also where a graph is opened from, which used to be a third menu on the
- * toolbar. A list of your saved things is the obvious place to pick one out of,
- * and a menu that only listed them was a second answer to a question already
- * answered here.
+ * Graphs used to be a third tab here. They are documents, not memory — you make
+ * them, name them, open them — and they belong where a document belongs: in the
+ * tabs across the top and the Graph menu beside them. A list in two places is
+ * two lists to keep in step.
  *
- * Every one of them is a file, and the folder button is the honest admission of
- * that: when something here is wrong, a text editor will fix it faster than any
- * panel could.
+ * Every one of these is a file, and the folder button is the honest admission
+ * of that: when something here is wrong, a text editor will fix it faster than
+ * any panel could.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { GraphDoc, SavedSource, Template } from '@dialect/core';
+import type { SavedSource, Template } from '@dialect/core';
 
 import { deleteSource, listSources, openSourcesFolder } from './sources.ts';
 import { deleteTemplate, listTemplates, openTemplatesFolder } from './templates.ts';
-import { deleteGraph, listGraphs, openGraphsFolder, type SavedGraph } from './graphs.ts';
-import { OPEN_ID } from './graph/open.ts';
-import { EXAMPLES } from './graph/examples.ts';
 
-type Tab = 'graphs' | 'templates' | 'readings';
+type Tab = 'readings' | 'templates';
 
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: 'graphs', label: 'Graphs' },
-  { id: 'templates', label: 'Templates' },
   { id: 'readings', label: 'Readings' },
+  { id: 'templates', label: 'Templates' },
 ];
 
 export interface ShelfProps {
   onClose: () => void;
   onChanged: () => void;
-  onOpenGraph: (doc: GraphDoc) => void;
 }
 
 interface Row {
@@ -48,20 +42,15 @@ interface Row {
   remove?: () => void;
 }
 
-export function Shelf({ onClose, onChanged, onOpenGraph }: ShelfProps): React.ReactElement {
-  const [tab, setTab] = useState<Tab>('graphs');
+export function Shelf({ onClose, onChanged }: ShelfProps): React.ReactElement {
+  const [tab, setTab] = useState<Tab>('readings');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [readings, setReadings] = useState<SavedSource[]>([]);
-  const [graphs, setGraphs] = useState<SavedGraph[]>([]);
   const [wrong, setWrong] = useState<string | null>(null);
 
   const refresh = useCallback((): void => {
     void listTemplates().then(setTemplates).catch(() => setTemplates([]));
     void listSources().then(setReadings).catch(() => setReadings([]));
-    void listGraphs()
-      // The graph that was simply open is not something anyone kept.
-      .then((all) => setGraphs(all.filter((g) => g.id !== OPEN_ID)))
-      .catch(() => setGraphs([]));
   }, []);
 
   useEffect(refresh, [refresh]);
@@ -75,41 +64,23 @@ export function Shelf({ onClose, onChanged, onOpenGraph }: ShelfProps): React.Re
       .catch((err: Error) => setWrong(err.message));
   };
 
-  const take = (doc: GraphDoc): void => {
-    onOpenGraph(doc);
-    onClose();
-  };
-
   const rows: Row[] =
-    tab === 'graphs'
-      ? graphs.map((g) => ({
-          id: g.id,
-          name: g.doc.name ?? g.id,
-          note: `${g.doc.nodes.length} nodes`,
-          open: () => take(g.doc),
-          remove: () => remove(deleteGraph(g.id)),
+    tab === 'templates'
+      ? templates.map((t) => ({
+          id: t.id,
+          name: t.name,
+          note: [t.modality, t.target].filter(Boolean).join(' · '),
+          remove: () => remove(deleteTemplate(t.id)),
         }))
-      : tab === 'templates'
-        ? templates.map((t) => ({
-            id: t.id,
-            name: t.name,
-            note: [t.modality, t.target].filter(Boolean).join(' · '),
-            remove: () => remove(deleteTemplate(t.id)),
-          }))
-        : readings.map((s) => ({
-            id: s.id,
-            name: s.name,
-            note: `${s.kind} · ${s.role} · ${s.lines.length} lines`,
-            remove: () => remove(deleteSource(s.id)),
-          }));
+      : readings.map((s) => ({
+          id: s.id,
+          name: s.name,
+          note: `${s.kind} · ${s.role} · ${s.lines.length} lines`,
+          remove: () => remove(deleteSource(s.id)),
+        }));
 
   const openFolder = (): void => {
-    const go =
-      tab === 'templates'
-        ? openTemplatesFolder()
-        : tab === 'readings'
-          ? openSourcesFolder()
-          : openGraphsFolder();
+    const go = tab === 'templates' ? openTemplatesFolder() : openSourcesFolder();
     // No longer swallowed: this button did nothing at all for months because
     // the permission it needs was never asked for and the failure was caught
     // and dropped.
@@ -117,7 +88,7 @@ export function Shelf({ onClose, onChanged, onOpenGraph }: ShelfProps): React.Re
   };
 
   return (
-    <div className="sheet" role="dialog" aria-label="Kept things">
+    <div className="sheet" role="dialog" aria-label="Memory">
       <div className="sheet-box">
         <header className="sheet-head">
           <nav className="shelf-tabs">
@@ -151,11 +122,9 @@ export function Shelf({ onClose, onChanged, onOpenGraph }: ShelfProps): React.Re
 
         {rows.length === 0 ? (
           <p className="shelf-empty">
-            {tab === 'graphs'
-              ? 'Nothing saved yet. Name a graph in the title bar and press Save.'
-              : tab === 'templates'
-                ? 'No templates yet. Learn one from a prompt that already works.'
-                : 'No readings kept yet. Keep one from the panel after reading a reference.'}
+            {tab === 'templates'
+              ? 'No templates yet. Learn one from a prompt that already works.'
+              : 'No readings kept yet. Keep one from the panel after reading a reference.'}
           </p>
         ) : (
           <ul className="shelf">
@@ -183,28 +152,6 @@ export function Shelf({ onClose, onChanged, onOpenGraph }: ShelfProps): React.Re
           </ul>
         )}
 
-        {/* The examples live with the saved graphs because that is what they
-            are: graphs, which happen to have shipped with the app. */}
-        {tab === 'graphs' ? (
-          <>
-            <h4 className="shelf-sub">Examples</h4>
-            <ul className="shelf">
-              {EXAMPLES.map((ex) => (
-                <li key={ex.id}>
-                  <div>
-                    <b>{ex.doc.name ?? ex.id}</b>
-                    <span>
-                      {ex.doc.nodes.length} nodes · {ex.about}
-                    </span>
-                  </div>
-                  <button type="button" className="btn ghost" onClick={() => take(ex.doc)}>
-                    Open
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
       </div>
     </div>
   );

@@ -116,7 +116,9 @@ export function Actions({ values }: { values: readonly Value[] }): React.ReactEl
             };
             await saveSource(saved);
           }
-          return readings.length > 1 ? `Kept ${readings.length}` : 'Kept';
+          return readings.length > 1
+            ? `${readings.length} into Memory`
+            : 'Into Memory';
         }),
     });
   }

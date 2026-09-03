@@ -103,10 +103,16 @@ export interface CardProposal extends CardLearnResult {
 /**
  * Fetch the guide at `url` and propose a card from it.
  *
+ * `keepId` makes it an update to a card that already exists rather than a new
+ * model — see `CardLearnOptions`.
+ *
  * Nothing is written. The caller shows the result and lets someone read it
  * before it becomes a file.
  */
-export async function proposeCard(url: string): Promise<CardProposal> {
+export async function proposeCard(
+  url: string,
+  options: { keepId?: string } = {},
+): Promise<CardProposal> {
   if (!hasHost()) {
     throw new Error(
       'Reading a guide needs the desktop app: a browser cannot fetch another site, ' +
@@ -119,6 +125,7 @@ export async function proposeCard(url: string): Promise<CardProposal> {
   const learned = await learnCard(opusGateway(model), {
     url: fetched.url,
     guide: fetched.text,
+    ...(options.keepId ? { keepId: options.keepId } : {}),
   });
 
   return {

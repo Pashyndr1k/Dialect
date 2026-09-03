@@ -12,10 +12,39 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { GraphDoc } from '@dialect/core';
 
-import { OPEN_ID, rememberOpenGraph } from './open.ts';
+import { isOpenId } from './open.ts';
 import { idFor, listGraphs, saveGraph, type SavedGraph } from '../graphs.ts';
 
-const EMPTY: GraphDoc = { version: 1, nodes: [], edges: [] };
+export const EMPTY_GRAPH: GraphDoc = { version: 1, nodes: [], edges: [] };
+
+/**
+ * Everything about one open graph that has to survive being looked away from.
+ *
+ * The document, obviously — but the history too. A tab you come back to with
+ * its undo stack emptied is not a tab, it is a document picker with a row of
+ * buttons, and the difference is exactly whether the work you did before you
+ * switched can still be taken back.
+ */
+export interface GraphSnapshot {
+  doc: GraphDoc;
+  past: GraphDoc[];
+  future: GraphDoc[];
+  /** The document as last written, as JSON. What the dirty dot compares to. */
+  written: string;
+}
+
+export const snapshotOf = (doc: GraphDoc): GraphSnapshot => ({
+  doc,
+  past: [],
+  future: [],
+  written: JSON.stringify(doc),
+});
+
+export const BLANK_SNAPSHOT = (): GraphSnapshot => snapshotOf(EMPTY_GRAPH);
+
+/** Whether a snapshot has changes it has not seen written. */
+export const isDirty = (snapshot: GraphSnapshot): boolean =>
+  JSON.stringify(snapshot.doc) !== snapshot.written;
 
 /** A new id that reads as what it is, so a saved graph can be followed by eye. */
 const freshId = (type: string, taken: Set<string>): string => {
@@ -42,28 +71,31 @@ export interface GraphDocApi {
   duplicateNode: (id: string) => void;
   removeNode: (id: string) => void;
   connect: (from: { node: string; port: string }, to: { node: string; port: string }) => void;
-  open: (next: GraphDoc) => void;
   /** Positions, written back when a drag ends rather than during it. */
   moved: (at: Map<string, { x: number; y: number }>) => void;
   keep: () => Promise<void>;
   /** Read the saved list again, after something outside changed it. */
   refresh: () => void;
+  /** Everything a tab has to hold on to while you are looking at another one. */
+  snapshot: GraphSnapshot;
 }
 
 export function useGraphDoc(
-  initial: GraphDoc | undefined,
-  onChanged: (opened: boolean) => void,
+  initial: GraphSnapshot | undefined,
+  onChanged: () => void,
 ): GraphDocApi {
-  const [doc, setDoc] = useState<GraphDoc>(initial ?? EMPTY);
+  const [doc, setDoc] = useState<GraphDoc>(initial?.doc ?? EMPTY_GRAPH);
   const [saved, setSaved] = useState<SavedGraph[]>([]);
   /**
    * What this graph looked like when it was last written or opened.
    *
-   * Seeded from what the window opened with, not left empty: otherwise nothing
+   * Seeded from what the tab opened with, not left empty: otherwise nothing
    * counts as changed until the first save, which is exactly the stretch where
    * knowing would matter most.
    */
-  const [written, setWritten] = useState<string>(() => JSON.stringify(initial ?? EMPTY));
+  const [written, setWritten] = useState<string>(
+    () => initial?.written ?? JSON.stringify(initial?.doc ?? EMPTY_GRAPH),
+  );
 
   /**
    * Where you have been, and where you were before you came back.
@@ -72,19 +104,21 @@ export function useGraphDoc(
    * whole documents rather than a list of operations to invert. That is a few
    * kilobytes each and correct by construction — an undo cannot drift out of
    * step with what it is undoing.
+   *
+   * Seeded from the snapshot, so switching tabs and coming back does not empty
+   * it. The stacks belong to the graph, not to the screen.
    */
-  const [past, setPast] = useState<GraphDoc[]>([]);
-  const [future, setFuture] = useState<GraphDoc[]>([]);
+  const [past, setPast] = useState<GraphDoc[]>(initial?.past ?? []);
+  const [future, setFuture] = useState<GraphDoc[]>(initial?.future ?? []);
 
   /** Deep enough to get out of trouble, shallow enough not to hold a session. */
   const DEPTH = 50;
 
-  // Where we are, not something anyone chose to keep. See open.ts.
-  useEffect(() => rememberOpenGraph(doc), [doc]);
-
   const refreshSaved = useCallback((): void => {
     void listGraphs()
-      .then((all) => setSaved(all.filter((g) => g.id !== OPEN_ID)))
+      // Neither the graph that was simply open in a tab nor its neighbours are
+      // things anyone chose to keep.
+      .then((all) => setSaved(all.filter((g) => !isOpenId(g.id))))
       .catch(() => setSaved([]));
   }, []);
 
@@ -106,7 +140,7 @@ export function useGraphDoc(
       // redo your way into a graph that never existed.
       setFuture([]);
       setDoc(next);
-      onChanged(false);
+      onChanged();
     },
     [doc, onChanged],
   );
@@ -117,7 +151,7 @@ export function useGraphDoc(
     setFuture((f) => [doc, ...f].slice(0, DEPTH));
     setPast((p) => p.slice(0, -1));
     setDoc(back);
-    onChanged(false);
+    onChanged();
   }, [past, doc, onChanged]);
 
   const redo = useCallback((): void => {
@@ -126,7 +160,7 @@ export function useGraphDoc(
     setPast((p) => [...p.slice(-DEPTH + 1), doc]);
     setFuture((f) => f.slice(1));
     setDoc(forward);
-    onChanged(false);
+    onChanged();
   }, [future, doc, onChanged]);
 
   const setParams = useCallback(
@@ -208,17 +242,6 @@ export function useGraphDoc(
     [doc],
   );
 
-  const open = useCallback(
-    (next: GraphDoc): void => {
-      setDoc(next);
-      setWritten(JSON.stringify(next));
-      setPast([]);
-      setFuture([]);
-      onChanged(true);
-    },
-    [onChanged],
-  );
-
   /**
    * Keep this graph under the name it carries.
    *
@@ -256,9 +279,9 @@ export function useGraphDoc(
     duplicateNode,
     removeNode,
     connect,
-    open,
     moved,
     keep,
     refresh: refreshSaved,
+    snapshot: { doc, past, future, written },
   };
 }

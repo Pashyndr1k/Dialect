@@ -92,7 +92,7 @@ const CONTROLS: Record<string, Control[]> = {
     {
       kind: 'select',
       key: 'id',
-      label: 'Kept',
+      label: 'From Memory',
       options: ({ sources }) =>
         sources.map((s) => ({ value: s.id, label: s.name, group: s.kind })),
       apply: (value, { sources }) => {

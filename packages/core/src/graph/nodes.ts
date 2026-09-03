@@ -112,9 +112,9 @@ const specs: NodeSpec[] = [
 
   {
     type: 'kept',
-    title: 'Kept reading',
+    title: 'Reading from Memory',
     group: 'in',
-    hint: 'A reading you saved earlier. Free, and always word-for-word the same.',
+    hint: 'A reading kept earlier. Free, and always word-for-word the same.',
     inputs: {},
     outputs: { out: { type: 'lines' } },
     async run(_inputs, params) {

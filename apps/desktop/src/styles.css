@@ -768,3 +768,7 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 .read-report li { margin: 2px 0; }
 .read-dropped { color: var(--ink-3); }
 .read-report + .card-text { margin-top: 10px; }
+
+/* The newer-guide row on the screen showing one card. */
+.card-update { margin-top: 14px; }
+.card-update-note { margin: 6px 0 0; }

@@ -161,6 +161,18 @@ export interface CardLearnOptions {
   url: string;
   /** The guide as text. */
   guide: string;
+  /**
+   * The id of the card being replaced, when this is an update rather than a
+   * new model.
+   *
+   * The id is what a graph's Compile node stores. A newer guide that writes the
+   * name differently — "Kling 3.5" where the card says `kling-3-omni` — would
+   * otherwise produce a card that is correct, saves cleanly, and is referenced
+   * by nothing, leaving every graph pointing at a model that no longer exists.
+   * So the id of the thing being updated wins, and the difference is said out
+   * loud rather than resolved quietly.
+   */
+  keepId?: string;
 }
 
 export interface CardLearnResult {
@@ -204,8 +216,10 @@ function typed(value: string): unknown {
 export function cardFrom(
   answer: LearnedCard,
   options: CardLearnOptions,
-): { profile: ModelProfile; dropped: string[] } {
+): { profile: ModelProfile; dropped: string[]; notes: string[] } {
   const dropped: string[] = [];
+  /** Things worth saying that the model did not say. */
+  const notes: string[] = [];
 
   const fields = answer.fields
     .map((f) => {
@@ -267,8 +281,18 @@ export function cardFrom(
     ...(some(answer.refSyntax) ? { refSyntax: clean(answer.refSyntax) } : {}),
   };
 
+  const proposed = clean(answer.id);
+  const id = options.keepId ?? proposed;
+  if (options.keepId && proposed && proposed !== options.keepId) {
+    notes.push(
+      `The guide reads as "${proposed}", but this card keeps the id ` +
+        `"${options.keepId}" — that is what your graphs point at. Rename it only ` +
+        `if you mean to make a second model.`,
+    );
+  }
+
   const profile: ModelProfile = {
-    id: clean(answer.id),
+    id,
     label: clean(answer.label),
     ...(some(answer.vendor) ? { vendor: clean(answer.vendor) } : {}),
     family: answer.family,
@@ -299,7 +323,7 @@ export function cardFrom(
     },
   };
 
-  return { profile, dropped };
+  return { profile, dropped, notes };
 }
 
 /** Read a guide and propose a card. Costs one call, and is cached by its text. */
@@ -333,12 +357,13 @@ export async function learnCard(gateway: Gateway, options: CardLearnOptions): Pr
     schemaVersion: CARD_LEARN_VERSION,
   });
 
-  const { profile, dropped } = cardFrom(result.value, options);
+  const { profile, dropped, notes } = cardFrom(result.value, options);
 
   return {
     profile,
     confidence: result.value.confidence,
-    notes: result.value.notes,
+    // What the model said, and then what this had to decide for itself.
+    notes: [...result.value.notes, ...notes],
     dropped,
     usage: result.usage,
     cached: result.cached,

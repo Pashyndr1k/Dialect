@@ -56,6 +56,9 @@ const LAYER: Record<Origin, string> = {
  * the card someone needs to open and fix — so the list cannot depend on the
  * loader having accepted it.
  */
+/** The file name a copy of `source` takes. */
+const copyName = (source: string): string => `${source.replace(/\.(ya?ml)$/, '')}-mine.yaml`;
+
 function headOf(text: string): { id: string; label: string } {
   const line = (key: string): string =>
     text.match(new RegExp(`^${key}:\\s*['"]?([^'"\\n]+)`, 'm'))?.[1]?.trim() ?? '';
@@ -104,6 +107,8 @@ export function CardList({
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [guideUrl, setGuideUrl] = useState('');
+  /** The address of a newer guide, on the screen showing one card. */
+  const [freshUrl, setFreshUrl] = useState('');
   const [reading, setReading] = useState(false);
   /** What the guide reader made of it, shown beside the card it proposed. */
   const [report, setReport] = useState<CardProposal | null>(null);
@@ -141,9 +146,10 @@ export function CardList({
       setName('my-model.yaml');
       return;
     }
+    setFreshUrl('');
     setOpen(copy ? 'new' : `${card.origin}/${card.source}`);
     setDraft(card.text);
-    setName(copy ? card.source.replace(/\.(ya?ml)$/, '') + '-mine.yaml' : card.source);
+    setName(copy ? copyName(card.source) : card.source);
   };
 
   const act = async (what: () => Promise<string | null>): Promise<void> => {
@@ -187,6 +193,44 @@ export function CardList({
     }
   };
 
+  /**
+   * Read a newer guide and rewrite the card open on screen.
+   *
+   * The same call as writing a new one, with one difference that matters: the
+   * id of the card being replaced is kept. A newer guide often writes the name
+   * differently, and a card whose id has quietly changed saves cleanly, reads
+   * correctly, and is referenced by nothing — leaving every graph pointing at a
+   * model that no longer exists.
+   *
+   * A built-in or installed card cannot be written to, so updating one produces
+   * a copy of your own. It loads last, so it wins, which is what makes this an
+   * update rather than a second model.
+   */
+  const updateFromGuide = async (): Promise<void> => {
+    const keepId = shown?.id || headOf(draft).id;
+    setReading(true);
+    setError(null);
+    setNote(null);
+    setReport(null);
+    try {
+      const proposal = await proposeCard(
+        freshUrl.trim(),
+        keepId ? { keepId } : {},
+      );
+      setReport(proposal);
+      setDraft(profileToYaml(proposal.profile));
+      if (shown && shown.origin !== 'yours') {
+        setName(copyName(shown.source));
+        setOpen('new');
+      }
+      setFreshUrl('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReading(false);
+    }
+  };
+
   if (open !== null) {
     const editable = open === 'new' || shown?.origin === 'yours';
     return (
@@ -212,6 +256,39 @@ export function CardList({
               : 'This card came from an installed set, and the next install replaces the whole set. Take a copy so your change survives it.'}
           </p>
         ) : null}
+
+        {/*
+          A card is a description of something that changes underneath it. The
+          guide is republished, the model gains a field, a limit doubles — and
+          the card goes on producing prompts written for last year's model,
+          quietly, because nothing about a stale card looks stale.
+        */}
+        <div className="sheet-row card-update">
+          <input
+            className="sheet-i"
+            spellCheck={false}
+            placeholder="https://… a newer prompting guide for this model"
+            value={freshUrl}
+            disabled={reading}
+            onChange={(e) => setFreshUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && freshUrl.trim() && !reading) void updateFromGuide();
+            }}
+          />
+          <button
+            className="ghost"
+            disabled={reading || freshUrl.trim().length === 0}
+            onClick={() => void updateFromGuide()}
+          >
+            {reading ? 'Reading…' : 'Update from this guide'}
+          </button>
+        </div>
+        <p className="sheet-p dim card-update-note">
+          Keeps the id, so the graphs pointing at this model go on pointing at it.
+          {shown && shown.origin !== 'yours'
+            ? ' This one cannot be written to, so the update becomes a card of your own — which loads last and wins.'
+            : ''}
+        </p>
 
         {/*
           What the guide reader had to say about its own answer, above the card

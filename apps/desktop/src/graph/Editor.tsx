@@ -41,7 +41,7 @@ import { BoardProvider, type NodeFace } from './NodeData.tsx';
 import { Inspector } from './Inspector.tsx';
 import { RunBar } from './RunBar.tsx';
 import { useRun } from './useRun.ts';
-import { useGraphDoc } from './useGraphDoc.ts';
+import { useGraphDoc, type GraphSnapshot } from './useGraphDoc.ts';
 import { ContextMenu, type Spot } from './ContextMenu.tsx';
 import { pickFolder, pickReferences } from '../store.ts';
 import { listSources } from '../sources.ts';
@@ -52,7 +52,10 @@ const nodeTypes = { dialect: NodeBody };
 export interface EditorProps {
   registry: LoadedRegistry;
   library: Library;
-  doc?: GraphDoc;
+  /** Which tab this is, so what it reports lands on the right one. */
+  tabId: string;
+  /** What this tab was holding when it was last looked at. */
+  snapshot?: GraphSnapshot;
   /**
    * The title bar owns the name and the Save button, so it needs to see the
    * document and be able to act on it. Handed up rather than duplicated: two
@@ -64,11 +67,13 @@ export interface EditorProps {
     doc: GraphDoc;
     rename: (name: string) => void;
     save: () => void;
-    open: (doc: GraphDoc) => void;
     saved: SavedGraph[];
     /** So the title bar's failures land where the editor's do. */
     say: (message: string) => void;
     refresh: () => void;
+    /** Handed up so the tab can be put down and picked up again intact. */
+    snapshot: GraphSnapshot;
+    tabId: string;
   }) => void;
 }
 
@@ -86,7 +91,13 @@ function portOf(
   return (side === 'out' ? spec?.outputs : spec?.inputs)?.[port ?? '']?.type;
 }
 
-function Board({ registry, library, doc: initial, onGraph }: EditorProps): React.ReactElement {
+function Board({
+  registry,
+  library,
+  tabId,
+  snapshot: initial,
+  onGraph,
+}: EditorProps): React.ReactElement {
   const [selected, setSelected] = useState<string | null>(null);
   const [sources, setSources] = useState<SavedSource[]>([]);
   const [flowNodes, setFlowNodes, onNodesChangeInternal] = useNodesState<Node>([]);
@@ -104,22 +115,16 @@ function Board({ registry, library, doc: initial, onGraph }: EditorProps): React
   const forget = useRef<(all?: boolean) => void>(() => {});
 
   /**
-   * Opening a graph drops the view's nodes rather than reconciling them.
+   * A change makes the last run stale, so the run is told.
    *
-   * Node objects are reused by id and two unrelated graphs can easily share one
-   * — both built-in examples have a `compile-1`. Reusing it kept the old
-   * position and drew the node in the middle of the new graph.
+   * This used to have a second job — dropping the view's nodes when a different
+   * graph was opened into the same editor, because node objects are reused by
+   * id and both built-in examples have a `compile-1`, so the new node kept the
+   * old one's position. Graphs open in their own tab now and each tab builds
+   * its own editor, so there is no reconciling one graph into another left to
+   * get wrong.
    */
-  const onDocChanged = useCallback(
-    (opened: boolean): void => {
-      forget.current(opened);
-      if (opened) {
-        setFlowNodes([]);
-        setSelected(null);
-      }
-    },
-    [setFlowNodes],
-  );
+  const onDocChanged = useCallback((): void => forget.current(false), []);
 
   const graph = useGraphDoc(initial, onDocChanged);
   const { doc } = graph;
@@ -344,12 +349,29 @@ function Board({ registry, library, doc: initial, onGraph }: EditorProps): React
       doc,
       rename: graph.rename,
       save: () => void graph.keep().catch((err: Error) => say(err.message)),
-      open: graph.open,
       saved: graph.saved,
       say,
       refresh: graph.refresh,
+      snapshot: graph.snapshot,
+      tabId,
     });
-  }, [doc, graph.dirty, graph.rename, graph.keep, graph.open, graph.saved, graph.refresh, onGraph, say]);
+    // The snapshot itself is rebuilt every render, so the pieces it is made of
+    // are the dependencies. Depending on the object would fire this effect on
+    // every render, which is the loop React stops by refusing to continue.
+  }, [
+    doc,
+    graph.snapshot.past,
+    graph.snapshot.future,
+    graph.snapshot.written,
+    graph.dirty,
+    graph.rename,
+    graph.keep,
+    graph.saved,
+    graph.refresh,
+    onGraph,
+    say,
+    tabId,
+  ]);
 
   const node = doc.nodes.find((n) => n.id === selected);
 
