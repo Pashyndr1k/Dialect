@@ -19,11 +19,16 @@ Three consequences follow, and they are the reason for the architecture:
 
 ## Words
 
-One name per thing, everywhere — interface, errors, guide, CLI, comments. The
-list is [docs/GLOSSARY.md](docs/GLOSSARY.md), and it is short on purpose. An
-image is an image and not a still; a video is a video and not a clip; audio is
-audio and not a track. A thing with two names is two things to whoever is
-reading, and this app has enough real ideas in it without inventing spare ones.
+One name per thing, everywhere in this repository — interface, errors, guide,
+CLI, comments. The list is [docs/GLOSSARY.md](docs/GLOSSARY.md), and it is short
+on purpose. An image is an image and not a still; a video is a video and not a
+clip; audio is audio and not a track. A thing with two names is two things to
+whoever is reading, and this app has enough real ideas in it without inventing
+spare ones.
+
+The list binds Dialect and nothing else. "Clip" and "still" are good words that
+another project may be right to use; they are just not the ones this one picked,
+and the point was picking.
 
 ## Version
 

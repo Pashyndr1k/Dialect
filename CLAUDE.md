@@ -1,9 +1,22 @@
 # Dialect
 
+Everything in this file applies to **this repository only** — the tree rooted at
+`dialect/`. Its sibling projects under `D:\Claude work` are unrelated work with
+their own vocabulary and their own habits; nothing here is a house style and
+none of it travels. If you are editing StoryReel, TD3D, DreamReel or anything
+else, this file is not addressed to you.
+
 ## Words
 
-`docs/GLOSSARY.md` is binding. Read it before naming anything a person will
-read — a label, a hint, an error, a heading, a commit message, a comment.
+`docs/GLOSSARY.md` is binding **inside Dialect**. Read it before naming anything
+a person will read here — a label, a hint, an error, a heading, a commit
+message, a comment.
+
+It is a local convention, not a general rule about English. "Clip" and "still"
+are perfectly good words and another project may well be right to use them; they
+are simply not the words this one uses, because this one has to name three kinds
+of reference consistently across a UI, a CLI, a document format and a card
+schema, and two names for one kind is two things to whoever is reading.
 
 The short version: **Image**, not still. **Video**, not clip. **Audio**, not
 track. **Input** and **Output** are the node groups, not "Bring in" and "Get

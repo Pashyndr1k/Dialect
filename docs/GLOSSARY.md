@@ -1,11 +1,22 @@
 # Glossary
 
+**Scope: Dialect only.** This is a local convention for one repository, not a
+claim about English and not a house style for anything else. Other projects have
+other subjects and are free to call things whatever suits them.
+
 The words this app uses, and the ones it does not. One name per thing,
 everywhere: in the interface, in error messages, in the guide, in the CLI, and
 in the comments. A thing with two names is two things to the person reading.
 
 Where a word is listed as **not**, it is not a synonym to be varied for style.
-It is wrong, and changing it back is a bug.
+It is wrong *here*, and changing it back is a bug. The words in the "Not" column
+are mostly good words — they are simply not the ones this project picked, and
+the value is in having picked one at all.
+
+The reason Dialect needs this and a smaller project might not: the same three
+kinds of reference have to be named identically across a window, a command line,
+a document format and a card schema, and they are the thing every feature
+touches. Where a name is only in one place, one name is not worth a rule.
 
 ## Material you bring in
 
