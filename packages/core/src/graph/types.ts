@@ -28,6 +28,7 @@ import type { Gateway } from '../providers/gateway.ts';
 import type { ImagePart } from '../providers/types.ts';
 import type { SongMeasurements } from '../extract/audio.ts';
 import type { SourceKind, SourceRole } from '../compose/types.ts';
+import type { NodeGroup } from './groups.ts';
 
 /**
  * What can travel on a wire.
@@ -112,8 +113,8 @@ export interface NodeContext {
   registry: Registry;
   library?: Library;
   /**
-   * Turns a source into the pictures a reader looks at. Frames for a clip,
-   * spectrograms for a track, the image itself for a still.
+   * Turns a source into the pictures a reader looks at. Frames for a video,
+   * spectrograms for audio, the image itself for an image.
    *
    * Supplied by the host because core cannot open a file. A node asks for what
    * it needs and does not learn where it came from.
@@ -126,8 +127,8 @@ export interface NodeContext {
  * What the host found in a file: pictures to look at, and the facts it measured
  * rather than guessed.
  *
- * The facts matter as much as the pictures. A clip's duration and aspect come
- * from a probe, and a track's tempo, key and loudness are counted — the reader
+ * The facts matter as much as the pictures. A video's duration and aspect come
+ * from a probe, and audio's tempo, key and loudness are counted — the reader
  * is told them so it does not have to estimate from a spectrogram.
  */
 export interface ResolvedSource {
@@ -152,8 +153,8 @@ export type SourceResolver = (source: GraphSource) => Promise<ResolvedSource>;
 export interface NodeSpec {
   type: string;
   title: string;
-  /** Groups the node in the editor's menu. */
-  group: 'in' | 'read' | 'compose' | 'shape' | 'out';
+  /** Groups the node in the editor's catalogue. See `groups.ts`. */
+  group: NodeGroup;
   /**
    * One line, for the menu you pick this from.
    *

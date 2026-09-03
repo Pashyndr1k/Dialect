@@ -55,7 +55,7 @@ const SHOT: ExtractedShot = {
 const gatewayWith = (answers: unknown[]) =>
   new Gateway(new MockProvider(answers), { budgetUsd: 10 });
 
-describe('reading a clip', () => {
+describe('reading a video', () => {
   it('takes its motion from the shot and its scene from the frames', async () => {
     const { ir } = await extractFromVideo(gatewayWith([SHOT]), FRAMES, {
       reference: 'saloon.mp4',
@@ -91,7 +91,7 @@ describe('reading a clip', () => {
     expect(sent.map((i) => i.base64)).toEqual(FRAMES.map((f) => f.base64));
   });
 
-  it('refuses a clip that produced nothing to look at', async () => {
+  it('refuses a video that produced nothing to look at', async () => {
     await expect(
       extractFromVideo(gatewayWith([SHOT]), [], { reference: 'empty.mp4' }),
     ).rejects.toThrow(/nothing to look at/);
@@ -109,7 +109,7 @@ describe('reading a clip', () => {
   });
 });
 
-describe('a clip becomes a prompt', () => {
+describe('a video becomes a prompt', () => {
   it('compiles to Kling with its movement intact', async () => {
     const { ir } = await extractFromVideo(gatewayWith([SHOT]), FRAMES, {
       reference: 'saloon.mp4',
@@ -151,7 +151,7 @@ describe('a clip becomes a prompt', () => {
     expect(result.findings.map((f) => f.ruleId)).toContain('one-action-one-move');
   });
 
-  it('blocks a clip longer than the target makes', async () => {
+  it('blocks a video longer than the target makes', async () => {
     const { ir } = await extractFromVideo(gatewayWith([SHOT]), FRAMES, {
       reference: 'long.mp4',
       durationS: 40,

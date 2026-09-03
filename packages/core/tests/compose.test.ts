@@ -108,7 +108,7 @@ describe('a reading, reduced to lines', () => {
     expect(lines.some((l) => l.startsWith('Grain'))).toBe(false);
   });
 
-  it('adds movement for a clip and nothing else', () => {
+  it('adds movement for a video and nothing else', () => {
     const shot: ExtractedShot = {
       ...PORTRAIT,
       cameraMove: 'push-in',
@@ -123,7 +123,7 @@ describe('a reading, reduced to lines', () => {
     expect(lines).toContain('Beat 00:02: she lets go of the frame');
   });
 
-  it('describes a track by what was heard of it', () => {
+  it('describes audio by what was heard of it', () => {
     const song: ExtractedSong = {
       genre: 'dusty americana',
       instruments: ['brushed drums', 'lap steel'],
@@ -150,8 +150,8 @@ describe('what the composer is told', () => {
     const asked = composeInstruction(bundleOf([WORDS, PICTURE, STYLE]));
 
     expect(asked).toContain('What they typed (words) — job: auto');
-    expect(asked).toContain('A picture, read (her.png) — job: auto');
-    expect(asked).toContain('A picture, read (street.png) — job: style');
+    expect(asked).toContain('An image, read (her.png) — job: auto');
+    expect(asked).toContain('An image, read (street.png) — job: style');
   });
 
   it('leaves out a source that says nothing', () => {
@@ -223,7 +223,7 @@ describe('the document it composes', () => {
     expect(render.text).toContain('scar through one eyebrow');
   });
 
-  it('composes a clip when a clip is what is being made', async () => {
+  it('composes a video when a video is what is being made', async () => {
     const shot: ExtractedShot = {
       ...ANSWER,
       cameraMove: 'push-in',

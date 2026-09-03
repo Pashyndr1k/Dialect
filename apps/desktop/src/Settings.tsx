@@ -138,7 +138,12 @@ export function Settings({ onClose }: { onClose: () => void }) {
               type="button"
               className="ghost"
               title="Reading those references again would cost money"
-              onClick={() => void clearCache().then(() => void cacheStats().then(setCache))}
+              onClick={() =>
+                void run(async () => {
+                  await clearCache();
+                  setCache(await cacheStats());
+                })
+              }
             >
               Forget them
             </button>

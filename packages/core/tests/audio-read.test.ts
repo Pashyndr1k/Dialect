@@ -90,7 +90,7 @@ describe('what was measured', () => {
     expect(one.calls[0]?.instruction).toContain('The picture is a spectrogram');
   });
 
-  it('refuses a track that produced nothing to look at', async () => {
+  it('refuses audio that produced nothing to look at', async () => {
     await expect(extractFromAudio(gatewayWith([SONG]), [], MEASURED)).rejects.toThrow(
       /nothing to look at/,
     );
@@ -130,7 +130,7 @@ describe('the document it makes', () => {
   });
 });
 
-describe('a track becomes a prompt', () => {
+describe('audio becomes a prompt', () => {
   it('compiles to Suno with the measured tempo in it', async () => {
     const { ir } = await extractFromAudio(gatewayWith([SONG]), PICTURES, MEASURED);
     const { render, blocked } = compile(ir, getProfile(registry, 'suno'));

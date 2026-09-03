@@ -272,7 +272,7 @@ describe('fields a template may leave open', () => {
     expect(JSON.stringify(template.ir)).not.toContain('{{framing}}');
   });
 
-  it('gives a clip the honest move when the example does not say', () => {
+  it('gives a video the honest move when the example does not say', () => {
     const template = learnedToTemplate(
       { ...LEARNED_VIDEO, cameraMove: '', cameraSpeed: '' },
       { kind: 'text2vid', cast: 1 },

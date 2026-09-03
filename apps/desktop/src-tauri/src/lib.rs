@@ -20,7 +20,6 @@ mod voice;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -51,8 +50,7 @@ pub fn run() {
             files::folder_scan,
             files::file_write,
             files::file_text,
-            channel::channel_trust,
-            channel::channel_distrust,
+            files::show_folder,
             channel::channel_status,
             channel::channel_cards,
             channel::channel_check,

@@ -100,7 +100,7 @@ describe('a reference and some words, together', () => {
     expect(plain.key).not.toBe(noted.key);
   });
 
-  it('carries a note into a clip and into a track', async () => {
+  it('carries a note into a video and into audio', async () => {
     const shot: ExtractedShot = {
       ...SCENE,
       cameraMove: 'push-in',

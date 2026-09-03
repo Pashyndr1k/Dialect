@@ -82,7 +82,7 @@ describe('a graph run from a terminal', () => {
     expect(texts).toContain(compile(ir, getProfile(registry, 'nano-banana-2')).render.text);
   });
 
-  it('says plainly that it cannot measure a track', async () => {
+  it('says plainly that it cannot measure audio', async () => {
     // Tempo, key and loudness are counted in the desktop host. Guessing them
     // here and stating them as fact would be worse than refusing.
     const resolve = resolverFor({ ffmpeg: true, ffprobe: true });
@@ -91,7 +91,7 @@ describe('a graph run from a terminal', () => {
     ).rejects.toThrow(/cannot measure/);
   });
 
-  it('asks for ffmpeg by name when a clip needs it and it is not there', async () => {
+  it('asks for ffmpeg by name when a video needs it and it is not there', async () => {
     const resolve = resolverFor({ ffmpeg: false, ffprobe: false });
     await expect(
       resolve({ path: '/x/clip.mp4', name: 'clip.mp4', kind: 'video' }),

@@ -40,6 +40,7 @@ interface GraphHandles {
   open: (doc: GraphDoc) => void;
   saved: SavedGraph[];
   say: (message: string) => void;
+  refresh: () => void;
 }
 
 /** A graph with nothing in it, for New. */
@@ -99,6 +100,7 @@ export function Shell(): React.ReactElement {
             onOpen={graph.open}
             onNew={() => graph.open({ ...BLANK, name: undefined })}
             onSay={graph.say}
+            onDeleted={graph.refresh}
           />
         ) : null}
 

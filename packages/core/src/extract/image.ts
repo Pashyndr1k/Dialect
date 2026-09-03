@@ -22,7 +22,7 @@ import {
 export interface ExtractOptions {
   /** Label recorded in provenance, normally the file name. */
   reference: string;
-  /** What the resulting IR is for. Defaults to a still. */
+  /** What the resulting IR is for. Defaults to an image. */
   modality?: Modality;
   /**
    * What the person said alongside the reference.

@@ -1,8 +1,0 @@
-id: tiny-one
-label: Tiny One
-family: image
-syntax: natural
-renderer: natural
-source:
-  name: fixture for the channel test
-  dated: "2026-08-30"

@@ -7,7 +7,7 @@
  * ways round — so the job is a property of each source, not of its kind.
  *
  * Every source arrives here already reduced to lines. A picture has been read,
- * a clip has been watched, a track has been measured; what is left is text, and
+ * a video has been watched, audio has been measured; what is left is text, and
  * composing is a text problem. That split is what makes iteration cheap: the
  * reading is bought once, and changing a word buys only the composition again.
  */

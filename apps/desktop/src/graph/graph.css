@@ -972,8 +972,50 @@
   background: var(--bad-soft);
   border-color: var(--bad);
 }
+/* A hint, not a control. It says where the files are; it does not highlight,
+   it does not take the cursor, and it cannot be clicked — a line of text that
+   looks like a button and does nothing is a broken button. */
 .doc-path {
+  margin: 0.1rem 0.45rem 0.3rem;
+  font: 0.72rem/1.35 var(--ui);
+  color: var(--ink-3);
   overflow-wrap: anywhere;
+  user-select: text;
+  cursor: default;
+}
+
+/* One saved graph: open it, or throw it away. */
+.doc-row {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+.doc-menu .doc-row > button:first-child {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+/* Scoped to beat `.doc-menu button`, which sets width: 100%%. An unscoped
+   .doc-drop loses that fight, takes the whole row, and squeezes the name it
+   sits beside down to one word per line. */
+.doc-menu .doc-drop {
+  flex: none;
+  width: var(--h);
+  min-width: var(--h);
+  min-height: var(--h);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.doc-menu .doc-drop:hover {
+  color: var(--bad);
+  background: var(--bad-soft);
+  border-color: var(--bad);
 }
 
 /* Add node opens sideways, because the catalogue is long and a menu that
@@ -1001,6 +1043,7 @@
   box-shadow: 0 16px 40px -18px rgb(0 0 0 / 0.55);
 }
 .ctx-sub:hover .ctx-menu,
+.ctx-sub.on .ctx-menu,
 .ctx-sub:focus-within .ctx-menu {
   display: block;
 }

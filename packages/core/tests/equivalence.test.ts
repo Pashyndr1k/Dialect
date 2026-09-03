@@ -507,7 +507,7 @@ describe('retargeting', () => {
 describe('the kinds a reference can be', () => {
   /**
    * The clip and the track paths carry facts the still path does not: a probe's
-   * duration and aspect, and a track's measured tempo, key and loudness. Those
+   * duration and aspect, and audio's measured tempo, key and loudness. Those
    * travel from the host through the resolver, and a graph that dropped them
    * would still produce a document — a worse one, with the numbers guessed.
    */
@@ -531,7 +531,7 @@ describe('the kinds a reference can be', () => {
     uncertain: [],
   };
 
-  it('tells a clip reader what the probe measured', async () => {
+  it('tells a video reader what the probe measured', async () => {
     const doc: GraphDoc = {
       version: 1,
       nodes: [
@@ -557,7 +557,7 @@ describe('the kinds a reference can be', () => {
     expect(asked).toContain('8.5 seconds');
   });
 
-  it('puts the shape of a clip into the document rather than into the question', async () => {
+  it('puts the shape of a video into the document rather than into the question', async () => {
     const doc: GraphDoc = {
       version: 1,
       nodes: [
@@ -583,7 +583,7 @@ describe('the kinds a reference can be', () => {
     expect(ir.shot?.durationS).toBe(8.5);
   });
 
-  it('tells a track reader what was counted rather than letting it guess', async () => {
+  it('tells audio reader what was counted rather than letting it guess', async () => {
     const doc: GraphDoc = {
       version: 1,
       nodes: [
@@ -638,7 +638,7 @@ describe('the kinds a reference can be', () => {
     expect(ir.title).toBe('song.mp3');
   });
 
-  it('refuses a track that was never measured, instead of describing a picture of it', async () => {
+  it('refuses audio that was never measured, instead of describing a picture of it', async () => {
     const doc: GraphDoc = {
       version: 1,
       nodes: [

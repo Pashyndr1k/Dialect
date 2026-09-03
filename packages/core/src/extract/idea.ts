@@ -37,7 +37,7 @@ export const IDEA_VERSION = '1';
 /**
  * A piece of music nobody has recorded yet.
  *
- * Shaped differently from a track that was read, because the two differ in what
+ * Shaped differently from audio that was read, because the two differ in what
  * is knowable: a reading takes tempo and key from measurement and refuses to
  * guess, while here there is nothing to measure and choosing them is the work.
  */

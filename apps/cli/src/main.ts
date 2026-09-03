@@ -24,7 +24,7 @@ import { loadBuiltinRegistry } from '@dialect/core/node';
 import { loadBuiltinLibrary } from '@dialect/core/templates-node';
 import { runGraphFile } from './graph.ts';
 import { runBatch } from './batch.ts';
-import { manifestFor, newKeypair, publicKeyOf, signSet } from './sign.ts';
+import { manifestFor, writeManifest } from './manifest.ts';
 import { clipExists, DEFAULT_CLIP, runProbe, writeReport } from './probe.ts';
 import { AnthropicProvider } from '@dialect/providers';
 
@@ -37,8 +37,7 @@ const USAGE = `dialect — compile a Prompt IR into one model's dialect
   dialect graph <graph.json> --out <dir> [--budget <usd>]
   dialect templates [--modality <image|video|audio>]
   dialect apply <template-id> --target <model-id> [--set name=value ...] [--ir-out <file>]
-  dialect keygen            [--key-out <file>]
-  dialect sign <cards-dir>  --key <file> --version <n> [--channel <name>]
+  dialect manifest <cards-dir> --version <n> [--channel <name>]
   dialect probe             --out <dir> [--dry] [--budget <usd>] [--only a,b]
 
 Options
@@ -53,9 +52,7 @@ Options
   --concurrency   how many references are read at once (default 4)
   --name-as       output file name (default {{basename}}_{{target}}.txt)
   --restart       ignore saved progress and run the folder again
-  --key           the signing key, as written by keygen
-  --key-out       where keygen writes the private key (default dialect-key.pem)
-  --version       the set's version. A machine will not install an older one.
+  --version       the set's version. The app will not install an older one.
   --channel       which set this is (default dialect-models)
   --dry           build every request and print it; call nothing, spend nothing
   --only          run just these probe steps, by name, comma-separated
@@ -365,53 +362,33 @@ async function cmdBatch(): Promise<number> {
 }
 
 /**
- * Make a publisher key.
- *
- * The public half is what a machine is told to trust; the private half signs
- * and never leaves here. Printed once and written once, because a key that is
- * emailed around is not a key.
- */
-async function cmdKeygen(): Promise<number> {
-  const out = flag('key-out') ?? 'dialect-key.pem';
-  const { publicKeyHex, privateKeyPem } = newKeypair();
-
-  await writeFile(out, privateKeyPem, { mode: 0o600 });
-  stdout.write(`Private key written to ${out}. Keep it; it is the only one.\n\n`);
-  stdout.write(`Trust this on any machine that should accept your card sets:\n`);
-  stdout.write(`${publicKeyHex}\n`);
-  return 0;
-}
-
-/**
- * Sign a folder of cards so a machine that trusts the key will install them.
+ * Name and number a folder of cards, so the app can say which set is installed.
  *
  * The version has to be given rather than guessed: it is what stops a set being
  * replaced by an older one, and a number invented here would be a number nobody
  * decided.
+ *
+ * Optional. The app installs a bare folder of `.yaml` files perfectly well —
+ * this is for a set you publish more than once.
  */
-async function cmdSign(): Promise<number> {
+async function cmdManifest(): Promise<number> {
   const dir = argv[3];
-  const keyPath = flag('key');
   const version = Number(flag('version'));
 
-  if (!dir || !keyPath || !Number.isInteger(version) || version < 1) {
-    stderr.write('sign needs a folder, --key <file> and --version <n>\n');
+  if (!dir || !Number.isInteger(version) || version < 1) {
+    stderr.write('manifest needs a folder and --version <n>\n');
     return 2;
   }
 
-  const privateKeyPem = await readFile(keyPath, 'utf8');
   const manifest = await manifestFor(dir, {
     channel: flag('channel') ?? 'dialect-models',
     version,
   });
-  await signSet(dir, manifest, privateKeyPem);
+  await writeManifest(dir, manifest);
 
   stdout.write(`${manifest.channel} v${manifest.version}, ${manifest.files.length} cards\n`);
-  for (const file of manifest.files) {
-    stdout.write(`  ${file.name}  ${file.sha256.slice(0, 12)}\n`);
-  }
-  stdout.write(`\nSigned by ${publicKeyOf(privateKeyPem)}\n`);
-  stdout.write(`Point the app at ${dir} — or serve that folder — to install it.\n`);
+  for (const name of manifest.files) stdout.write(`  ${name}\n`);
+  stdout.write(`\nPoint the app at ${dir} — or serve that folder — to install it.\n`);
   return 0;
 }
 
@@ -494,10 +471,8 @@ async function main(): Promise<number> {
       return cmdTemplates();
     case 'apply':
       return cmdApply();
-    case 'keygen':
-      return cmdKeygen();
-    case 'sign':
-      return cmdSign();
+    case 'manifest':
+      return cmdManifest();
     case 'probe':
       return cmdProbe();
     default:

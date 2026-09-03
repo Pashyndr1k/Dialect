@@ -181,13 +181,13 @@ export const CAST_NOTE: Record<CastSize, string> = {
 };
 
 export const KIND_NOTE: Record<TemplateKind, string> = {
-  text2img: 'It makes a still from words alone.',
+  text2img: 'It makes an image from words alone.',
   img2img:
     'It starts from an image someone supplies and changes it. So the prompt is about the change, ' +
     'not about the whole picture: name what becomes different and let the rest be carried by the source.',
-  text2vid: 'It makes a clip from words alone: one action, one camera move.',
+  text2vid: 'It makes a video from words alone: one action, one camera move.',
   img2vid:
-    'It starts from a still someone supplies and moves it. The picture already fixes the room and ' +
+    'It starts from an image someone supplies and moves it. The picture already fixes the room and ' +
     'the light, so the prompt is about the motion: one action, one camera move.',
 };
 

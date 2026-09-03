@@ -12,15 +12,9 @@
 
 import { useState } from 'react';
 
-import { NODES } from './host.ts';
+import { GROUPS } from '@dialect/core';
 
-const GROUPS: Array<{ id: 'in' | 'read' | 'compose' | 'shape' | 'out'; label: string }> = [
-  { id: 'in', label: 'Bring in' },
-  { id: 'read', label: 'Read' },
-  { id: 'compose', label: 'Describe' },
-  { id: 'shape', label: 'Shape' },
-  { id: 'out', label: 'Get out' },
-];
+import { NODES } from './host.ts';
 
 export interface RunBarProps {
   running: boolean;

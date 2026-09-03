@@ -241,7 +241,7 @@ export async function savePromptsTo(files: OutFile[]): Promise<string | null> {
 export { showFolder } from './folders.ts';
 
 // ---------------------------------------------------------------------------
-// Reading a clip
+// Reading a video
 // ---------------------------------------------------------------------------
 
 export interface MediaTools {
@@ -263,7 +263,7 @@ export interface VideoFrame {
   base64: string;
 }
 
-/** Whether a clip can be read here at all, so the window can say so up front. */
+/** Whether a video can be read here at all, so the window can say so up front. */
 export async function mediaTools(): Promise<MediaTools> {
   if (!hasHost()) return { ffmpeg: false, ffprobe: false };
   try {
@@ -290,7 +290,7 @@ export async function pickReferences(imagesOnly = false): Promise<string[]> {
   const picked = await open({
     multiple: true,
     title: 'Choose references',
-    // Without ffmpeg a clip cannot be read at all, so it is not offered rather
+    // Without ffmpeg a video cannot be read at all, so it is not offered rather
     // than accepted and refused later.
     filters: imagesOnly
       ? [{ name: 'Images', extensions: [...EXTENSIONS.image] }]
@@ -326,13 +326,13 @@ export interface Found {
 export const scanFolder = (dir: string): Promise<Found[]> =>
   invoke<Found[]>('folder_scan', { dir });
 
-/** Bytes off disk, for a still the host picked rather than the page received. */
+/** Bytes off disk, for an image the host picked rather than the page received. */
 export const readFile = (path: string): Promise<{ base64: string; bytes: number }> =>
   invoke<{ base64: string; bytes: number }>('file_read', { path });
 
 /**
- * Something to recognise a reference by, whatever kind it is: the still, the
- * clip's first frame, or the track's spectrogram.
+ * Something to recognise a reference by, whatever kind it is: the image, the
+ * video's first frame, or the audio's spectrogram.
  */
 export async function thumbOf(path: string): Promise<string | undefined> {
   if (!hasHost()) return undefined;
@@ -351,7 +351,7 @@ export const videoFrames = (path: string, count = 5): Promise<VideoFrame[]> =>
   invoke<VideoFrame[]>('media_frames', { path, count });
 
 // ---------------------------------------------------------------------------
-// Reading a track
+// Reading audio
 // ---------------------------------------------------------------------------
 
 export interface AudioTags {

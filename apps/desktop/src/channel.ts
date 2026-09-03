@@ -10,9 +10,8 @@ import { showFolder } from './folders.ts';
  * correct a card without a new binary and a hand-written card can override
  * either — which is the whole point of the cards being data.
  *
- * Verification is not here. A signature checked by the page that the signature
- * is protecting is not a check, so the host does it and this side only asks for
- * what has already been verified.
+ * Installing is not here. The host reads and writes the folder; this side asks
+ * and shows what came back.
  */
 
 const hasHost = (): boolean =>
@@ -30,7 +29,6 @@ export const BUILTIN_CARDS: CardSource[] = Object.entries(shipped).map(([path, t
 }));
 
 export interface ChannelStatus {
-  trusted_key: string | null;
   channel: string | null;
   version: number | null;
   published: string | null;
@@ -75,7 +73,6 @@ export async function loadRegistry(): Promise<LoadedRegistry> {
 }
 
 export const EMPTY_STATUS: ChannelStatus = {
-  trusted_key: null,
   channel: null,
   version: null,
   published: null,
@@ -91,11 +88,6 @@ export async function channelStatus(): Promise<ChannelStatus> {
     return EMPTY_STATUS;
   }
 }
-
-export const trustKey = (keyHex: string): Promise<string> =>
-  invoke<string>('channel_trust', { keyHex });
-
-export const distrustKey = (): Promise<void> => invoke<void>('channel_distrust', {});
 
 export const checkChannel = (source: string): Promise<Checked> =>
   invoke<Checked>('channel_check', { source });
@@ -113,10 +105,10 @@ export const myCards = (): Promise<CardSource[]> => fromHost('my_cards');
 /**
  * One card of your own, written or replaced. Returns where it landed.
  *
- * Only your own: the built-in cards are in the binary and an installed set is
- * checked against a signature, so writing into either would either be
- * impossible or would break the thing that makes it trustworthy. Editing one of
- * those means taking a copy first, which is what the panel offers.
+ * Only your own: the built-in cards are in the binary, and an installed set is
+ * replaced wholesale by the next install — an edit to either would be lost or
+ * impossible. Editing one of those means taking a copy first, which is what the
+ * panel offers, and the copy wins anyway because your layer loads last.
  */
 export const saveMyCard = (name: string, text: string): Promise<string> =>
   invoke<string>('my_card_save', { name, text });

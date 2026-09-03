@@ -33,7 +33,7 @@ import {
 
 const run = promisify(execFile);
 
-/** How many frames stand in for a clip. Matches the window exactly. */
+/** How many frames stand in for a video. Matches the window exactly. */
 const FRAMES = 5;
 
 async function has(tool: string): Promise<boolean> {
@@ -50,7 +50,7 @@ interface Probe {
   aspectRatio: string;
 }
 
-/** What ffprobe knows about a clip, in the shape the reader wants. */
+/** What ffprobe knows about a video, in the shape the reader wants. */
 async function probe(path: string): Promise<Probe> {
   const { stdout } = await run('ffprobe', [
     '-v', 'error',
@@ -80,7 +80,7 @@ async function probe(path: string): Promise<Probe> {
 /**
  * Frames taken in order, spread across the clip without touching its edges.
  *
- * The first and last moments of a clip are usually a fade or a slate, and a
+ * The first and last moments of a video are usually a fade or a slate, and a
  * reader shown those describes the fade.
  */
 async function frames(path: string, durationS: number): Promise<string[]> {
@@ -101,7 +101,7 @@ async function frames(path: string, durationS: number): Promise<string[]> {
  * A path becomes something to look at.
  *
  * Stills need nothing but the disk. Clips need ffmpeg. Tracks are refused, and
- * that is said plainly rather than half-done: measuring a track means counting
+ * that is said plainly rather than half-done: measuring audio means counting
  * its tempo, key and loudness before anything is described, and that lives in
  * the desktop host. A guessed tempo stated as a fact is worse than no tempo.
  */
@@ -130,7 +130,7 @@ export function resolverFor(tools: { ffmpeg: boolean; ffprobe: boolean }) {
     }
 
     throw new GraphError(
-      `${source.name} is a track, and the command line cannot measure one yet — ` +
+      `${source.name} is audio, and the command line cannot measure it yet — ` +
         `tempo, key and loudness are counted in the desktop host. Read it there and keep the ` +
         `reading; a kept reading works everywhere.`,
     );
@@ -163,7 +163,7 @@ const folderNode: NodeSpec = {
       .sort((a, b) => a.name.localeCompare(b.name));
 
     if (found.length === 0) {
-      throw new GraphError(`Nothing readable in ${dir} — no stills, clips or tracks.`);
+      throw new GraphError(`Nothing readable in ${dir} — no images, videos or audio.`);
     }
     return { out: found.map((source) => ({ type: 'source' as const, source })) };
   },
@@ -259,6 +259,6 @@ export async function runGraphFile(options: GraphRunOptions): Promise<GraphRunRe
 }
 
 /** Extensions this can open at all, for the usage text. */
-export const READABLE = ['image files', 'clips (with ffmpeg)'].join(', ');
+export const READABLE = ['images', 'video (with ffmpeg)'].join(', ');
 
 export const extensionOf = (name: string): string => extname(name).slice(1).toLowerCase();

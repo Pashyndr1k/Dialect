@@ -33,14 +33,14 @@ import {
 /** Below this the measurement is a guess, and a guess stated as a number is worse than silence. */
 const SURE_ENOUGH = 0.5;
 
-/** How many frames stand in for a clip. What no single frame shows, five in order do. */
+/** How many frames stand in for a video. What no single frame shows, five in order do. */
 const FRAMES = 5;
 
 /**
  * A path becomes something to look at.
  *
- * Each kind is resolved as what it is: a still is its own bytes, a clip is
- * frames taken in order, a track is measured first and its spectrograms looked
+ * Each kind is resolved as what it is: an image is its own bytes, a video is
+ * frames taken in order, audio is measured first and its spectrograms looked
  * at second. The measurements travel alongside because they are counted, and a
  * model asked to estimate a tempo from a picture of a waveform will oblige.
  */
@@ -110,7 +110,7 @@ const HOST_NODES: NodeSpec[] = [
       });
 
       if (usable.length === 0) {
-        throw new GraphError(`Nothing readable in ${dir} — no stills, clips or tracks.`);
+        throw new GraphError(`Nothing readable in ${dir} — no images, videos or audio.`);
       }
 
       return { out: usable.map((source) => ({ type: 'source' as const, source })) };

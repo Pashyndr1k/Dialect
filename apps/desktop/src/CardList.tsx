@@ -10,7 +10,7 @@
  *
  * Three layers, and the layer decides what you can do:
  *   built in — in the binary, read only. Copy it to edit it.
- *   installed — checked against a signature, so editing would break the check.
+ *   installed — replaced whole by the next install, so an edit would be lost.
  *   yours — a file in your own folder. Edit it, or delete it.
  */
 
@@ -159,7 +159,7 @@ export function CardList({
           <p className="sheet-p dim">
             {shown?.origin === 'built in'
               ? 'This card came with the app. Take a copy to change it — the copy loads last and wins.'
-              : 'This card came from a signed set, and editing it would break the signature. Take a copy to change it.'}
+              : 'This card came from an installed set, and the next install replaces the whole set. Take a copy so your change survives it.'}
           </p>
         ) : null}
 
@@ -242,10 +242,22 @@ export function CardList({
         <button className="solid" onClick={() => start(null)}>
           Write a card
         </button>
-        <button className="ghost" onClick={() => void openCardsFolder()}>
-          Open my cards folder
+        <button
+          className="ghost"
+          onClick={() => void act(async () => {
+            await openCardsFolder();
+            return null;
+          })}
+        >
+          Show my cards folder
         </button>
       </div>
+
+      {/* The list had nowhere to put a failure, so its buttons reported
+          nothing at all — which is how "open the folder" managed to look
+          broken twice over. */}
+      {error ? <p className="sheet-err">{error}</p> : null}
+      {note && !error ? <p className="state on">{note}</p> : null}
 
       <p className="sheet-p dim">
         Cards load in three layers — what the app shipped with, what a signed set installed, then

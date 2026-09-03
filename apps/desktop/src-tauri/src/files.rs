@@ -201,8 +201,26 @@ mod tests {
 
         fs::remove_dir_all(&dir).ok();
     }
+    #[test]
+    fn a_folder_that_is_not_there_says_so_rather_than_failing_silently() {
+        // The whole history of this button is silent refusals, so the refusals
+        // are what is under test.
+        let missing = std::env::temp_dir().join("dialect-no-such-folder-at-all");
+        fs::remove_dir_all(&missing).ok();
+        let said = show_folder(missing.to_string_lossy().to_string()).unwrap_err();
+        assert!(said.contains("no folder"), "{said}");
 
+        let dir = std::env::temp_dir().join("dialect-show-test");
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("a.txt");
+        fs::write(&file, b"x").unwrap();
+        let said = show_folder(file.to_string_lossy().to_string()).unwrap_err();
+        assert!(said.contains("not a folder"), "{said}");
+
+        fs::remove_dir_all(&dir).ok();
+    }
 }
+
 
 /// Write text to a path the person chose in a save dialog.
 ///
@@ -216,6 +234,38 @@ pub fn file_write(path: String, text: String) -> Result<(), String> {
         fs::create_dir_all(parent).map_err(|e| format!("Could not make that folder: {e}"))?;
     }
     fs::write(&path, text).map_err(|e| format!("Could not write there: {e}"))
+}
+
+/// Show a folder in the file manager.
+///
+/// Done here rather than through the opener plugin, which was the third attempt
+/// at this button. `opener:default` turned out not to grant `open-path` at all;
+/// granting it explicitly turned out not to be enough either, because the
+/// plugin scope-checks the path and `allow-open-path` is documented as enabling
+/// the command *without any pre-configured scope* — an empty allow-list, which
+/// denies everything. Two silent refusals from one plugin is enough. This is
+/// fifteen lines, it is testable, and when it fails it says why.
+#[tauri::command]
+pub fn show_folder(path: String) -> Result<(), String> {
+    let dir = std::path::Path::new(&path);
+    if !dir.exists() {
+        return Err(format!("There is no folder at {path} yet."));
+    }
+    if !dir.is_dir() {
+        return Err(format!("{path} is a file, not a folder."));
+    }
+
+    let launched = if cfg!(target_os = "windows") {
+        // Explorer answers 1 for a folder it opened perfectly well, so its exit
+        // code is not evidence of anything and is deliberately not read.
+        Command::new("explorer").arg(dir).spawn().map(|_| ())
+    } else if cfg!(target_os = "macos") {
+        Command::new("open").arg(dir).spawn().map(|_| ())
+    } else {
+        Command::new("xdg-open").arg(dir).spawn().map(|_| ())
+    };
+
+    launched.map_err(|e| format!("Could not open the file manager: {e}"))
 }
 
 /// Read a text file the person chose. Small files only — a graph is kilobytes,

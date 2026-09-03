@@ -68,6 +68,7 @@ export interface EditorProps {
     saved: SavedGraph[];
     /** So the title bar's failures land where the editor's do. */
     say: (message: string) => void;
+    refresh: () => void;
   }) => void;
 }
 
@@ -346,8 +347,9 @@ function Board({ registry, library, doc: initial, onGraph }: EditorProps): React
       open: graph.open,
       saved: graph.saved,
       say,
+      refresh: graph.refresh,
     });
-  }, [doc, graph.dirty, graph.rename, graph.keep, graph.open, graph.saved, onGraph, say]);
+  }, [doc, graph.dirty, graph.rename, graph.keep, graph.open, graph.saved, graph.refresh, onGraph, say]);
 
   const node = doc.nodes.find((n) => n.id === selected);
 

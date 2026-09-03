@@ -46,6 +46,8 @@ export interface GraphDocApi {
   /** Positions, written back when a drag ends rather than during it. */
   moved: (at: Map<string, { x: number; y: number }>) => void;
   keep: () => Promise<void>;
+  /** Read the saved list again, after something outside changed it. */
+  refresh: () => void;
 }
 
 export function useGraphDoc(
@@ -257,5 +259,6 @@ export function useGraphDoc(
     open,
     moved,
     keep,
+    refresh: refreshSaved,
   };
 }

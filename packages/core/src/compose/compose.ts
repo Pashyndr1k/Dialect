@@ -72,9 +72,9 @@ const roleOf = (item: BundleItem): string =>
 
 const KIND_WORD: Record<BundleItem['kind'], string> = {
   words: 'What they typed',
-  image: 'A picture, read',
-  video: 'A clip, watched',
-  audio: 'A track, measured',
+  image: 'An image, read',
+  video: 'A video, watched',
+  audio: 'Audio, measured',
 };
 
 /** One source, as a labelled block the composer can tell from the others. */

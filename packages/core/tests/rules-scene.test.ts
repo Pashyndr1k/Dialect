@@ -41,7 +41,7 @@ function ir(patch: Partial<PromptIR>, modality: Modality = 'video'): PromptIR {
 const ruleIds = (r: ReturnType<typeof compile>): string[] => r.findings.map((f) => f.ruleId);
 
 describe('clip-duration-limit', () => {
-  it('blocks a clip longer than the model generates, naming both numbers', () => {
+  it('blocks a video longer than the model generates, naming both numbers', () => {
     const result = compile(ir({ shot: { durationS: 22 } }), video);
 
     expect(result.blocked).toBe(true);
@@ -50,7 +50,7 @@ describe('clip-duration-limit', () => {
     expect(f?.message).toContain('15s');
   });
 
-  it('allows a clip at the limit', () => {
+  it('allows a video at the limit', () => {
     expect(compile(ir({ shot: { durationS: 15 } }), video).blocked).toBe(false);
   });
 
@@ -182,7 +182,7 @@ describe('exit-frame-means-gone', () => {
 describe('skin-realism-block', () => {
   const person = { subject: { entities: [{ id: 'p', type: 'person' as const, name: 'a woman' }] } };
 
-  it('adds the block for a still with a person in it', () => {
+  it('adds the block for an image with a person in it', () => {
     const result = compile(ir(person, 'image'), image);
     expect(result.ir.texture?.skinBlock).toBe(true);
     expect(result.render.text).toContain('realistic pores');

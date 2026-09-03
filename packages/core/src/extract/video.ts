@@ -1,8 +1,8 @@
 /**
- * Reading a clip.
+ * Reading a video.
  *
- * A vision model cannot watch anything, so a clip arrives as a handful of
- * stills taken in order across its length. Everything a still cannot show —
+ * A vision model cannot watch anything, so a video arrives as a handful of
+ * images taken in order across its length. Everything an image cannot show —
  * that the camera is pushing in, that a hand is rising — has to be inferred
  * from how the frames differ, which is the whole reason they are described as
  * an ordered set rather than as separate pictures.
@@ -73,7 +73,7 @@ export const SHOT_INSTRUCTION =
 export interface ShotOptions {
   /** Label recorded in provenance, normally the file name. */
   reference: string;
-  /** What the person said alongside the clip. See `ExtractOptions.note`. */
+  /** What the person said alongside the video. See `ExtractOptions.note`. */
   note?: string;
   /** From the container, so the model is not asked to guess it. */
   durationS?: number;
@@ -89,7 +89,7 @@ export interface ShotResult {
 }
 
 export function shotToIR(shot: ExtractedShot, options: ShotOptions): PromptIR {
-  // The scene half maps exactly as a still does; only the motion is new.
+  // The scene half maps exactly as an image does; only the motion is new.
   const base = sceneToIR(shot, { reference: options.reference, modality: 'video' });
 
   const beats = shot.beats.filter((b) => b.action.trim().length > 0);
@@ -100,7 +100,7 @@ export function shotToIR(shot: ExtractedShot, options: ShotOptions): PromptIR {
     modality: 'video',
     subject: {
       ...base.subject,
-      // What the subject does comes from the movement, not from the still.
+      // What the subject does comes from the movement, not from the image.
       ...(shot.subjectMotion.trim() ? { action: shot.subjectMotion } : {}),
     },
     shot: {
@@ -121,7 +121,7 @@ export async function extractFromVideo(
   options: ShotOptions,
 ): Promise<ShotResult> {
   if (frames.length === 0) {
-    throw new Error('No frames to read: the clip produced nothing to look at.');
+    throw new Error('No frames to read: the video produced nothing to look at.');
   }
 
   const result = await gateway.extract({

@@ -17,6 +17,14 @@ Three consequences follow, and they are the reason for the architecture:
 - **Edits happen by meaning.** You change the lighting or the shot size, not a
   string you hope the model reads the way you meant.
 
+## Words
+
+One name per thing, everywhere — interface, errors, guide, CLI, comments. The
+list is [docs/GLOSSARY.md](docs/GLOSSARY.md), and it is short on purpose. An
+image is an image and not a still; a video is a video and not a clip; audio is
+audio and not a track. A thing with two names is two things to whoever is
+reading, and this app has enough real ideas in it without inventing spare ones.
+
 ## Version
 
 Two numbers, `major.minor`, shown beside the name in the window. The workspace
@@ -250,16 +258,16 @@ over as the schema's field descriptions. The model never sees the template's IR:
 a template is a decision about the look, and letting a model rewrite it would
 defeat the point of choosing one.
 
-## Reading a clip
+## Reading a video
 
-A vision model cannot watch anything, so a clip becomes a handful of stills
+A vision model cannot watch anything, so a video becomes a handful of images
 taken in order across its length. What no single frame shows — that the camera
 is pushing in, that a hand is rising — is inferred from how the frames differ,
 which is why they go in one question as an ordered set rather than as separate
 pictures.
 
-The host does that work: a web view cannot run a program, and a clip is far too
-large to hand across as base64 just to have it handed back. So a clip is chosen
+The host does that work: a web view cannot run a program, and a video is far too
+large to hand across as base64 just to have it handed back. So a video is chosen
 rather than dropped, and only its path travels.
 
 Duration and aspect ratio come from the container rather than the model —
@@ -269,9 +277,9 @@ then has to be corrected.
 ffmpeg is found on PATH rather than bundled. Shipping a copy is a release
 concern; the button says what it needs and stays disabled without it.
 
-## Reading a track
+## Reading audio
 
-A model cannot listen, and unlike a clip there is no frame to show it. So the
+A model cannot listen, and unlike a video there is no frame to show it. So the
 job splits by what each side is good at.
 
 What can be measured is measured and handed over as fact: length, loudness,
@@ -285,7 +293,7 @@ matter, then correlated against the Krumhansl–Schmuckler profiles.
 Both carry how sure they are, and that is the point of measuring at all.
 Ambient with no pulse still produces a number; stated as fact it would mislead,
 so below a threshold nothing is said. A prompt claiming 140 BPM about a 90 BPM
-track is worse than one that never mentions tempo.
+reading is worse than one that never mentions tempo.
 
 What is left is judgement — genre, instruments, mood, where the sections change
 — and that goes to the model with a picture of the sound: a spectrogram and a
@@ -302,37 +310,35 @@ Model cards are dated. The formula a model wants this month is not the one it
 wanted last, and the card is the only thing between that change and a wrong
 prompt — so the set has to be replaceable without a new binary.
 
-Which makes it a supply chain, and the design says so out loud. A card decides
-what every prompt says: its field list *is* the formula, its defaults are what
-goes in unasked. Anyone who can drop a file in that folder can rewrite what this
-app produces without touching a line of its code.
+A set is a folder of `.yaml` cards, or a web address serving one. A folder is
+as good as a URL — that is how a set reaches a machine that is not online, and
+how one is tried before it is published.
 
-So a set installs only if it carries an Ed25519 signature from a key trusted
-beforehand, and every file in it hashes to what the signed manifest says. The
-signature covers the manifest bytes exactly as fetched, never a
-re-serialisation: a manifest that round-trips differently would verify something
-nobody signed. Verification happens in the host rather than the window, for the
-plain reason that the window is the thing being replaced.
+This was built as a supply chain first. A set installed only if it carried an
+Ed25519 signature from a key you had trusted beforehand, every file hashed
+against a signed manifest, verification in the host because the window is the
+thing being replaced. The reasoning was sound and the shape was wrong: a card is
+plain YAML that the app itself will let you write, edit and delete in the panel
+next door, in a folder you can open in Explorer. Demanding a 64-character public
+key before anything would install was a lock on a door standing open beside it,
+and locks like that mostly teach people that the locks here do not mean
+anything. It is gone, and so are the keypair commands that fed it.
 
-Nothing is ever half-installed. A set is fetched whole, verified whole, staged,
-and only then swapped in — a broken update leaves the working one exactly where
-it was, which is the only reason any of this is worth doing. An older version
-does not replace a newer one unless someone insists, which is how you get off a
-set that turned out wrong.
+What survived is the part doing real work. Nothing is ever half-installed: a set
+is fetched whole, staged, and only then swapped in, so a broken install leaves
+the working one exactly where it was. A named, numbered set does not go
+backwards unless someone insists, which is how you get off one that turned out
+wrong. And a name out of a manifest is still checked before it becomes a path —
+not because publishers are suspect, but because nothing should write outside the
+folder it was told to write in.
 
-`dialect keygen` makes a publisher key and prints the half to trust; `dialect
-sign` writes the manifest and its signature beside the cards. A folder is as
-good as a URL — that is how a set reaches a machine that is not online, and how
-one is tried before it is published.
-
-The two halves are written in different languages, so a fixture signed by the
-command line is checked against the host's verifier in the test suite. A
-disagreement about what Ed25519 over those bytes means would otherwise turn up
-on someone's machine when an update refuses to install.
+`dialect manifest <folder> --version <n>` names and numbers a set. It is
+optional: a bare folder of cards installs, unnumbered, and an unnumbered set
+blocks nothing.
 
 ## Rules a set can ship
 
-Phase 7 made the cards replaceable and signed and left one hole: a card is data
+Phase 7 made the cards replaceable and left one hole: a card is data
 but a rule is code, so an update could change every model's formula and could
 not add a single check. That is backwards, because the rules are the part most
 likely to age — a booster word that worked last month reads as noise this month.
@@ -355,7 +361,8 @@ is worse than losing the check.
 
 ## Cards you write yourself
 
-Three layers: what the build shipped, what a signed set brought, what you wrote.
+Three layers: what the build shipped, what an installed set brought, what you
+wrote.
 Later wins by id, so a hand-written card overrides either — which is what the
 cards being data was always for.
 

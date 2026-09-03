@@ -1,13 +1,15 @@
 /**
  * Opening the folder a thing lives in.
  *
- * Was five copies of the same three lines, each ending in
- * `.catch(() => undefined)` — and every one of them was failing. `opener:default`
- * grants open-url and reveal-item, not open-path, so the call was refused every
- * time and the swallow made a button that did nothing and said nothing.
+ * Three attempts, and the first two both failed silently. It was five copies of
+ * the same three lines, each ending in `.catch(() => undefined)`, calling a
+ * plugin command that `opener:default` did not grant. Granting `open-path`
+ * explicitly did not fix it either: that permission is documented as enabling
+ * the command "without any pre-configured scope", and the plugin scope-checks
+ * every path, so an empty allow-list denies all of them.
  *
- * Two lessons, both taken: the permission is now asked for explicitly, and
- * nothing here swallows. A folder that will not open says so.
+ * So the host does it now — fifteen lines of `explorer`/`open`/`xdg-open`, with
+ * tests. Nothing here swallows: a folder that will not open says why.
  */
 
 import { invoke } from '@tauri-apps/api/core';
@@ -30,14 +32,12 @@ export async function openKeptFolder(what: Kept): Promise<string> {
   }
 
   const dir = await invoke<string>('authored_folder', { what });
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(dir);
+  await invoke<void>('show_folder', { path: dir });
   return dir;
 }
 
 /** Same, for a folder the caller already knows the path of. */
 export async function showFolder(dir: string): Promise<void> {
   if (!hasHost()) throw new Error('Opening a folder needs the desktop app.');
-  const { openPath } = await import('@tauri-apps/plugin-opener');
-  await openPath(dir);
+  await invoke<void>('show_folder', { path: dir });
 }

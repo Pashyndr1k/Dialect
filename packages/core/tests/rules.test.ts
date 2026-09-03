@@ -45,7 +45,7 @@ describe('no-booster-words', () => {
 });
 
 describe('one-action-one-move', () => {
-  it('blocks a clip carrying two actions', () => {
+  it('blocks a video carrying two actions', () => {
     const result = compile(
       ir({ subject: { action: 'she lifts the flask and then turns to the window' } }),
       videoProfile,

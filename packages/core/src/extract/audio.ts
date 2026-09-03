@@ -1,7 +1,7 @@
 /**
- * Reading a track.
+ * Reading audio.
  *
- * A model cannot listen, and unlike a clip there is no frame to show it. So the
+ * A model cannot listen, and unlike a video there is no frame to show it. So the
  * job splits by what each side is actually good at.
  *
  * Tempo, key, length and loudness are measured by the host and arrive here as

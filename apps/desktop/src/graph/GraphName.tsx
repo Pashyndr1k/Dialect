@@ -13,9 +13,32 @@ import { useEffect, useRef, useState } from 'react';
 import type { GraphDoc } from '@dialect/core';
 
 import { EXAMPLES } from './examples.ts';
-import { graphsFolder, openGraphFile, openGraphsFolder, saveGraphAs, type SavedGraph } from '../graphs.ts';
+import {
+  deleteGraph,
+  graphsFolder,
+  openGraphFile,
+  openGraphsFolder,
+  saveGraphAs,
+  type SavedGraph,
+} from '../graphs.ts';
 
 const UNTITLED = 'Untitled graph';
+
+/** A bin, drawn rather than typed, so it is the same size as every other icon. */
+function TrashIcon(): React.ReactElement {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <path
+        d="M3 4h10M6.5 4V2.5h3V4M4.5 4l.6 9h5.8l.6-9M6.8 6.3v4.4M9.2 6.3v4.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export interface GraphNameProps {
   name: string | undefined;
@@ -27,6 +50,8 @@ export interface GraphNameProps {
   onOpen: (doc: GraphDoc) => void;
   onNew: () => void;
   onSay: (message: string) => void;
+  /** So the list reloads after one is removed. */
+  onDeleted: () => void;
 }
 
 export function GraphName({
@@ -39,6 +64,7 @@ export function GraphName({
   onOpen,
   onNew,
   onSay,
+  onDeleted,
 }: GraphNameProps): React.ReactElement {
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -162,10 +188,33 @@ export function GraphName({
                 <hr />
                 <h4>Saved</h4>
                 {saved.map((g) => (
-                  <button key={g.id} type="button" onClick={() => { setMenu(false); onOpen(g.doc); }}>
-                    {g.doc.name ?? g.id}
-                    <span>{g.doc.nodes.length} nodes</span>
-                  </button>
+                  <div key={g.id} className="doc-row">
+                    <button type="button" onClick={() => { setMenu(false); onOpen(g.doc); }}>
+                      {g.doc.name ?? g.id}
+                      <span>{g.doc.nodes.length} nodes</span>
+                    </button>
+                    {/* Asked about, because a graph is work and a mis-aimed
+                        click in a list is how work disappears. */}
+                    <button
+                      type="button"
+                      className="doc-drop"
+                      title={`Delete ${g.doc.name ?? g.id}`}
+                      aria-label={`Delete ${g.doc.name ?? g.id}`}
+                      onClick={() => {
+                        if (!confirm(`Delete “${g.doc.name ?? g.id}”? This cannot be undone.`)) return;
+                        // The menu stays open: you came here to tidy up, and
+                        // reopening it for each one would be its own annoyance.
+                        void deleteGraph(g.id)
+                          .then(onDeleted)
+                          .catch((err: Error) => {
+                            setMenu(false);
+                            onSay(err.message);
+                          });
+                      }}
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
                 ))}
               </>
             ) : null}
@@ -182,13 +231,14 @@ export function GraphName({
             ))}
 
             <hr />
-            {/* The path is spelled out rather than hidden behind the verb,
-                because the question people actually have is where the files
-                are, not how to open a window onto them. */}
             <button type="button" onClick={() => act(openGraphsFolder)}>
               Show in the file manager
-              <span className="doc-path">{where || 'Dialect’s graphs folder'}</span>
             </button>
+            {/* Not part of the button. It is the answer to "where are my
+                files", which is a thing to read, and a line of text that
+                highlights under the cursor and does nothing when clicked is a
+                broken button as far as anyone can tell. */}
+            <p className="doc-path">{where || 'Dialect’s graphs folder'}</p>
           </div>
         </>
       ) : null}

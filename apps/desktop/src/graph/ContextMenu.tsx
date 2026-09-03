@@ -13,6 +13,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { GROUPS } from '@dialect/core';
+
 import { NODES } from './host.ts';
 
 export interface Spot {
@@ -27,14 +29,6 @@ export interface Spot {
 
 /** The catalogue's width, in pixels, matching `.ctx-menu` in the stylesheet. */
 const SUB_WIDTH = 240;
-
-const GROUPS: Array<{ id: 'in' | 'read' | 'compose' | 'shape' | 'out'; label: string }> = [
-  { id: 'in', label: 'Bring in' },
-  { id: 'read', label: 'Read' },
-  { id: 'compose', label: 'Describe' },
-  { id: 'shape', label: 'Shape' },
-  { id: 'out', label: 'Get out' },
-];
 
 export interface ContextMenuProps {
   spot: Spot;
@@ -66,6 +60,14 @@ export function ContextMenu({
   const box = useRef<HTMLDivElement>(null);
   /** Whether the catalogue has to open leftwards to stay on screen. */
   const [flip, setFlip] = useState(false);
+  /**
+   * Held open by a click, as well as by the pointer being over it.
+   *
+   * Hover alone made this the one control in the window that did nothing when
+   * you clicked it, which is indistinguishable from broken — and on a keyboard
+   * it could only be reached by tabbing into it and hoping.
+   */
+  const [pinned, setPinned] = useState(false);
 
   // Escape closes it, like every other menu on the machine.
   useEffect(() => {
@@ -121,8 +123,13 @@ export function ContextMenu({
         ) : null}
 
         {/* First, always: it is what a right-click on a canvas is for. */}
-        <div className="ctx-sub">
-          <button type="button" className="ctx-parent">
+        <div className={pinned ? 'ctx-sub on' : 'ctx-sub'}>
+          <button
+            type="button"
+            className="ctx-parent"
+            aria-expanded={pinned}
+            onClick={() => setPinned((p) => !p)}
+          >
             Add node <span>▸</span>
           </button>
           <div className="ctx-menu">

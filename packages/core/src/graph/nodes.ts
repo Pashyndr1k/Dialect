@@ -95,7 +95,7 @@ const specs: NodeSpec[] = [
     type: 'reference',
     title: 'Reference',
     group: 'in',
-    hint: 'A file from disk — a still, a clip or a track. Not looked at yet.',
+    hint: 'A file from disk — an image, a video or audio. Not looked at yet.',
     inputs: {},
     outputs: { out: { type: 'source' } },
     async run(_inputs, params) {
@@ -191,7 +191,7 @@ const specs: NodeSpec[] = [
   /* -------------------------------------------------------------- read --- */
 
   {
-    // One node for all three kinds. A still, a clip and a track are read
+    // One node for all three kinds. An image, a video and audio are read
     // differently, but from the graph's side they answer the same question, and
     // three nodes would mean three wires to rearrange when a file kind changes.
     type: 'read',

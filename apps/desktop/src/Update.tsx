@@ -87,7 +87,15 @@ export function Update(): React.ReactElement | null {
           {/* Installed, but not switched to. Restarting is still the person's
               call — they may be in the middle of a run. */}
           <span>{update.version} is installed. It starts using it when you restart.</span>
-          <button type="button" onClick={() => void relaunch()}>
+          <button
+            type="button"
+            onClick={() =>
+              void relaunch().catch((err: Error) => {
+                setNote(err.message);
+                setStage('failed');
+              })
+            }
+          >
             Restart now
           </button>
           <button type="button" className="ghost" onClick={() => setDismissed(true)}>

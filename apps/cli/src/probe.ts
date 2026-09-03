@@ -130,7 +130,7 @@ const asPart = (bytes: Buffer): ImagePart => ({
 /**
  * Every modality out of one file.
  *
- * A clip holds a still, a sequence of stills, and — if it was recorded with
+ * A video holds an image, a sequence of images, and — if it was recorded with
  * sound — something to draw a spectrogram of. One fixture rather than three
  * keeps the probe honest about what it is actually testing.
  */

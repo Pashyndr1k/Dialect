@@ -133,8 +133,14 @@ export function Shelf({ onClose, onChanged, onOpenGraph }: ShelfProps): React.Re
             ))}
           </nav>
           <span className="spacer" />
-          <button type="button" className="btn ghost" onClick={openFolder}>
-            Open the folder
+          {/* Which folder is the whole question, so the button says. */}
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={openFolder}
+            title={`Show the ${tab} folder in the file manager`}
+          >
+            Show the folder
           </button>
           <button type="button" className="btn ghost" onClick={onClose}>
             Close
