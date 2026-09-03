@@ -364,6 +364,41 @@ set can arrive from a channel, a card mentioning a newer build's rule is
 ordinary rather than a mistake, and losing the whole card over one missing check
 is worse than losing the check.
 
+## Adding a model by giving its guide
+
+Writing a card by hand means knowing the card format, six syntaxes, three
+renderers, the whole IR path vocabulary and which engine rules exist — which is
+a working knowledge of this codebase. The thing that actually describes a model
+is the vendor's prompting guide, and everybody has one of those.
+
+So the input is the link. The host fetches the page and reduces it to text —
+markup out, block boundaries kept as line breaks — and Opus reads it and answers
+one structured question: the id, the label, the family, the syntax, the field
+order, the limits, what it supports, which rules apply. Opus specifically,
+whatever the window is otherwise set to: this happens once per model rather than
+once per reference, and a card that is subtly wrong is wrong in every prompt it
+ever produces.
+
+The reduction happens in the host rather than the window because a page is
+usually several hundred kilobytes of markup around a few kilobytes of prose, and
+every one of those kilobytes would otherwise be paid for at the input rate.
+
+Then it is checked, which is the part that matters. A field may only read paths
+that exist, so `docs/GLOSSARY.md`'s sibling — the vocabulary in
+`ir/vocabulary.ts` — is both what the model is shown and what its answer is
+tested against. A field naming `subject.appearance` renders nothing, for ever,
+and says nothing about why: not a crash, just a prompt with a hole in it that
+nobody notices for a week. Invented paths are dropped, a field left with nothing
+to read is dropped whole, a rule this build does not have is dropped, and every
+one of those is listed on screen beside the card.
+
+Nothing is saved. What comes back is a proposal, opened in the editor with the
+model's own confidence, what it had to assume, and what was taken out. A guide
+can be out of date, can describe three models at once, or can turn out not to be
+a prompting guide at all — and the only one who can tell is the person reading.
+
+Writing one by hand is still one button along.
+
 ## Cards you write yourself
 
 Three layers: what the build shipped, what an installed set brought, what you

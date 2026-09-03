@@ -184,6 +184,12 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
 }
 .sheet-box {
   width: min(540px, 100%);
+  /* Scrolls when it outgrows the window. Without this the bottom of a long
+     panel was simply unreachable — which is a panel with a hidden half, and
+     nothing on screen says the half is there. */
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface); border: 1px solid var(--rule);
   border-radius: 8px; padding: 20px 22px 22px;
   box-shadow: 0 24px 64px -24px rgba(0, 0, 0, .45);
@@ -715,3 +721,50 @@ li.autofix .lvl { background: var(--accent-soft); color: var(--accent); }
   tab-size: 2;
 }
 .card-text:read-only { color: var(--ink-2); }
+
+/* --- what the guide reader made of a guide -------------------------------- */
+/*
+ * Above the card it proposed, not below. This is the part that says how much of
+ * the card was actually in the guide and how much was inferred, and that is
+ * worth reading before saving, not after.
+ */
+.read-report {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
+  border-radius: 6px;
+  max-height: 15rem;
+  overflow-y: auto;
+}
+/* The confidence the model reported, as a colour rather than another sentence. */
+.read-report.conf-high { border-left-color: var(--accent); }
+.read-report.conf-medium { border-left-color: var(--hot); }
+.read-report.conf-low { border-left-color: var(--bad); }
+
+.read-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+.read-head b { font-size: 13px; color: var(--ink); }
+.read-head span { font-size: 12px; color: var(--ink-3); }
+.read-src {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.read-report ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.read-report li { margin: 2px 0; }
+.read-dropped { color: var(--ink-3); }
+.read-report + .card-text { margin-top: 10px; }

@@ -11,6 +11,7 @@ mod audio;
 mod channel;
 mod customs;
 mod files;
+mod guide;
 mod media;
 mod secrets;
 mod store;
@@ -51,6 +52,7 @@ pub fn run() {
             files::file_write,
             files::file_text,
             files::show_folder,
+            guide::guide_fetch,
             channel::channel_status,
             channel::channel_cards,
             channel::channel_check,

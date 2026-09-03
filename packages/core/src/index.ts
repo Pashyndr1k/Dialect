@@ -23,3 +23,5 @@ export * from './compose/index.ts';
 export * from './sources/index.ts';
 export * from './vary/index.ts';
 export * from './graph/index.ts';
+export * from './cards/index.ts';
+export * from './ir/vocabulary.ts';

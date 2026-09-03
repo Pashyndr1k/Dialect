@@ -8,6 +8,10 @@
  * cards" could install a set and count them and never show you one, which is
  * like a font manager that will not display a letter.
  *
+ * A card is added by giving the model's own prompting guide, which is the
+ * document that actually describes it. Writing one by hand is still there, one
+ * button along, for the times when there is no guide or it is wrong.
+ *
  * Three layers, and the layer decides what you can do:
  *   built in — in the binary, read only. Copy it to edit it.
  *   installed — replaced whole by the next install, so an edit would be lost.
@@ -15,7 +19,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { CardSource, LoadedRegistry } from '@dialect/core';
+import { profileToYaml, type CardSource, type LoadedRegistry } from '@dialect/core';
+
+import { proposeCard, type CardProposal } from './learnCard.ts';
 
 import {
   BUILTIN_CARDS,
@@ -56,18 +62,31 @@ function headOf(text: string): { id: string; label: string } {
   return { id: line('id'), label: line('label') };
 }
 
+/**
+ * The blank card.
+ *
+ * It said `family: field-list`, `syntax: prose`, `renderer: prose` and gave its
+ * fields a `key`/`label`/`from` shape the loader has never accepted — three
+ * invalid values and a wrong field shape, in the one file that exists to show
+ * someone what a card looks like. Corrected, and cut back to what is actually
+ * required, with the optional half named rather than demonstrated wrongly.
+ */
 const NEW_CARD = `id: my-model
 label: My model
-family: field-list
-syntax: prose
-renderer: prose
-fields:
-  - key: subject
-    label: Subject
-    from: subject
-  - key: style
-    label: Style
-    from: style
+vendor: someone
+family: image        # image, video, audio or pipeline
+syntax: natural      # natural, field-list, shot-description, comma-phrases, tag-list, graph
+renderer: natural    # this build has: natural, field-list, shot-description
+header: My model prompt
+
+routingNote: One sentence on when to reach for this rather than another model.
+
+supports:
+  negativePrompt: false
+  emitsGearNumbers: false
+
+# A field-list model also needs a \`fields:\` list — each entry a name and the
+# IR paths that feed it. Reading a guide writes that for you.
 `;
 
 export function CardList({
@@ -84,8 +103,12 @@ export function CardList({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [guideUrl, setGuideUrl] = useState('');
+  const [reading, setReading] = useState(false);
+  /** What the guide reader made of it, shown beside the card it proposed. */
+  const [report, setReport] = useState<CardProposal | null>(null);
 
-  const read = useCallback(async (): Promise<void> => {
+  const reload = useCallback(async (): Promise<void> => {
     const [installed, mine] = await Promise.all([channelCards(), myCards()]);
     const of = (list: CardSource[], origin: Origin): Card[] =>
       list.map((c) => ({ ...c, origin, ...headOf(c.text) }));
@@ -97,8 +120,8 @@ export function CardList({
   }, []);
 
   useEffect(() => {
-    void read();
-  }, [read]);
+    void reload();
+  }, [reload]);
 
   /** Which card each id is actually being served by, after the layers settle. */
   const winner = registry.origin;
@@ -111,6 +134,7 @@ export function CardList({
   const start = (card: Card | null, copy = false): void => {
     setError(null);
     setNote(null);
+    setReport(null);
     if (!card) {
       setOpen('new');
       setDraft(NEW_CARD);
@@ -127,13 +151,39 @@ export function CardList({
     setError(null);
     try {
       const said = await what();
-      await read();
+      await reload();
       onChanged();
       setNote(said);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * Read the guide at the pasted address and open what came back for editing.
+   *
+   * Straight into the editor, unsaved, because that is what it is: a proposal.
+   * The report beside it says which model wrote it, how sure it was, and what
+   * it had to leave out — all of which is worth reading before this becomes the
+   * formula behind every prompt for that model.
+   */
+  const readGuide = async (): Promise<void> => {
+    setReading(true);
+    setError(null);
+    setNote(null);
+    setReport(null);
+    try {
+      const proposal = await proposeCard(guideUrl.trim());
+      setReport(proposal);
+      setDraft(profileToYaml(proposal.profile));
+      setName(`${proposal.profile.id}.yaml`);
+      setOpen('new');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReading(false);
     }
   };
 
@@ -161,6 +211,53 @@ export function CardList({
               ? 'This card came with the app. Take a copy to change it — the copy loads last and wins.'
               : 'This card came from an installed set, and the next install replaces the whole set. Take a copy so your change survives it.'}
           </p>
+        ) : null}
+
+        {/*
+          What the guide reader had to say about its own answer, above the card
+          rather than below it. A card is a formula that will be behind every
+          prompt for this model, and "the model was unsure about the duration
+          limit" is worth knowing before you save it, not after.
+        */}
+        {report ? (
+          <div className={`read-report conf-${report.confidence}`}>
+            <p className="read-head">
+              <b>Read from the guide</b>
+              <span>
+                {report.model} · {report.confidence} confidence ·{' '}
+                {report.cached
+                  ? 'already read, nothing spent'
+                  : `$${report.usage.costUsd.toFixed(4)}`}
+              </span>
+            </p>
+            <p className="read-src">
+              {report.guideTitle || 'Untitled page'} · {Math.round(report.guideChars / 1000)}k
+              characters read
+            </p>
+
+            {report.notes.length > 0 ? (
+              <ul>
+                {report.notes.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            ) : null}
+
+            {/* Not a warning: these are things the guide asked for that this
+                build has no way to render, taken out so the card works. */}
+            {report.dropped.length > 0 ? (
+              <>
+                <p className="read-head">
+                  <b>Left out, because this build has no such thing</b>
+                </p>
+                <ul className="read-dropped">
+                  {report.dropped.map((d) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+          </div>
         ) : null}
 
         <textarea
@@ -238,9 +335,49 @@ export function CardList({
         })}
       </ul>
 
+      <h3>Add a model</h3>
+      {/*
+        The link, not the form. Writing a card by hand means knowing the card
+        format, six syntaxes, three renderers, the whole IR path vocabulary and
+        which engine rules exist. The vendor's prompting guide already says all
+        of it — in prose, which is what the model is for.
+      */}
+      <p className="sheet-p">
+        Paste the link to the model’s official prompting guide. Dialect reads it with Opus and
+        writes the card — name, family, the field order, the limits, what it will not do — and
+        shows it to you before anything is saved.
+      </p>
+
       <div className="sheet-row">
-        <button className="solid" onClick={() => start(null)}>
-          Write a card
+        <input
+          className="sheet-i"
+          spellCheck={false}
+          placeholder="https://… the model’s prompting guide"
+          value={guideUrl}
+          disabled={reading}
+          onChange={(e) => setGuideUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && guideUrl.trim() && !reading) void readGuide();
+          }}
+        />
+        <button
+          className="solid"
+          disabled={reading || guideUrl.trim().length === 0}
+          onClick={() => void readGuide()}
+        >
+          {reading ? 'Reading…' : 'Read the guide'}
+        </button>
+      </div>
+
+      {/* Said before it is pressed, not after. */}
+      <p className="sheet-p dim">
+        One call to Opus, usually a few cents, counted against the same budget as everything else.
+        {' '}A guide already read costs nothing the second time.
+      </p>
+
+      <div className="sheet-row">
+        <button className="ghost" onClick={() => start(null)}>
+          Write one by hand
         </button>
         <button
           className="ghost"
@@ -260,7 +397,7 @@ export function CardList({
       {note && !error ? <p className="state on">{note}</p> : null}
 
       <p className="sheet-p dim">
-        Cards load in three layers — what the app shipped with, what a signed set installed, then
+        Cards load in three layers — what the app shipped with, what an installed set brought, then
         yours. Later wins by id, so a card of your own overrides either without touching them.
       </p>
     </>
