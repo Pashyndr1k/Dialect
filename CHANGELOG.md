@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.40.0 — 2026-09-03
+
+The release engineering that 0.31 said was missing, and an interface that
+answers the questions people kept having to ask.
+
+**The app updates itself.** It checks on start, downloads in the background, and
+waits for you to restart rather than restarting for you. Code signing is still
+not done, so Windows and macOS will still warn on first install.
+
+**ffmpeg travels with it** on Windows — an LGPL build, bundled. Video and audio
+references work out of the box instead of after a separate install. macOS still
+looks for ffmpeg on your machine.
+
+**Add a model by giving Dialect its prompting guide.** Paste the link and Opus
+reads it and writes the card: the id, the family, the syntax, the field order,
+the limits, what it will not do. Then it is checked — a field may only read IR
+paths that exist, and one that does not renders nothing, for ever, without
+saying why. Invented paths, empty fields and unknown rules are dropped and
+listed. Nothing is saved: the card opens for reading, with the model's own
+confidence and what it had to assume. A card can be brought up to date the same
+way, from a newer guide, keeping the id your graphs point at.
+
+**Model cards can be seen and edited.** The panel could install a set, count
+them, and never show you one. Every card is now listed with the layer it came
+from and whether a later layer overrides it; yours are editable in place and the
+others offer a copy.
+
+**No more publisher key.** A card set needed an Ed25519 signature from a key you
+had trusted first. Cards are plain YAML the app itself lets you write and
+delete, in a folder you can open — a 64-character key in front of that was a
+lock on a door standing open beside it. A set is now a folder or a URL, and it
+installs. Nothing is half-installed and a numbered set still will not go
+backwards by accident.
+
+**Several graphs open at once.** Tabs, with the undo history kept per tab, and
+every open tab remembered across a restart.
+
+**A right-click menu that belongs to this app**, replacing the web view's Back /
+Reload / View Page Source, with Add node first.
+
+**One node for a reference and its reading.** They were two — a file you have
+not paid to look at, and the same file after you paid — which made using the
+reading you already had a different box in a different port. Up to three files
+and up to three readings from Memory; picking a reading greys the files rather
+than removing them, because reading a file twice costs money twice.
+
+**Names.** `docs/GLOSSARY.md` fixes one word per thing and the app follows it:
+image not still, video not clip, audio not track, Input and Output for the node
+groups, User prompt for what you type. "Kept" is **Memory**, and it holds
+readings and templates — graphs went to the tabs, where documents belong.
+
+**Buttons that work.** "Open the folder" did nothing, anywhere, in any build:
+the opener plugin's `open-path` permission is granted with an empty scope, which
+denies every path, and every call site swallowed the refusal. Opening a folder
+is a host command now, and nothing swallows. Then every other button in the
+window was checked; three more said nothing when they failed and one did nothing
+when clicked.
+
+**Fixed:** an effect that handed the title bar its state on every render and was
+re-rendered by doing so; a failed card-set install leaving its staging folder on
+disk for ever; a closed tab reopening itself at the next start; the sheet not
+scrolling when it outgrew the window.
+
+**Known:** 429 compiler tests, 23 CLI, 47 host, and none of them can press a
+button. Dictation still needs whisper on PATH or a transcription key. macOS
+still finds its own ffmpeg.
+
 ## 0.35.0 — 2026-09-02
 
 Dialect is a node editor now. The two panes are gone and so is the fixed
