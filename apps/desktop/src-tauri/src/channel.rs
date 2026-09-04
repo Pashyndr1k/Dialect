@@ -21,11 +21,16 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
 const MANIFEST: &str = "manifest.json";
+
+/// Makes each install's staging folder its own, so two can never collide and
+/// none is ever the leftovers of the last one.
+static STAGE: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Manifest {
@@ -275,8 +280,17 @@ pub async fn install_into(dir: &Path, source: &str, force: bool) -> Result<Manif
 
     // Staged whole, then swapped. A set that fails halfway through leaves the
     // working one untouched, which is the only reason this is worth doing.
-    let staging = dir.with_extension("staging");
-    let _ = fs::remove_dir_all(&staging);
+    //
+    // A fresh name each time rather than one emptied and remade. Windows
+    // schedules a directory's deletion and finishes it when the last handle
+    // closes, so removing and immediately recreating the same path can hand
+    // back a directory that is on its way out — and the writes into it then
+    // fail with "the system cannot find the path specified".
+    let staging = dir.with_extension(format!(
+        "staging-{}-{}",
+        std::process::id(),
+        STAGE.fetch_add(1, Ordering::Relaxed)
+    ));
     fs::create_dir_all(&staging).map_err(|e| format!("Could not stage the set: {e}"))?;
 
     // Every way out of `stage` goes through here, so a half-written set is
@@ -291,16 +305,42 @@ pub async fn install_into(dir: &Path, source: &str, force: bool) -> Result<Manif
     let previous = dir.with_extension("previous");
     let _ = fs::remove_dir_all(&previous);
     if dir.exists() {
-        fs::rename(&dir, &previous).map_err(|e| format!("Could not put the old set aside: {e}"))?;
+        rename(dir, &previous).map_err(|e| format!("Could not put the old set aside: {e}"))?;
     }
-    if let Err(e) = fs::rename(&staging, &dir) {
+    if let Err(e) = rename(&staging, dir) {
         // Put back what was there rather than leaving nothing.
-        let _ = fs::rename(&previous, &dir);
+        let _ = rename(&previous, dir);
         return Err(format!("Could not swap the new set in: {e}"));
     }
     let _ = fs::remove_dir_all(&previous);
 
     Ok(manifest)
+}
+
+/// Rename a directory, giving Windows a moment to let go of it.
+///
+/// On Windows a directory cannot be renamed while anything holds a handle
+/// inside it, and something usually does for a fraction of a second after the
+/// files are written — an indexer, or a virus scanner reading what just
+/// appeared. The rename fails with "access is denied" and there is nothing
+/// wrong that waiting will not fix.
+///
+/// Half a second in total, in growing steps. If it is still held after that,
+/// something has the folder open for real and the caller should say so rather
+/// than keep trying.
+fn rename(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut waited = 0;
+    loop {
+        match fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(e) if waited >= 500 => return Err(e),
+            Err(_) => {
+                let step = if waited == 0 { 10 } else { waited };
+                std::thread::sleep(std::time::Duration::from_millis(step as u64));
+                waited += step;
+            }
+        }
+    }
 }
 
 /// Back to the cards this build shipped with.
@@ -399,9 +439,22 @@ fn card_file(app: &tauri::AppHandle, name: &str) -> Result<PathBuf, String> {
 mod tests {
     use super::*;
 
+    /// A directory nothing else is using.
+    ///
+    /// Not a fixed name emptied and remade. On Windows `remove_dir_all` returns
+    /// once deletion is *scheduled*: the directory lingers until the last handle
+    /// closes, and creating it again in that window succeeds and then hands back
+    /// a directory that is on its way out — so the next write fails with "the
+    /// system cannot find the path specified". It depends on how busy the
+    /// machine is, which is why this passed here for weeks and failed on every
+    /// CI run.
     fn temp(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("dialect-channel-{name}"));
-        let _ = fs::remove_dir_all(&dir);
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "dialect-channel-{name}-{}-{n}",
+            std::process::id()
+        ));
         fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -511,7 +564,15 @@ mod tests {
             "id: a\nlabel: the good one\n",
         );
         assert_eq!(read_manifest(&into).unwrap().version, 1);
-        assert!(!into.with_extension("staging").exists(), "no half-installed set left behind");
+        // By name rather than by one guessed path: staging folders carry the
+        // process and a counter now, so naming one would be asserting about a
+        // folder that is never created.
+        let leftovers: Vec<String> = fs::read_dir(into.parent().unwrap())
+            .unwrap()
+            .filter_map(|e| Some(e.ok()?.file_name().to_string_lossy().to_string()))
+            .filter(|n| n.contains(".staging"))
+            .collect();
+        assert!(leftovers.is_empty(), "no half-installed set left behind: {leftovers:?}");
 
         for d in [&good, &bad] {
             fs::remove_dir_all(d.parent().unwrap()).ok();

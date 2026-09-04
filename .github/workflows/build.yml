@@ -36,24 +36,22 @@ jobs:
   # tells you anything about the other.
   rust:
     runs-on: windows-latest
-    # Reports, does not gate — for now, and not because the failure is
-    # acceptable.
+    # It gates again.
     #
-    # These 39 tests pass on the machine this is built on; they pass against a
-    # tree of only tracked files, which is what the runner checks out; and they
-    # pass with ffmpeg taken off PATH, which is the state the runner is in.
-    # Three reproductions, three passes, and it still fails up there.
+    # It did not, for four releases, because these tests passed on the machine
+    # they were written on and failed here, and job logs need admin rights on
+    # the repository that nobody working on this has. Annotations do not need
+    # them, so the steps below turn the failure into annotations — and the
+    # first run that had them said, in one line, what a fortnight of guessing
+    # had not: two tests, both racing Windows over a directory.
     #
-    # Job logs need admin rights on the repository — that was checked, not
-    # assumed, and the API says so in as many words even though the repository
-    # is public. Annotations do not, so the step below turns the tail of the
-    # output into annotations, which anyone can then read. Guessing was tried
-    # first and cost more than this would have.
+    # A fixed temporary path emptied and remade is the bug. Windows schedules a
+    # directory's deletion and finishes it when the last handle closes, so
+    # recreating it immediately can hand back one that is on its way out. Both
+    # test modules did it, and so did the installer itself.
     #
-    # A gate nobody can explain is worse than no gate: it teaches people to
-    # ignore red. So the signal stays visible and stops blocking, and this flag
-    # comes off the moment the annotations say what is wrong.
-    continue-on-error: true
+    # A gate nobody can explain is worse than no gate, because it teaches
+    # people to ignore red. This one can be explained now.
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -85,6 +83,14 @@ jobs:
           out=$(cargo test --lib 2>&1); code=$?
           echo "$out"
           [ $code -eq 0 ] && exit 0
+
+          # Which tests failed, by name, first. A blind tail can push the
+          # summary off the end exactly when there is most to say, and the
+          # names are the one thing worth reading before anything else.
+          echo "$out" | grep -E '^\s+[a-z_]+::' | sort -u \
+            | while IFS= read -r t; do echo "::error title=Failed test::$(echo "$t" | tr -d '[:space:]')"; done
+          echo "$out" | grep -E '^test result:' \
+            | while IFS= read -r line; do echo "::error::${line}"; done
           echo "$out" | tail -30 | while IFS= read -r line; do echo "::error::${line}"; done
           exit $code
 
@@ -169,9 +175,13 @@ jobs:
       # ffmpeg travels with the app so a machine that has never heard of it can
       # still read a clip. Pinned and licence-checked in the script rather than
       # here — see scripts/fetch-ffmpeg.sh, which explains why that matters.
+      # Run through bash rather than as ./script, because the executable bit
+      # is a thing git tracks and a thing that is easy to lose — and losing it
+      # fails only on macOS, where the mode is respected, which is exactly the
+      # platform that is hardest to check before pushing.
       - name: Fetch the ffmpeg that ships with it
         shell: bash
-        run: ./scripts/fetch-ffmpeg.sh ${{ matrix.name }}
+        run: bash ./scripts/fetch-ffmpeg.sh ${{ matrix.name }}
 
       # Split into steps on purpose.
       #
@@ -184,16 +194,30 @@ jobs:
       # These are the commands that were run by hand before any of this was
       # written, which is a better thing to depend on than an action whose
       # inputs I inferred from a list.
+      # Signs each installer so the updater can tell ours from anyone else's.
+      #
+      # This said the build "still succeeds and simply produces no signatures"
+      # without the secret. That was an assumption written down as a fact, and
+      # it is wrong: a configured `plugins > updater > pubkey` with no private
+      # key is a hard error — "A public key has been found, but no private key"
+      # — ten minutes into the build, on every platform.
+      #
+      # So the absence is handled rather than discovered. Without the secret the
+      # installers are built without updater artifacts and the run says, in a
+      # warning anyone can read, that this release cannot update itself.
       - name: Build the installers
-        run: npx tauri build
+        shell: bash
         working-directory: apps/desktop
         env:
-          # Signs each installer so the updater can tell ours from anyone
-          # else's. Without the secret the build still succeeds and simply
-          # produces no signatures — which is right for a fork, and means the
-          # updater finds nothing rather than trusting anything.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            npx tauri build
+          else
+            echo "::warning title=No signing key::TAURI_SIGNING_PRIVATE_KEY is not set, so these installers are unsigned and this release ships without an update manifest. Installed copies will not update themselves to it."
+            npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          fi
 
       - name: List what was built
         shell: bash

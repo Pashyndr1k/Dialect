@@ -8,6 +8,7 @@
 //! place shared with the CLI. This side reports what it found and no more.
 
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 use base64::Engine;
@@ -154,6 +155,21 @@ fn natural(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A directory nothing else is using. See the note on `channel.rs`'s copy:
+    /// a fixed name emptied and remade is a race on Windows, and it is the race
+    /// that failed every CI run.
+    fn temp(name: &str) -> PathBuf {
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "dialect-files-{name}-{}-{n}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
 
     #[test]
     fn sorts_the_way_a_person_numbered_them() {
@@ -165,8 +181,7 @@ mod tests {
 
     #[test]
     fn reads_a_file_it_wrote() {
-        let dir = std::env::temp_dir().join("dialect-files-test");
-        fs::create_dir_all(&dir).unwrap();
+        let dir = temp("read");
         let path = dir.join("hello.txt");
         fs::write(&path, b"hi").unwrap();
 
@@ -188,7 +203,7 @@ mod tests {
 
     #[test]
     fn lists_only_the_files_directly_inside() {
-        let dir = std::env::temp_dir().join("dialect-scan-test");
+        let dir = temp("scan");
         fs::create_dir_all(dir.join("nested")).unwrap();
         fs::write(dir.join("b.png"), b"x").unwrap();
         fs::write(dir.join("a.png"), b"x").unwrap();
@@ -205,13 +220,11 @@ mod tests {
     fn a_folder_that_is_not_there_says_so_rather_than_failing_silently() {
         // The whole history of this button is silent refusals, so the refusals
         // are what is under test.
-        let missing = std::env::temp_dir().join("dialect-no-such-folder-at-all");
-        fs::remove_dir_all(&missing).ok();
+        let missing = temp("gone").join("not-here");
         let said = show_folder(missing.to_string_lossy().to_string()).unwrap_err();
         assert!(said.contains("no folder"), "{said}");
 
-        let dir = std::env::temp_dir().join("dialect-show-test");
-        fs::create_dir_all(&dir).unwrap();
+        let dir = temp("show");
         let file = dir.join("a.txt");
         fs::write(&file, b"x").unwrap();
         let said = show_folder(file.to_string_lossy().to_string()).unwrap_err();
