@@ -1,6 +1,6 @@
 [package]
 name = "dialect"
-version = "0.40.0"
+version = "0.41.0"
 description = "Compiles ideas and references into prompts written in each model's own dialect"
 authors = ["Dialect"]
 edition = "2021"
@@ -25,9 +25,7 @@ keyring = { version = "4.1.6", features = ["apple-native-keyring-store"] }
 reqwest = { version = "0.13.4", features = ["json", "multipart"] }
 tauri-plugin-dialog = "2.7.2"
 # Updating itself, so a version that is out is a version people leave.
-tauri-plugin-updater = "2"
 # Restarting into the new version, when the person says so.
-tauri-plugin-process = "2"
 base64 = "0.23.1"
 
 [dev-dependencies]

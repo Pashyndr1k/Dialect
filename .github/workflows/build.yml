@@ -194,30 +194,16 @@ jobs:
       # These are the commands that were run by hand before any of this was
       # written, which is a better thing to depend on than an action whose
       # inputs I inferred from a list.
-      # Signs each installer so the updater can tell ours from anyone else's.
+      # No signing key, and nothing that needs one.
       #
-      # This said the build "still succeeds and simply produces no signatures"
-      # without the secret. That was an assumption written down as a fact, and
-      # it is wrong: a configured `plugins > updater > pubkey` with no private
-      # key is a hard error — "A public key has been found, but no private key"
-      # — ten minutes into the build, on every platform.
-      #
-      # So the absence is handled rather than discovered. Without the secret the
-      # installers are built without updater artifacts and the run says, in a
-      # warning anyone can read, that this release cannot update itself.
+      # The app used to download and install its own replacement, which meant
+      # every release had to be signed so it could tell its own build from
+      # anyone else's — a private key, a repository secret, and a password to
+      # keep. It now tells you a newer version exists and opens the releases
+      # page, downloading and running nothing, so there is nothing to sign.
       - name: Build the installers
-        shell: bash
+        run: npx tauri build
         working-directory: apps/desktop
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
-            npx tauri build
-          else
-            echo "::warning title=No signing key::TAURI_SIGNING_PRIVATE_KEY is not set, so these installers are unsigned and this release ships without an update manifest. Installed copies will not update themselves to it."
-            npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
-          fi
 
       - name: List what was built
         shell: bash
@@ -281,77 +267,10 @@ jobs:
             // be explained.
             if (!rel.assets.length) throw new Error('Nothing was uploaded; leaving the draft alone.');
 
-            /*
-             * The manifest the running app reads to learn a new version exists.
-             *
-             * Built from what was actually uploaded rather than from a list
-             * written down somewhere: a manifest naming a file that is not
-             * there is an update that fails for everyone, silently, and only
-             * on the machines that already had the app.
-             *
-             * A platform with no signature is left out entirely. An unsigned
-             * entry is not a lesser update, it is an update the app will refuse
-             * — better to offer nothing than to offer something that cannot be
-             * checked.
-             */
-            const tag = context.ref.replace('refs/tags/', '');
-            const version = tag.replace(/^v/, '');
-            const byName = new Map(rel.assets.map((a) => [a.name, a]));
-
-            // Which uploaded installer belongs to which platform the updater
-            // knows about. The keys are Tauri's own names for them.
-            const wanted = [
-              ['windows-x86_64', (n) => n.endsWith('-setup.exe')],
-              ['darwin-x86_64', (n) => n.includes('x64') && n.endsWith('.app.tar.gz')],
-              ['darwin-aarch64', (n) => n.includes('aarch64') && n.endsWith('.app.tar.gz')],
-            ];
-
-            const platforms = {};
-            for (const [key, matches] of wanted) {
-              const asset = rel.assets.find((a) => matches(a.name));
-              if (!asset) continue;
-
-              const sig = byName.get(`${asset.name}.sig`);
-              if (!sig) {
-                console.log(`${key}: ${asset.name} has no signature, leaving it out`);
-                continue;
-              }
-
-              // The signature is small and its text is what goes in the
-              // manifest, not a link to it.
-              const signature = await github.request(sig.url, {
-                headers: { accept: 'application/octet-stream' },
-              });
-              platforms[key] = {
-                signature: Buffer.from(signature.data).toString('utf8').trim(),
-                url: asset.browser_download_url,
-              };
-            }
-
-            if (Object.keys(platforms).length === 0) {
-              console.log('No signed installers, so no update manifest. The release still ships.');
-            } else {
-              const manifest = {
-                version,
-                notes: `Dialect ${version}`,
-                pub_date: new Date().toISOString(),
-                platforms,
-              };
-              console.log('Manifest covers:', Object.keys(platforms).join(', '));
-
-              // Replaced rather than added to, so re-running a release does not
-              // leave two manifests disagreeing about what the latest version is.
-              const old = byName.get('latest.json');
-              if (old) {
-                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: old.id });
-              }
-              await github.rest.repos.uploadReleaseAsset({
-                owner,
-                repo,
-                release_id: id,
-                name: 'latest.json',
-                data: JSON.stringify(manifest, null, 2),
-              });
-            }
-
+            // No update manifest any more. The app asks GitHub which release
+            // is newest and opens this page; it downloads nothing and runs
+            // nothing, so there is nothing here to sign or to describe.
+            //
+            // make_latest matters more than it used to: it is now the one
+            // thing the running app reads.
             await github.rest.repos.updateRelease({ owner, repo, release_id: id, draft: false, make_latest: 'true' });

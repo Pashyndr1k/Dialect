@@ -1,117 +1,73 @@
 /**
- * Telling you a new version exists, once.
+ * A bar that says a newer version exists.
  *
- * Deliberately quiet. It checks at startup, and if there is nothing it says
- * nothing and never mentions itself again — an app that reports "you are up to
- * date" every launch has taught you to ignore the place it will one day say
- * something else.
+ * Not an updater. Dialect used to download its own replacement and install it,
+ * which meant it had to tell its own build from anyone else's, which meant
+ * signing every release, which meant a private key, a repository secret and a
+ * password to keep. A reasonable trade for software with strangers using it; a
+ * poor one for a handful of people who know whoever wrote it.
  *
- * Nothing installs on its own. A download and a restart in the middle of work
- * is the app deciding your afternoon is less important than its version number.
+ * So nothing is downloaded and nothing is run. The host asks GitHub which
+ * release is newest and the window offers to open the releases page. What
+ * arrives over the network is one version number, and the worst a wrong one can
+ * do is offer a link nobody wanted.
+ *
+ * Silent when there is nothing to say, and silent when it cannot tell. No
+ * network, a rate limit, a repository that has never published — none of those
+ * is something the person is doing, and a bar saying "could not check for
+ * updates" is a bar that is wrong about what matters.
  */
 
 import { useEffect, useState } from 'react';
-import { check, type Update as Available } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
-
-type Stage = 'idle' | 'found' | 'getting' | 'ready' | 'failed';
-
-/** How much has arrived, when the server bothered to say how much there is. */
-function progressOf(got: number, total: number | undefined): string {
-  if (!total) return `${(got / 1024 / 1024).toFixed(0)} MB`;
-  return `${Math.round((got / total) * 100)}%`;
-}
+import { invoke } from '@tauri-apps/api/core';
 
 export function Update(): React.ReactElement | null {
-  const [stage, setStage] = useState<Stage>('idle');
-  const [update, setUpdate] = useState<Available | null>(null);
-  const [note, setNote] = useState('');
+  const [version, setVersion] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [wrong, setWrong] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+
     void (async () => {
       try {
-        const found = await check();
-        if (found) {
-          setUpdate(found);
-          setStage('found');
-        }
+        const { version: latest } = await invoke<{ version: string }>('latest_release', {});
+        if (!latest) return;
+        // Compared in the host, where it is a numeric comparison with tests
+        // behind it. Done here it would be string comparison, and string
+        // comparison stops mentioning releases after the tenth.
+        const newer = await invoke<boolean>('newer_than', {
+          latest,
+          running: __APP_VERSION__,
+        });
+        if (newer) setVersion(latest);
       } catch {
-        // No network, no release yet, or a dev build with no endpoint. None of
-        // those is worth a word: nothing the person is doing has changed.
+        /* Nothing worth saying. See the note above. */
       }
     })();
   }, []);
 
-  if (stage === 'idle' || dismissed || !update) return null;
-
-  const install = async (): Promise<void> => {
-    setStage('getting');
-    try {
-      let got = 0;
-      let total: number | undefined;
-      await update.downloadAndInstall((event) => {
-        if (event.event === 'Started') total = event.data.contentLength;
-        if (event.event === 'Progress') {
-          got += event.data.chunkLength;
-          setNote(progressOf(got, total));
-        }
-      });
-      setStage('ready');
-    } catch (err) {
-      setNote((err as Error).message);
-      setStage('failed');
-    }
-  };
+  if (!version || dismissed) return null;
 
   return (
     <aside className="update" role="status">
-      {stage === 'found' ? (
-        <>
-          <span>
-            <b>{update.version}</b> is out. You have {update.currentVersion}.
-          </span>
-          <button type="button" onClick={() => void install()}>
-            Get it
-          </button>
-          <button type="button" className="ghost" onClick={() => setDismissed(true)}>
-            Later
-          </button>
-        </>
-      ) : null}
-
-      {stage === 'getting' ? <span>Downloading… {note}</span> : null}
-
-      {stage === 'ready' ? (
-        <>
-          {/* Installed, but not switched to. Restarting is still the person's
-              call — they may be in the middle of a run. */}
-          <span>{update.version} is installed. It starts using it when you restart.</span>
-          <button
-            type="button"
-            onClick={() =>
-              void relaunch().catch((err: Error) => {
-                setNote(err.message);
-                setStage('failed');
-              })
-            }
-          >
-            Restart now
-          </button>
-          <button type="button" className="ghost" onClick={() => setDismissed(true)}>
-            Later
-          </button>
-        </>
-      ) : null}
-
-      {stage === 'failed' ? (
-        <>
-          <span className="update-bad">That update would not install: {note}</span>
-          <button type="button" className="ghost" onClick={() => setDismissed(true)}>
-            Close
-          </button>
-        </>
-      ) : null}
+      <span>
+        <b>{version}</b> is out. You have {__APP_VERSION__}.
+      </span>
+      <button
+        type="button"
+        onClick={() =>
+          void invoke('open_releases', {}).catch((err: unknown) =>
+            setWrong(err instanceof Error ? err.message : String(err)),
+          )
+        }
+      >
+        Get it
+      </button>
+      <button type="button" className="ghost" onClick={() => setDismissed(true)}>
+        Later
+      </button>
+      {wrong ? <span className="update-bad">{wrong}</span> : null}
     </aside>
   );
 }

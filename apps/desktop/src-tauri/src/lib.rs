@@ -13,6 +13,7 @@ mod customs;
 mod files;
 mod guide;
 mod media;
+mod release;
 mod secrets;
 mod store;
 mod tools;
@@ -22,8 +23,6 @@ mod voice;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             secrets::secret_available,
             secrets::secret_set,
@@ -53,6 +52,9 @@ pub fn run() {
             files::file_text,
             files::show_folder,
             guide::guide_fetch,
+            release::latest_release,
+            release::newer_than,
+            release::open_releases,
             channel::channel_status,
             channel::channel_cards,
             channel::channel_check,

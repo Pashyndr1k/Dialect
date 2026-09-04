@@ -1,13 +1,33 @@
 # Changelog
 
+## 0.41.0 — 2026-09-03
+
+**No keys, no secrets, no passwords.** The app used to download its own
+replacement and install it, which meant it had to tell its own build from
+anyone else's — so every release had to be signed, which meant a private key,
+a repository secret and a password to keep. That is a fair trade for software
+with strangers using it and a poor one for a handful of people who know
+whoever wrote it.
+
+It now asks GitHub which release is newest, and if that is newer than what is
+running it says so and offers to open the releases page. It downloads nothing
+and runs nothing, so there is nothing to sign. The updater plugin, the signing
+key, the repository secret and the release manifest are all gone, and the build
+no longer depends on a secret it might not have.
+
+Updating is: press the button, download the installer, run it.
+
 ## 0.40.0 — 2026-09-03
 
 The release engineering that 0.31 said was missing, and an interface that
 answers the questions people kept having to ask.
 
-**The app updates itself.** It checks on start, downloads in the background, and
-waits for you to restart rather than restarting for you. Code signing is still
-not done, so Windows and macOS will still warn on first install.
+**It tells you when a new version is out.** On start it asks GitHub which
+release is newest and, if that is newer than what is running, offers to open the
+releases page. It does not download or install anything itself — which is why
+there is no signing key, no repository secret and no password anywhere in this
+project. Code signing is still not done either, so Windows and macOS warn on
+first install.
 
 **ffmpeg travels with it** on Windows — an LGPL build, bundled. Video and audio
 references work out of the box instead of after a separate install. macOS still

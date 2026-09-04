@@ -61,6 +61,7 @@ Phase 0–1 spine, running and tested. No GUI yet.
 | Key storage | OS credential store via the Rust host, with a settings panel |
 | CLI | `compile`, `extract`, `batch`, `apply`, `targets`, `templates` |
 | Desktop shell | Tauri 2 window, compiling live with a chip editor |
+| Updates | tells you a newer release exists and opens the page; installs nothing |
 
 ## Try it
 
