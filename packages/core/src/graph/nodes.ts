@@ -73,14 +73,65 @@ const many = <T extends Value['type']>(
 const str = (params: Record<string, unknown>, key: string, fallback = ''): string =>
   typeof params[key] === 'string' ? (params[key] as string) : fallback;
 
+/** How many of each a Reference node will hold. */
+export const REFERENCE_MAX = 3;
+
+const list = (params: Record<string, unknown>, key: string): Record<string, unknown>[] =>
+  Array.isArray(params[key])
+    ? (params[key] as unknown[]).filter(
+        (v): v is Record<string, unknown> => typeof v === 'object' && v !== null,
+      )
+    : [];
+
+/**
+ * The files on a Reference node.
+ *
+ * Also reads the single `path`/`name`/`kind` a Reference held before it could
+ * hold three, so a graph saved by an older build opens with its file still on
+ * it rather than empty. Both shapes, never the two at once: the list wins where
+ * there is one, because that is what the current editor writes.
+ */
+export function filesOf(params: Record<string, unknown>): GraphSource[] {
+  const rows = list(params, 'files');
+  const from = (p: Record<string, unknown>): GraphSource | undefined => {
+    const path = str(p, 'path');
+    if (!path) return undefined;
+    return {
+      path,
+      name: str(p, 'name', path.split(/[\\/]/).pop() ?? path),
+      kind: (str(p, 'kind', 'image') as GraphSource['kind']) ?? 'image',
+    };
+  };
+
+  if (rows.length > 0) return rows.flatMap((p) => from(p) ?? []);
+  const only = from(params);
+  return only ? [only] : [];
+}
+
+/** The readings picked out of Memory on a Reference node. */
+export function readingsOf(params: Record<string, unknown>): GraphLines[] {
+  return list(params, 'readings').flatMap((p) => {
+    const lines = Array.isArray(p.lines) ? (p.lines as string[]) : [];
+    if (lines.length === 0) return [];
+    return [
+      {
+        id: str(p, 'id', 'kept'),
+        kind: (str(p, 'kind', 'image') as GraphLines['kind']) ?? 'image',
+        role: (str(p, 'role', 'auto') as SourceRole) ?? 'auto',
+        lines,
+      },
+    ];
+  });
+}
+
 const specs: NodeSpec[] = [
   /* ---------------------------------------------------------------- in --- */
 
   {
     type: 'words',
-    title: 'Words',
+    title: 'User prompt',
     group: 'in',
-    hint: 'Something you type. The starting point when you have no reference.',
+    hint: 'What you type yourself. The starting point when you have no reference.',
     inputs: {},
     outputs: { out: { type: 'words' } },
     defaults: { text: '' },
@@ -92,29 +143,54 @@ const specs: NodeSpec[] = [
   },
 
   {
+    /**
+     * The references a graph works from, and the readings of them you already
+     * have.
+     *
+     * One node rather than two. "Reference" and "Reading from Memory" were the
+     * same thing at two moments in its life: a file you have not paid to look
+     * at yet, and a file you paid to look at last week. Two nodes meant that
+     * using the reading you already had was a different box, wired into a
+     * different port, rather than a choice about the same reference.
+     *
+     * So the readings win. Pick one or more from Memory and the files are not
+     * emitted at all — they stay listed, shown deactivated, because the point
+     * is to switch back and forth without losing the paths. Reading a file
+     * costs money; reading it twice costs money twice.
+     */
     type: 'reference',
     title: 'Reference',
     group: 'in',
-    hint: 'A file from disk — an image, a video or audio. Not looked at yet.',
+    hint: 'Up to three files from disk, or readings of them already in Memory.',
     inputs: {},
-    outputs: { out: { type: 'source' } },
-    async run(_inputs, params) {
-      const path = str(params, 'path');
-      if (!path) throw new GraphError('Choose a file for this reference.');
-      const source: GraphSource = {
-        path,
-        name: str(params, 'name', path.split(/[\\/]/).pop() ?? path),
-        kind: (str(params, 'kind', 'image') as GraphSource['kind']) ?? 'image',
-      };
-      return { out: { type: 'source', source } };
+    outputs: {
+      out: { type: 'source' },
+      read: { type: 'lines', label: 'from Memory' },
+    },
+    async run(_inputs, params): Promise<Record<string, Value | readonly Value[]>> {
+      const readings = readingsOf(params);
+      if (readings.length > 0) {
+        return { read: readings.map((lines) => ({ type: 'lines' as const, lines })) };
+      }
+
+      const files = filesOf(params);
+      if (files.length === 0) {
+        throw new GraphError('Choose a file for this reference, or a reading from Memory.');
+      }
+      return { out: files.map((source) => ({ type: 'source' as const, source })) };
     },
   },
 
   {
+    /**
+     * Folded into `reference`, and kept only so graphs that hold one still run.
+     * See `NodeSpec.hidden`.
+     */
     type: 'kept',
     title: 'Reading from Memory',
     group: 'in',
-    hint: 'A reading kept earlier. Free, and always word-for-word the same.',
+    hidden: true,
+    hint: 'A reading kept earlier. Now part of the Reference node.',
     inputs: {},
     outputs: { out: { type: 'lines' } },
     async run(_inputs, params) {

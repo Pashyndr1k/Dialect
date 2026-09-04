@@ -137,7 +137,7 @@ export function ContextMenu({
               <section key={g.id}>
                 <h4>{g.label}</h4>
                 {[...NODES.values()]
-                  .filter((s) => s.group === g.id)
+                  .filter((s) => s.group === g.id && !s.hidden)
                   .map((s) => (
                     <button key={s.type} type="button" onClick={() => done(() => onAdd(s.type, spot.at))}>
                       {s.title}

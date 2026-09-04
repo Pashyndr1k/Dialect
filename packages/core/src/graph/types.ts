@@ -44,7 +44,7 @@ export type PortType = (typeof PORT_TYPES)[number];
 
 /** Shown on a port, and in the message when a connection is refused. */
 export const PORT_LABEL: Record<PortType, string> = {
-  words: 'words',
+  words: 'user prompt',
   source: 'reference',
   lines: 'reading',
   ir: 'document',
@@ -163,6 +163,14 @@ export interface NodeSpec {
    * which, and that is not a catalogue, it is a list of guesses.
    */
   hint: string;
+  /**
+   * Kept working but off the catalogue.
+   *
+   * For a node type that has been folded into another one. Old graphs still
+   * hold it and still have to run — a document someone saved is not something
+   * to break — but nobody should be adding a new one.
+   */
+  hidden?: boolean;
   inputs: Record<string, PortSpec>;
   outputs: Record<string, PortSpec>;
   /**

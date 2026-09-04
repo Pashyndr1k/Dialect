@@ -14,7 +14,7 @@
  */
 
 import { createContext, useContext } from 'react';
-import type { NodeSpec } from '@dialect/core';
+import type { GraphSource, NodeSpec } from '@dialect/core';
 
 import type { World } from './controls.ts';
 
@@ -34,6 +34,15 @@ export interface BoardValue {
   faces: Map<string, NodeFace>;
   setParams: (id: string, patch: Record<string, unknown>) => void;
   pick: (id: string, key: string, what: 'file' | 'folder') => void;
+  /**
+   * Ask for a file and hand it back, rather than writing it somewhere.
+   *
+   * `pick` decides where the answer goes, which is right for a node holding
+   * one file and wrong for a node holding a list — the caller there has to add
+   * it to the list, and only the caller knows how long the list is allowed to
+   * get. Null when the dialog was dismissed.
+   */
+  chooseFile: () => Promise<GraphSource | null>;
 }
 
 const BoardContext = createContext<BoardValue | null>(null);

@@ -19,6 +19,7 @@ import { controlsFor, summaryOf, type Control, type World } from './controls.ts'
 import { useBoard, type NodeFace } from './NodeData.tsx';
 import { NODES } from './host.ts';
 import { DeckCard, Dictated } from './Widgets.tsx';
+import { FileList, ReadingList } from './RefList.tsx';
 
 /**
  * What a widget needs. Assembled here from the board rather than carried on the
@@ -160,6 +161,8 @@ function Widget({ control, data }: { control: Control; data: Face }): React.Reac
 
   if (control.kind === 'mic') return <Dictated control={control} data={data} />;
   if (control.kind === 'deck') return <DeckCard control={control} data={data} />;
+  if (control.kind === 'files') return <FileList control={control} data={data} />;
+  if (control.kind === 'readings') return <ReadingList control={control} data={data} />;
 
   return (
     <label className="node-field">

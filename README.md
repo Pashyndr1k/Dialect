@@ -399,6 +399,24 @@ a prompting guide at all — and the only one who can tell is the person reading
 
 Writing one by hand is still one button along.
 
+## One node for a reference and its reading
+
+A reference and the reading of it were two nodes: a file you have not paid to
+look at, and the same file after you paid. Which made "use the reading I already
+have" a different box wired to a different port, rather than a choice about the
+same reference.
+
+They are one node. It holds up to three files and up to three readings kept in
+Memory, and it has two sockets — the files, and the readings. Picking a reading
+stops the files being used and greys them where they are: the paths stay so you
+can switch back, and reading a file twice costs money twice. Three of each is not
+a principled number; it is the point past which a node stops being readable on a
+canvas, and a folder is the right answer beyond it.
+
+The node type is unchanged, so a graph that holds the old single-file shape opens
+with its file still on it. The old `kept` node is kept working and taken off the
+catalogue — a document someone saved is not something to break to tidy a menu.
+
 ## Cards you write yourself
 
 Three layers: what the build shipped, what an installed set brought, what you

@@ -228,14 +228,23 @@ function Board({
     return map;
   }, [doc.nodes, run.runs]);
 
+  /** One file, handed back rather than filed. See `BoardValue.chooseFile`. */
+  const chooseFile = useCallback(async () => {
+    const [path] = await pickReferences();
+    if (!path) return null;
+    const name = path.split(/[\\/]/).pop() ?? path;
+    return { path, name, kind: kindOf(name) ?? ('image' as const) };
+  }, []);
+
   const board = useMemo(
     () => ({
       world,
       faces,
       setParams: graph.setParams,
       pick: (id: string, key: string, what: 'file' | 'folder') => void pick(id, key, what),
+      chooseFile,
     }),
-    [world, faces, graph.setParams, pick],
+    [world, faces, graph.setParams, pick, chooseFile],
   );
 
   const flowEdges: Edge[] = useMemo(

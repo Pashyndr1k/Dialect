@@ -25,8 +25,8 @@ touches. Where a name is only in one place, one name is not worth a rule.
 | **Image** | still, picture, photo, shot | "Still" is a film word for a frame lifted out of a moving picture. Most images here never came from a film. The file is an image; the field is `image`; the sentence says image. |
 | **Video** | clip, footage, movie | "Clip" implies a fragment of something longer. A file is a video whether it runs four seconds or forty minutes. |
 | **Audio** | track, sound, recording | "Track" means a numbered song on a record, and also a channel in an editor, and also the thing a camera does. Audio means none of those and exactly this. |
-| **Reference** | source file, input file, asset | A file you bring in *for the app to look at*. It stays a reference whether it is an image, a video or audio. |
-| **Words** | text, prompt, description | What you type yourself. "Prompt" is reserved for the finished thing that goes to a model. |
+| **Reference** | source file, input file, asset | A file you bring in *for the app to look at*. It stays a reference whether it is an image, a video or audio. The node of that name holds up to three of them, and the readings of them you already have. |
+| **User prompt** | words, text, description | What you type yourself, as against what the app writes. Two words rather than one because it is the counterpart of the finished **prompt** below, and "words" on its own never said whose. The port type is still `words` in the code; the socket reads "user prompt". |
 
 `image`, `video` and `audio` are also the three values of a reference's kind in
 the code, which is the point: the interface says what the type says.

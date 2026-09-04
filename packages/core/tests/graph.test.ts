@@ -285,7 +285,9 @@ describe('a graph that cannot run says so before it spends', () => {
     };
 
     const problems = checkGraph(doc, BUILTIN_NODES);
-    expect(problems.some((p) => p.fatal && p.message.includes('words'))).toBe(true);
+    // The port's label, which the glossary makes 'user prompt' — the refusal
+    // has to name what a person sees on the socket, not the type's id.
+    expect(problems.some((p) => p.fatal && p.message.includes('user prompt'))).toBe(true);
   });
 
   it('reports a required socket with nothing on it', () => {

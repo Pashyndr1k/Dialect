@@ -54,7 +54,7 @@ export function RunBar({
                 <section key={group.id}>
                   <h4>{group.label}</h4>
                   {[...NODES.values()]
-                    .filter((s) => s.group === group.id)
+                    .filter((s) => s.group === group.id && !s.hidden)
                     .map((s) => (
                       <button
                         key={s.type}

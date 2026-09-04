@@ -17,6 +17,8 @@ import {
   SOURCE_ROLES,
   TEMPLATE_KINDS,
   VARY_AXES,
+  filesOf,
+  readingsOf,
   type LoadedRegistry,
   type Library,
 } from '@dialect/core';
@@ -52,7 +54,17 @@ export type Control =
   | { kind: 'deck'; key: string; label: string }
   | { kind: 'mic'; key: string; label: string; rows?: number; placeholder?: string }
   | { kind: 'file'; key: string; label: string }
-  | { kind: 'folder'; key: string; label: string };
+  | { kind: 'folder'; key: string; label: string }
+  /**
+   * A short list of files, added one at a time.
+   *
+   * `mutedWhen` names another key that, when it holds anything, greys this
+   * list out and stops it being used — which is how one node can hold both a
+   * reference and the reading of it without emitting both.
+   */
+  | { kind: 'files'; key: string; label: string; max: number; mutedWhen?: string }
+  /** A short list of readings picked out of Memory. */
+  | { kind: 'readings'; key: string; label: string; max: number };
 
 /** What the option lists are read from, so nothing here is a hardcoded list. */
 export interface World {
@@ -68,9 +80,15 @@ const roleChoices = (): Choice[] =>
 const CONTROLS: Record<string, Control[]> = {
   // A microphone beside the box, not a channel of its own: dictation is a way
   // of filling the field, not a different kind of input.
-  words: [{ kind: 'mic', key: 'text', label: 'Words', rows: 4, placeholder: 'What do you want?' }],
+  words: [{ kind: 'mic', key: 'text', label: 'Text', rows: 4, placeholder: 'What do you want?' }],
 
-  reference: [{ kind: 'file', key: 'path', label: 'File' }],
+  // Both halves of a reference on one node: the files, and the readings of
+  // them you already paid for. Picking a reading greys the files, because
+  // emitting both would be reading the same thing twice.
+  reference: [
+    { kind: 'files', key: 'files', label: 'Files', max: 3, mutedWhen: 'readings' },
+    { kind: 'readings', key: 'readings', label: 'From Memory', max: 3 },
+  ],
 
   document: [
     {
@@ -211,8 +229,17 @@ export function summaryOf(type: string, params: Record<string, unknown>, w: Worl
       const text = s('text').trim();
       return text ? (text.length > 60 ? `${text.slice(0, 57)}…` : text) : 'nothing typed yet';
     }
-    case 'reference':
-      return s('name') || s('path').split(/[\\/]/).pop() || 'no file chosen';
+    case 'reference': {
+      const readings = readingsOf(params);
+      if (readings.length > 0) {
+        return readings.length === 1
+          ? `${readings[0]!.id}, from Memory`
+          : `${readings.length} readings from Memory`;
+      }
+      const files = filesOf(params);
+      if (files.length === 0) return 'no file chosen';
+      return files.length === 1 ? files[0]!.name : `${files.length} files`;
+    }
     case 'folder':
       return s('dir').split(/[\\/]/).pop() || 'no folder chosen';
     case 'document': {
