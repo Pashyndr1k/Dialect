@@ -439,24 +439,60 @@ fn card_file(app: &tauri::AppHandle, name: &str) -> Result<PathBuf, String> {
 mod tests {
     use super::*;
 
-    /// A directory nothing else is using.
+    /// One directory per test, cleaned up when the test ends.
     ///
-    /// Not a fixed name emptied and remade. On Windows `remove_dir_all` returns
-    /// once deletion is *scheduled*: the directory lingers until the last handle
-    /// closes, and creating it again in that window succeeds and then hands back
-    /// a directory that is on its way out — so the next write fails with "the
-    /// system cannot find the path specified". It depends on how busy the
-    /// machine is, which is why this passed here for weeks and failed on every
-    /// CI run.
-    fn temp(name: &str) -> PathBuf {
+    /// Two bugs lived in what this replaces, and between them they failed every
+    /// CI run for four releases while passing on every machine they were
+    /// written on.
+    ///
+    /// The first: a fixed path emptied and remade. Windows schedules a
+    /// directory's deletion and finishes it when the last handle closes, so
+    /// recreating it immediately can hand back one that is on its way out, and
+    /// the next write fails with "the system cannot find the path specified".
+    ///
+    /// The second, and the one that actually did the damage: the cleanup said
+    /// `remove_dir_all(dir.parent())`, and for a directory made directly in the
+    /// system temp folder the parent *is* the system temp folder. Each test
+    /// tried to delete every other test's working directory. Locally that
+    /// mostly failed — a machine's temp folder is full of files in use, and the
+    /// error was swallowed — and on a fresh runner with an empty temp folder it
+    /// worked, taking whatever was running in parallel with it.
+    ///
+    /// So: one root, everything inside it, and the cleanup happens on drop
+    /// where it cannot name the wrong thing or be forgotten.
+    struct Sandbox {
+        root: PathBuf,
+    }
+
+    impl Sandbox {
+        /// A directory inside the sandbox, made ready to write into.
+        fn dir(&self, name: &str) -> PathBuf {
+            let path = self.root.join(name);
+            fs::create_dir_all(&path).unwrap();
+            path
+        }
+
+        /// A path inside the sandbox that does not exist yet.
+        fn path(&self, name: &str) -> PathBuf {
+            self.root.join(name)
+        }
+    }
+
+    impl Drop for Sandbox {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn sandbox(name: &str) -> Sandbox {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let n = NEXT.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
+        let root = std::env::temp_dir().join(format!(
             "dialect-channel-{name}-{}-{n}",
             std::process::id()
         ));
-        fs::create_dir_all(&dir).unwrap();
-        dir
+        fs::create_dir_all(&root).unwrap();
+        Sandbox { root }
     }
 
     /// A set with a manifest, as a publisher would put one together.
@@ -485,24 +521,23 @@ mod tests {
 
     #[test]
     fn installs_a_set_that_has_a_manifest() {
-        let from = temp("install-from");
-        let into = temp("install-into").join("models");
+        let s = sandbox("install");
+        let from = s.dir("from");
+        let into = s.path("into/models");
         write_set(&from, 1, &[("a.yaml", "id: a\n"), ("b.yaml", "id: b\n")]);
 
         let manifest = install(&into, &from, false).unwrap();
         assert_eq!(manifest.version, 1);
         assert_eq!(fs::read_to_string(into.join("a.yaml")).unwrap(), "id: a\n");
         assert!(into.join(MANIFEST).exists(), "the manifest is kept, so the set knows what it is");
-
-        fs::remove_dir_all(from.parent().unwrap()).ok();
-        fs::remove_dir_all(into.parent().unwrap()).ok();
     }
 
     /// The case the signing requirement made impossible: a folder of cards.
     #[test]
     fn installs_a_plain_folder_of_cards_with_no_manifest_at_all() {
-        let from = temp("plain-from");
-        let into = temp("plain-into").join("models");
+        let s = sandbox("plain");
+        let from = s.dir("from");
+        let into = s.path("into/models");
         fs::write(from.join("b.yaml"), "id: b\n").unwrap();
         fs::write(from.join("a.yaml"), "id: a\n").unwrap();
         fs::write(from.join("notes.txt"), "not a card").unwrap();
@@ -511,28 +546,25 @@ mod tests {
         assert_eq!(manifest.files, ["a.yaml", "b.yaml"], "sorted, and only the cards");
         assert!(!into.join("notes.txt").exists(), "a text file is not a card");
         assert_eq!(fs::read_to_string(into.join("a.yaml")).unwrap(), "id: a\n");
-
-        fs::remove_dir_all(from.parent().unwrap()).ok();
-        fs::remove_dir_all(into.parent().unwrap()).ok();
     }
 
     #[test]
     fn an_empty_folder_is_not_a_card_set() {
-        let from = temp("empty-from");
-        let into = temp("empty-into").join("models");
+        let s = sandbox("empty");
+        let from = s.dir("from");
+        let into = s.path("into/models");
 
         let refused = install(&into, &from, false).unwrap_err();
         assert!(refused.contains("No .yaml cards"), "{refused}");
         assert!(!into.exists(), "nothing was written");
-
-        fs::remove_dir_all(from.parent().unwrap()).ok();
     }
 
     /// A manifest naming a path rather than a file name would write outside the
     /// folder. Dropping the signature does not make that acceptable.
     #[test]
     fn a_manifest_name_cannot_reach_out_of_its_folder() {
-        let dir = temp("escape");
+        let s = sandbox("escape");
+        let dir = s.dir("from");
         fs::write(dir.join("safe.yaml"), "id: a\n").unwrap();
         let source = dir.to_string_lossy().to_string();
 
@@ -540,14 +572,14 @@ mod tests {
         assert!(refused.unwrap_err().contains("not a usable file name"));
 
         assert!(tauri::async_runtime::block_on(fetch(&source, "safe.yaml")).is_ok());
-        fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn a_broken_set_does_not_replace_a_working_one() {
-        let good = temp("survive-good");
-        let bad = temp("survive-bad");
-        let into = temp("survive-into").join("models");
+        let s = sandbox("survive");
+        let good = s.dir("good");
+        let bad = s.dir("bad");
+        let into = s.path("into/models");
 
         write_set(&good, 1, &[("a.yaml", "id: a\nlabel: the good one\n")]);
         install(&into, &good, false).unwrap();
@@ -564,27 +596,24 @@ mod tests {
             "id: a\nlabel: the good one\n",
         );
         assert_eq!(read_manifest(&into).unwrap().version, 1);
-        // By name rather than by one guessed path: staging folders carry the
-        // process and a counter now, so naming one would be asserting about a
-        // folder that is never created.
+
+        // Found by name rather than by one guessed path: staging folders carry
+        // the process and a counter, so naming one would assert about a folder
+        // that is never created.
         let leftovers: Vec<String> = fs::read_dir(into.parent().unwrap())
             .unwrap()
             .filter_map(|e| Some(e.ok()?.file_name().to_string_lossy().to_string()))
             .filter(|n| n.contains(".staging"))
             .collect();
         assert!(leftovers.is_empty(), "no half-installed set left behind: {leftovers:?}");
-
-        for d in [&good, &bad] {
-            fs::remove_dir_all(d.parent().unwrap()).ok();
-        }
-        fs::remove_dir_all(into.parent().unwrap()).ok();
     }
 
     #[test]
     fn will_not_go_backwards_unless_told_to() {
-        let older = temp("down-older");
-        let newer = temp("down-newer");
-        let into = temp("down-into").join("models");
+        let s = sandbox("down");
+        let older = s.dir("older");
+        let newer = s.dir("newer");
+        let into = s.path("into/models");
 
         write_set(&newer, 5, &[("a.yaml", "id: a\nlabel: five\n")]);
         write_set(&older, 2, &[("a.yaml", "id: a\nlabel: two\n")]);
@@ -597,20 +626,16 @@ mod tests {
         // Forced, it goes back — for getting off a set that turned out wrong.
         install(&into, &older, true).unwrap();
         assert_eq!(read_manifest(&into).unwrap().version, 2);
-
-        for d in [&older, &newer] {
-            fs::remove_dir_all(d.parent().unwrap()).ok();
-        }
-        fs::remove_dir_all(into.parent().unwrap()).ok();
     }
 
     /// An unnumbered folder is version 0, and 0 blocks nothing — otherwise two
     /// hand-made folders in a row would refuse each other for being equally old.
     #[test]
     fn an_unnumbered_folder_never_blocks_the_next_one() {
-        let first = temp("unnum-first");
-        let second = temp("unnum-second");
-        let into = temp("unnum-into").join("models");
+        let s = sandbox("unnumbered");
+        let first = s.dir("first");
+        let second = s.dir("second");
+        let into = s.path("into/models");
 
         fs::write(first.join("a.yaml"), "id: a\nlabel: first\n").unwrap();
         fs::write(second.join("a.yaml"), "id: a\nlabel: second\n").unwrap();
@@ -618,18 +643,14 @@ mod tests {
         install(&into, &first, false).unwrap();
         install(&into, &second, false).unwrap();
         assert!(fs::read_to_string(into.join("a.yaml")).unwrap().contains("second"));
-
-        for d in [&first, &second] {
-            fs::remove_dir_all(d.parent().unwrap()).ok();
-        }
-        fs::remove_dir_all(into.parent().unwrap()).ok();
     }
 
     #[test]
     fn a_second_install_replaces_rather_than_accumulates() {
-        let first = temp("swap-first");
-        let second = temp("swap-second");
-        let into = temp("swap-into").join("models");
+        let s = sandbox("swap");
+        let first = s.dir("first");
+        let second = s.dir("second");
+        let into = s.path("into/models");
 
         write_set(&first, 1, &[("gone.yaml", "id: gone\n"), ("kept.yaml", "id: kept\n")]);
         install(&into, &first, false).unwrap();
@@ -639,11 +660,6 @@ mod tests {
 
         assert!(!into.join("gone.yaml").exists(), "a card dropped from the set is gone");
         assert!(fs::read_to_string(into.join("kept.yaml")).unwrap().contains("newer"));
-
-        for d in [&first, &second] {
-            fs::remove_dir_all(d.parent().unwrap()).ok();
-        }
-        fs::remove_dir_all(into.parent().unwrap()).ok();
     }
 
     #[test]

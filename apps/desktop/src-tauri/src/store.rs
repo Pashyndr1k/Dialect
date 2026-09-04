@@ -305,7 +305,8 @@ mod tests {
 
     #[test]
     fn writes_a_whole_batch_into_a_folder_it_makes() {
-        let dir = scratch("save").join("prompts");
+        let root = scratch("save");
+        let dir = root.join("prompts");
 
         let files = vec![
             OutFile { name: "one.txt".into(), contents: "first prompt".into() },
@@ -320,7 +321,10 @@ mod tests {
         let bad = vec![OutFile { name: "../escape.txt".into(), contents: "x".into() }];
         assert!(write_all(&dir, &bad).is_err());
 
-        fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+        // Its own root, named. Reaching for the parent was right only for as
+        // long as this stayed one level down, and the same line elsewhere was
+        // deleting the system temp folder — see the note in channel.rs.
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
